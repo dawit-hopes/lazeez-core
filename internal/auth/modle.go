@@ -15,6 +15,7 @@ const (
 type User struct {
 	common.Base
 	PhoneNumber     string         `json:"phone_number" db:"phone_number"`
+	FullName        string         `json:"full_name" db:"full_name"`
 	Password        string         `json:"-" db:"password"`
 	Role            Role           `json:"role" db:"role"`
 	BranchID        sql.NullString `json:"branch_id" db:"branch_id"`
@@ -38,9 +39,9 @@ func (u *User) Columns() []string {
 }
 
 func (u *User) Values() []any {
-	return []any{u.ID, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.CreatedAt, u.UpdatedAt, u.DeletedAt, u.IsDeleted}
+	return []any{u.ID, u.FullName, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.CreatedAt, u.UpdatedAt, u.DeletedAt, u.IsDeleted}
 }
 
 func (u *User) Addr() []any {
-	return []any{&u.ID, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.IsDeleted}
+	return []any{&u.ID, &u.FullName, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.IsDeleted}
 }

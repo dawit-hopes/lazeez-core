@@ -2,6 +2,7 @@ package auth
 
 type UserRequest struct {
 	PhoneNumber string `json:"phone_number"`
+	FullName    string `json:"full_name"`
 	BranchID    string `json:"branch_id"`
 	MerchantID  string `json:"merchant_id"`
 }
@@ -9,6 +10,7 @@ type UserRequest struct {
 type CreateUserResponse struct {
 	ID          string `json:"id"`
 	PhoneNumber string `json:"phone_number"`
+	FullName    string `json:"full_name"`
 	BranchID    string `json:"branch_id"`
 	MerchantID  string `json:"merchant_id"`
 	Role        Role   `json:"role"`
@@ -16,12 +18,13 @@ type CreateUserResponse struct {
 
 type SetPasswordRequest struct {
 	PhoneNumber string `json:"phone_number"`
-	Password string `json:"password"`
+	Password    string `json:"password"`
 }
 
 type SetPasswordResponse struct {
 	ID          string `json:"id"`
 	PhoneNumber string `json:"phone_number"`
+	FullName    string `json:"full_name"`
 	BranchID    string `json:"branch_id"`
 	MerchantID  string `json:"merchant_id"`
 	Role        Role   `json:"role"`
@@ -35,5 +38,5 @@ type LoginRequest struct {
 type LoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	User         *User   `json:"user"`
+	User         *User  `json:"user"`
 }

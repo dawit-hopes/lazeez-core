@@ -86,27 +86,27 @@ func (s *authService) createUserDefaultData(req *UserRequest) *User {
 	user.IsLocked = false
 	user.LoggingAttempts = 0
 	user.Role = RoleBranchManager
+	user.FullName = req.FullName
 	user.PhoneNumber = req.PhoneNumber
 	user.BranchID = common.ToNUllString(req.BranchID)
 	return &user
 }
 
 func (s *authService) updateUserDefaultData(req *UserRequest, existingUser *User) *User {
-	var user User
+	user := existingUser
 	now := time.Now()
 	user.UpdatedAt = now
-	user.PhoneNumber = req.PhoneNumber
-	if existingUser != nil {
-		user.BranchID = existingUser.BranchID
-	}
 	if req.PhoneNumber != "" {
 		user.PhoneNumber = req.PhoneNumber
 	}
 	if req.BranchID != "" {
 		user.BranchID = common.ToNUllString(req.BranchID)
 	}
+	if req.FullName != "" {
+		user.FullName = req.FullName
+	}
 
-	return &user
+	return user
 }
 
 func (s *authService) validatePassword(password string) error {
