@@ -18,4 +18,8 @@ var (
 	ErrPhoneNumberRequired = &Errors{Code: BadRequest, Message: "phone number is required"}
 	ErrInvalidPhoneNumber  = &Errors{Code: BadRequest, Message: "invalid phone number"}
 	ErrBranchNotFound      = &Errors{Code: NotFound, Message: "branch not found"}
+	ErrUnAuthorized     = &Errors{Code: Unauthorized, Message: "unauthorized"}
+	ErrPasswordRequired = &Errors{Code: BadRequest, Message: "password is required"}
+	ErrInvalidPassword = &Errors{Code: BadRequest, Message: "invalid password"}
+	ErrPasswordTooShort = &Errors{Code: BadRequest, Message: "password is too short"}
 )

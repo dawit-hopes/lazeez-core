@@ -108,3 +108,38 @@ func (s *authService) updateUserDefaultData(req *UserRequest, existingUser *User
 
 	return &user
 }
+
+func (s *authService) validatePassword(password string) error {
+	if password == "" {
+		s.logger.Error("Password is required")
+		return common.ErrPasswordRequired
+	}
+
+	re := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+	if !re.MatchString(password) {
+		s.logger.Error("Invalid password")
+		return common.ErrInvalidPassword
+	}
+
+	if len(password) < 8 {
+		s.logger.Error("Password is too short")
+		return common.ErrPasswordTooShort
+	}
+	return nil
+}
+
+func (s *authService) generateTokens(user *User) (string, string, error) {
+	payload := map[string]any{"uid": user.ID, "bid": user.BranchID, "rol": user.Role}
+
+	accessToken, err := s.keyService.GenerateJWTToken(payload, accessTokenExpirationMinutes)
+	if err != nil {
+		s.logger.Error("Failed to generate access token", "error", err)
+		return "", "", err
+	}
+	refreshToken, err := s.keyService.GenerateJWTToken(payload, refreshTokenExpirationMinutes)
+	if err != nil {
+		s.logger.Error("Failed to generate refresh token", "error", err)
+		return "", "", err
+	}
+	return accessToken, refreshToken, nil
+}

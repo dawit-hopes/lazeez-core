@@ -12,7 +12,7 @@ import (
 
 type KeyService interface {
 	DecodeJWTToken(tokenStr string, secretKey string) (map[string]any, error)
-	GenerateJWTToken(payload map[string]any, secretKey string, expirationMinutes int) (string, error)
+	GenerateJWTToken(payload map[string]any, expirationMinutes int) (string, error)
 	HashPassword(password string) (string, error)
 	VerifyPassword(password string, hashedPassword string) (bool, error)
 }
@@ -45,14 +45,14 @@ func (s *keyService) DecodeJWTToken(tokenStr string, secretKey string) (map[stri
 	return claims, nil
 }
 
-func (s *keyService) GenerateJWTToken(payload map[string]any, secretKey string, expirationMinutes int) (string, error) {
+func (s *keyService) GenerateJWTToken(payload map[string]any, expirationMinutes int) (string, error) {
 	claims := jwt.MapClaims{}
 	maps.Copy(claims, payload)
 	if expirationMinutes > 0 {
 		claims["exp"] = time.Now().Add(time.Minute * time.Duration(expirationMinutes)).Unix()
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString([]byte(secretKey))
+	tokenStr, err := token.SignedString([]byte(s.secretKey))
 	if err != nil {
 		s.logger.Error("failed to sign token", "error", err)
 		return "", err
