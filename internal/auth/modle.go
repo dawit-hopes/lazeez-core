@@ -14,7 +14,6 @@ const (
 
 type User struct {
 	common.Base
-	UserName        string         `json:"user_name" db:"user_name"`
 	PhoneNumber     string         `json:"phone_number" db:"phone_number"`
 	Password        string         `json:"-" db:"password"`
 	Role            Role           `json:"role" db:"role"`
@@ -39,9 +38,9 @@ func (u *User) Columns() []string {
 }
 
 func (u *User) Values() []any {
-	return []any{u.ID, u.UserName, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.CreatedAt, u.UpdatedAt, u.DeletedAt, u.IsDeleted}
+	return []any{u.ID, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.CreatedAt, u.UpdatedAt, u.DeletedAt, u.IsDeleted}
 }
 
 func (u *User) Addr() []any {
-	return []any{&u.ID, &u.UserName, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.IsDeleted}
+	return []any{&u.ID, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.IsDeleted}
 }
