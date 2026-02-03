@@ -22,4 +22,7 @@ var (
 	ErrPasswordRequired = &Errors{Code: BadRequest, Message: "password is required"}
 	ErrInvalidPassword = &Errors{Code: BadRequest, Message: "invalid password"}
 	ErrPasswordTooShort = &Errors{Code: BadRequest, Message: "password is too short"}
+	ErrMerchantAlreadyExists = &Errors{Code: BadRequest, Message: "merchant already exists"}
+	ErrMerchantNotFound = &Errors{Code: NotFound, Message: "merchant not found"}
+	ErrInternalServerError = &Errors{Code: InternalServerError, Message: "internal server error"}
 )

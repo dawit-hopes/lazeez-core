@@ -2,6 +2,7 @@ package common
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -29,4 +30,22 @@ type Errors struct {
 
 func (e *Errors) Error() string {
 	return fmt.Sprintf("code: %s, message: %s, error: %v", e.Code, e.Message, e.Err)
+}
+
+type Response struct {
+	Data       any    `json:"data"`
+	Message    string `json:"message"`
+	StatusCode int    `json:"status_code"`
+}
+
+func NewResponse(data any, message string, statusCode int) *Response {
+	return &Response{Data: data, Message: message, StatusCode: statusCode}
+}
+
+func (r *Response) ToJSON() []byte {
+	json, err := json.Marshal(r)
+	if err != nil {
+		return nil
+	}
+	return json
 }

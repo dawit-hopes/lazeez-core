@@ -3,6 +3,8 @@ module lazeez-core
 go 1.24.4
 
 require (
+	github.com/go-chi/chi/v5 v5.2.4
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/lmittmann/tint v1.1.2
