@@ -89,8 +89,16 @@ func (r *authRepository) DeleteUser(ctx context.Context, id string) error {
 }
 
 func (r *authRepository) SetPassword(ctx context.Context, phoneNumber string, password string) error {
+	// First, fetch the user by phone number to get the ID
+	existingUser, err := r.GetUserByPhoneNumber(ctx, phoneNumber)
+	if err != nil {
+		r.logger.Error("user not found", "error", err)
+		return err
+	}
+
+	// Update the user's password using the user's ID
 	user := User{Password: password}
-	_, err := r.dal.Update(ctx, phoneNumber, &user)
+	_, err = r.dal.Update(ctx, existingUser.ID, &user)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("user not found", "error", err)
