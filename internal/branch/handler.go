@@ -72,6 +72,7 @@ func (h *branchHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r)
 	var req UpdateBranchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode update branch request body", "error", err)
@@ -85,7 +86,7 @@ func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	branch, err := h.branchService.Update(r.Context(), req)
+	branch, err := h.branchService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update branch", "error", err)
 		common.WriteErrorResponse(w, err)

@@ -9,7 +9,7 @@ import (
 type BranchService interface {
 	Create(ctx context.Context, req CreateBranchRequest) (Branch, error)
 	Get(ctx context.Context, id string) (Branch, error)
-	Update(ctx context.Context, req UpdateBranchRequest) (Branch, error)
+	Update(ctx context.Context, id string, req UpdateBranchRequest) (Branch, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -56,10 +56,10 @@ func (s *branchService) Get(ctx context.Context, id string) (Branch, error) {
 	return branch, nil
 }
 
-func (s *branchService) Update(ctx context.Context, req UpdateBranchRequest) (Branch, error) {
-	s.logger.Info("Updating branch", "id", req.ID)
+func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchRequest) (Branch, error) {
+	s.logger.Info("Updating branch", "id", id)
 
-	existingBranch, err := s.branchRepository.Get(ctx, req.ID)
+	existingBranch, err := s.branchRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get branch", "error", err)
 		return Branch{}, err

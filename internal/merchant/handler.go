@@ -1,8 +1,10 @@
 package merchant
 
 import (
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -31,20 +33,23 @@ func (h *merchantHandler) parseMultipart(r *http.Request, limit int64) error {
 	return nil
 }
 
-func (h *merchantHandler) parseRequest(r *http.Request) (MerchantRequest, error) {
+func (h *merchantHandler) parseRequest(r *http.Request, isRequired bool) (MerchantRequest, multipart.File, error) {
 	var req MerchantRequest
 	file, fileHeader, err := r.FormFile("logo")
 	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) && !isRequired {
+			req.Name = r.FormValue("name")
+			return req, nil, nil
+		}
 		h.logger.Error("Failed to get logo file", "error", err)
-		return req, err
+		return req, nil, err
 	}
-	defer file.Close()
 
 	req.LogoHeader = *fileHeader
 	req.Logo = file
 	req.Name = r.FormValue("name")
 
-	return req, nil
+	return req, file, nil
 }
 
 func (h *merchantHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -54,12 +59,14 @@ func (h *merchantHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := h.parseRequest(r)
+	req, file, err := h.parseRequest(r, true)
 	if err != nil {
 		h.logger.Error("Failed to parse request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	defer file.Close()
 
 	if err := req.Validate(); err != nil {
 		h.logger.Error("Failed to validate request body", "error", err)
@@ -102,12 +109,14 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := h.parseRequest(r)
+	req, file, err := h.parseRequest(r, false)
 	if err != nil {
 		h.logger.Error("Failed to parse request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	defer file.Close()
 
 	if req.Logo != nil {
 		if err := common.ValidateImage(req.LogoHeader); err != nil {
@@ -115,6 +124,12 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 			common.WriteErrorResponse(w, err)
 			return
 		}
+	}
+
+	if IsEmpty(&req) {
+		h.logger.Error("Name and logo are required")
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
 	}
 
 	merchant, err := h.merchantService.Update(r.Context(), req)

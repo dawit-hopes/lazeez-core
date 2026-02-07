@@ -11,3 +11,7 @@ func (m *MerchantRequest) Validate() error {
 		validation.Field(&m.LogoHeader, validation.Required.Error("logo header is required")),
 	)
 }
+
+func IsEmpty(m *MerchantRequest) bool {
+	return m.Name == "" && m.Logo == nil
+}

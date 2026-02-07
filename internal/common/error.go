@@ -30,4 +30,7 @@ var (
 	ErrImageSizeTooLarge     = &Errors{Code: BadRequest, Message: "image size is too large"}
 	ErrInvalidImageType      = &Errors{Code: BadRequest, Message: "invalid image type"}
 	ErrInvalidMultipartForm  = &Errors{Code: BadRequest, Message: "invalid multipart form"}
+	ErrMissingFile           = &Errors{Code: BadRequest, Message: "missing file"}
+	ErrNameAndLogoRequired   = &Errors{Code: BadRequest, Message: "name and logo are required"}
+	ErrInvalidRequest        = &Errors{Code: BadRequest, Message: "invalid request"}
 )

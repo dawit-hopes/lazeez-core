@@ -18,7 +18,6 @@ type CreateBranchRequest struct {
 }
 
 type UpdateBranchRequest struct {
-	ID          string `json:"id"`
 	BranchName  string `json:"branch_name"`
 	Address     string `json:"address"`
 	PhoneNumber string `json:"phone_number"`

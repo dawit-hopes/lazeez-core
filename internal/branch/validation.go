@@ -29,10 +29,7 @@ func (r *CreateBranchRequest) Validate() error {
 
 func (r *UpdateBranchRequest) Validate() error {
 	return validation.ValidateStruct(r,
-		validation.Field(&r.ID,
-			validation.Required.Error("id is required"),
-			validation.Match(regexp.MustCompile(`^[0-9a-f-]+$`)).Error("id must be a valid UUID"),
-		),
+
 		validation.Field(&r.BranchName,
 			validation.Length(3, 100).Error("branch name must be between 3 and 100 characters"),
 		),
