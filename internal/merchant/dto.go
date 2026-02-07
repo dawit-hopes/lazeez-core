@@ -1,20 +1,12 @@
 package merchant
 
-import "time"
+import (
+	"mime/multipart"
+)
 
-type CreateMerchantRequest struct {
-	Name string `json:"name"`
+type MerchantRequest struct {
+	Name       string               `json:"name"`
+	Logo       multipart.File       `json:"logo"`
+	LogoHeader multipart.FileHeader `json:"-"`
 }
 
-type UpdateMerchantRequest struct {
-	Name string `json:"name"`
-}
-
-type GetMerchantResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	DeletedAt time.Time `json:"deleted_at"`
-	IsDeleted bool      `json:"is_deleted"`
-}

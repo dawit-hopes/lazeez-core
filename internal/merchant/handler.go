@@ -1,18 +1,17 @@
 package merchant
 
 import (
-	"encoding/json"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"net/http"
 )
 
 type MerchantHandler interface {
-	Create(r *http.Request, w http.ResponseWriter)
-	Get(r *http.Request, w http.ResponseWriter)
-	Update(r *http.Request, w http.ResponseWriter)
-	Delete(r *http.Request, w http.ResponseWriter)
-	GetAll(r *http.Request, w http.ResponseWriter)
+	Create(w http.ResponseWriter, r *http.Request)
+	Get(w http.ResponseWriter, r *http.Request)
+	Update(w http.ResponseWriter, r *http.Request)
+	Delete(w http.ResponseWriter, r *http.Request)
+	GetAll(w http.ResponseWriter, r *http.Request)
 }
 
 type merchantHandler struct {
@@ -24,17 +23,52 @@ func NewMerchantHandler(merchantService MerchantService, logger config.Logger) M
 	return &merchantHandler{merchantService: merchantService, logger: logger}
 }
 
-func (h *merchantHandler) Create(r *http.Request, w http.ResponseWriter) {
-	var req CreateMerchantRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+func (h *merchantHandler) parseMultipart(r *http.Request, limit int64) error {
+	if err := r.ParseMultipartForm(limit); err != nil {
+		h.logger.Error("Failed to parse multipart form", "error", err)
+		return common.ErrInvalidMultipartForm
+	}
+	return nil
+}
+
+func (h *merchantHandler) parseRequest(r *http.Request) (MerchantRequest, error) {
+	var req MerchantRequest
+	file, fileHeader, err := r.FormFile("logo")
 	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
+		h.logger.Error("Failed to get logo file", "error", err)
+		return req, err
+	}
+	defer file.Close()
+
+	req.LogoHeader = *fileHeader
+	req.Logo = file
+	req.Name = r.FormValue("name")
+
+	return req, nil
+}
+
+func (h *merchantHandler) Create(w http.ResponseWriter, r *http.Request) {
+	if err := h.parseMultipart(r, 32<<20); err != nil {
+		h.logger.Error("Failed to parse multipart form", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	req, err := h.parseRequest(r)
+	if err != nil {
+		h.logger.Error("Failed to parse request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	if err := req.Validate(); err != nil {
 		h.logger.Error("Failed to validate request body", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	if err := common.ValidateImage(req.LogoHeader); err != nil {
+		h.logger.Error("Failed to validate image", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
@@ -50,7 +84,7 @@ func (h *merchantHandler) Create(r *http.Request, w http.ResponseWriter) {
 
 }
 
-func (h *merchantHandler) Get(r *http.Request, w http.ResponseWriter) {
+func (h *merchantHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r)
 	merchant, err := h.merchantService.Get(r.Context(), id)
 	if err != nil {
@@ -61,19 +95,26 @@ func (h *merchantHandler) Get(r *http.Request, w http.ResponseWriter) {
 	common.WriteSuccessResponse(w, common.Response{Data: merchant, Message: "Merchant fetched successfully", StatusCode: http.StatusOK})
 }
 
-func (h *merchantHandler) Update(r *http.Request, w http.ResponseWriter) {
-	var req UpdateMerchantRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
+func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
+	if err := h.parseMultipart(r, 32<<20); err != nil {
+		h.logger.Error("Failed to parse multipart form", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	if err := req.Validate(); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
+	req, err := h.parseRequest(r)
+	if err != nil {
+		h.logger.Error("Failed to parse request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
+	}
+
+	if req.Logo != nil {
+		if err := common.ValidateImage(req.LogoHeader); err != nil {
+			h.logger.Error("Failed to validate image", "error", err)
+			common.WriteErrorResponse(w, err)
+			return
+		}
 	}
 
 	merchant, err := h.merchantService.Update(r.Context(), req)
@@ -85,7 +126,7 @@ func (h *merchantHandler) Update(r *http.Request, w http.ResponseWriter) {
 	common.WriteSuccessResponse(w, common.Response{Data: merchant, Message: "Merchant updated successfully", StatusCode: http.StatusOK})
 }
 
-func (h *merchantHandler) Delete(r *http.Request, w http.ResponseWriter) {
+func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r)
 	err := h.merchantService.Delete(r.Context(), id)
 	if err != nil {
@@ -96,7 +137,7 @@ func (h *merchantHandler) Delete(r *http.Request, w http.ResponseWriter) {
 	common.WriteSuccessResponse(w, common.Response{Message: "Merchant deleted successfully", StatusCode: http.StatusOK})
 }
 
-func (h *merchantHandler) GetAll(r *http.Request, w http.ResponseWriter) {
+func (h *merchantHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	merchants, err := h.merchantService.GetAll(r.Context())
 	if err != nil {
 		h.logger.Error("Failed to get all merchants", "error", err)

@@ -1,10 +1,20 @@
 package menu
 
-import "lazeez-core/internal/common"
+import (
+	"lazeez-core/internal/common"
+	"mime/multipart"
+)
 
 type Menu struct {
 	common.Base
-	Name string `json:"name" db:"name"`
+	Name  string `json:"name" db:"name"`
+	Image string `json:"image" db:"image"`
+}
+
+type MenuRequest struct {
+	Name        string               `json:"name"`
+	ImageHeader multipart.FileHeader `json:"-"`
+	Image       multipart.File       `json:"image"`
 }
 
 func (m *Menu) Table() string {
