@@ -29,7 +29,7 @@ type Errors struct {
 }
 
 func (e *Errors) Error() string {
-	return fmt.Sprintf("code: %s, message: %s, error: %v", e.Code, e.Message, e.Err)
+	return fmt.Sprintf("code: %d, message: %s, error: %v", e.Code, e.Message, e.Err)
 }
 
 type Response struct {

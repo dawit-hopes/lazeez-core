@@ -40,3 +40,7 @@ type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	User         *User  `json:"user"`
 }
+
+type UserLookUpRequest struct {
+	PhoneNumber string `json:"phone_number"`
+}

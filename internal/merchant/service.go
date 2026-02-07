@@ -7,9 +7,9 @@ import (
 )
 
 type MerchantService interface {
-	Create(ctx context.Context, req CreateMerchantRequest) (Merchant, error)
+	Create(ctx context.Context, req MerchantRequest) (Merchant, error)
 	Get(ctx context.Context, id string) (Merchant, error)
-	Update(ctx context.Context, req UpdateMerchantRequest) (Merchant, error)
+	Update(ctx context.Context, id string, req MerchantRequest) (Merchant, error)
 	Delete(ctx context.Context, id string) error
 	GetAll(ctx context.Context) ([]*Merchant, error)
 }
@@ -26,7 +26,7 @@ func NewMerchantService(merchantRepository MerchantRepository, logger config.Log
 	}
 }
 
-func (s *merchantService) Create(ctx context.Context, req CreateMerchantRequest) (Merchant, error) {
+func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (Merchant, error) {
 	merchant := Merchant{
 		Name: req.Name,
 	}
@@ -36,6 +36,10 @@ func (s *merchantService) Create(ctx context.Context, req CreateMerchantRequest)
 	if err != nil {
 		s.logger.Error("Failed to check if merchant exists", "error", err)
 		return merchant, err
+	}
+
+	if req.Logo != nil {
+		// we will upload the image to the cloud storage and update the image url in the database
 	}
 
 	newMerchant, err := s.merchantRepository.Create(ctx, merchant)
@@ -51,13 +55,13 @@ func (s *merchantService) Get(ctx context.Context, id string) (Merchant, error) 
 	return s.merchantRepository.Get(ctx, id)
 }
 
-func (s *merchantService) Update(ctx context.Context, req UpdateMerchantRequest) (Merchant, error) {
+func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) (Merchant, error) {
 	merchant := Merchant{
 		Name: req.Name,
 	}
 	s.logger.Info("Updating merchant", "merchant", merchant)
 	// check if merchant exists
-	existingMerchant, err := s.Get(ctx, merchant.ID)
+	existingMerchant, err := s.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
 		return existingMerchant, err
@@ -72,6 +76,9 @@ func (s *merchantService) Update(ctx context.Context, req UpdateMerchantRequest)
 
 	// update merchant name
 	existingMerchant.Name = merchant.Name
+	if req.Logo != nil {
+		// we will upload the image to the cloud storage and update the image url in the database
+	}
 	return s.merchantRepository.Update(ctx, existingMerchant)
 }
 

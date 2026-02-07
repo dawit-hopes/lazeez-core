@@ -13,13 +13,16 @@ import (
 func (s *authService) checkUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error) {
 	existingUser, err := s.authRepository.GetUserByPhoneNumber(ctx, phoneNumber)
 	if err != nil {
+		// If user not found, return nil user and nil error (user doesn't exist, which is OK for some operations)
+		if err == common.ErrUserNotFound {
+			return nil, nil
+		}
+		// For other errors, return the error
 		s.logger.Error("Failed to get user by phone number", "error", err)
 		return nil, err
 	}
-	if existingUser.ID != "" {
-		return &existingUser, nil
-	}
-	return nil, nil
+	// User exists, return it
+	return &existingUser, nil
 }
 
 func (s *authService) normalizePhoneNumber(phoneNumber string) string {

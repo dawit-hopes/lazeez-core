@@ -10,6 +10,19 @@ type Branch struct {
 	PhoneNumber string `json:"phone_number" db:"phone_number"`
 }
 
+type CreateBranchRequest struct {
+	MerchantID  string `json:"merchant_id"`
+	BranchName  string `json:"branch_name"`
+	Address     string `json:"address"`
+	PhoneNumber string `json:"phone_number"`
+}
+
+type UpdateBranchRequest struct {
+	BranchName  string `json:"branch_name"`
+	Address     string `json:"address"`
+	PhoneNumber string `json:"phone_number"`
+}
+
 type BranchStats struct {
 	TotalOrdersToday int     `json:"total_orders_today"`
 	ActiveTables     int     `json:"active_tables"`

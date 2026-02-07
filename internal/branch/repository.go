@@ -27,7 +27,7 @@ func (r *branchRepository) Create(ctx context.Context, branch Branch) (Branch, e
 	result, err := r.dal.Create(ctx, &branch)
 	if err != nil {
 		r.logger.Error("failed to create branch", "error", err)
-		return branch, err
+		return branch, common.ErrInternalServerError
 	}
 	return *result, nil
 }
@@ -38,10 +38,10 @@ func (r *branchRepository) Get(ctx context.Context, id string) (Branch, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("branch not found", "error", err)
-			return Branch{}, err
+			return Branch{}, common.ErrBranchNotFound
 		}
 		r.logger.Error("failed to get branch", "error", err)
-		return Branch{}, err
+		return Branch{}, common.ErrInternalServerError
 	}
 	return *result, nil
 }
@@ -51,10 +51,10 @@ func (r *branchRepository) Update(ctx context.Context, branch Branch) (Branch, e
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("branch not found", "error", err)
-			return Branch{}, err
+			return Branch{}, common.ErrBranchNotFound
 		}
 		r.logger.Error("failed to update branch", "error", err)
-		return Branch{}, err
+		return Branch{}, common.ErrInternalServerError
 	}
 	return *result, nil
 }
@@ -64,10 +64,10 @@ func (r *branchRepository) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("branch not found", "error", err)
-			return err
+			return common.ErrBranchNotFound
 		}
 		r.logger.Error("failed to delete branch", "error", err)
-		return err
+		return common.ErrInternalServerError
 	}
 	return nil
 }

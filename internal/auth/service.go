@@ -16,7 +16,7 @@ var (
 type AuthService interface {
 	CreateUser(ctx context.Context, req UserRequest) error
 	GetUserByID(ctx context.Context, id string) (User, error)
-	UpdateUser(ctx context.Context, req UserRequest) error
+	UpdateUser(ctx context.Context, id string, req UserRequest) error
 	DeleteUser(ctx context.Context, id string) error
 	Login(ctx context.Context, req LoginRequest) (LoginResponse, error)
 	SetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
@@ -42,11 +42,18 @@ func NewAuthService(authRepository AuthRepository, branchRepository branch.Branc
 func (s *authService) CreateUser(ctx context.Context, req UserRequest) error {
 	s.logger.Info("Creating user by phone number", "phone number", req.PhoneNumber)
 	// check if user already exists
-	_, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
+	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
 	if err != nil {
+		// If there's an error (other than not found), return it
 		s.logger.Error("Failed to check user exists", "error", err)
 		return err
 	}
+	// If user exists, return error
+	if existingUser != nil {
+		s.logger.Error("User already exists", "phone number", req.PhoneNumber)
+		return common.ErrUserAlreadyExists
+	}
+
 	err = s.validateBranch(ctx, req.BranchID, req.MerchantID)
 	if err != nil {
 		s.logger.Error("Failed to validate branch", "error", err)
@@ -74,13 +81,18 @@ func (s *authService) GetUserByID(ctx context.Context, id string) (User, error) 
 	return s.authRepository.GetUserByID(ctx, id)
 }
 
-func (s *authService) UpdateUser(ctx context.Context, req UserRequest) error {
+func (s *authService) UpdateUser(ctx context.Context, id string, req UserRequest) error {
 
 	// check if user already exists
 	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return err
+	}
+	// User must exist for update
+	if existingUser == nil {
+		s.logger.Error("User not found", "phone number", req.PhoneNumber)
+		return common.ErrUserNotFound
 	}
 
 	if req.PhoneNumber != "" {
@@ -107,6 +119,11 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 	if err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return LoginResponse{}, err
+	}
+	// User must exist for login
+	if existingUser == nil {
+		s.logger.Error("User not found", "phone number", req.PhoneNumber)
+		return LoginResponse{}, common.ErrUserNotFound
 	}
 	ok, err := s.keyService.VerifyPassword(req.Password, existingUser.Password)
 	if err != nil {
@@ -137,6 +154,11 @@ func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (
 	if err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return nil, err
+	}
+	// User must exist to set password
+	if existingUser == nil {
+		s.logger.Error("User not found", "phone number", req.PhoneNumber)
+		return nil, common.ErrUserNotFound
 	}
 
 	err = s.validatePassword(req.Password)
