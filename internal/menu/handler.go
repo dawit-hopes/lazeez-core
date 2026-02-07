@@ -128,7 +128,9 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer file.Close()
+	if file != nil {
+		defer file.Close()
+	}
 
 	if req.Image != nil {
 		if err := common.ValidateImage(req.ImageHeader); err != nil {
