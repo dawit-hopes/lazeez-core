@@ -1,8 +1,10 @@
 package menu
 
 import (
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -33,20 +35,23 @@ func (h *menuHandler) parseMultipart(r *http.Request, limit int64) error {
 	return nil
 }
 
-func (h *menuHandler) parseRequest(r *http.Request) (MenuRequest, error) {
+func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuRequest, multipart.File, error) {
 	var req MenuRequest
 	file, fileHeader, err := r.FormFile("image")
 	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) && !isRequired {
+			req.Name = r.FormValue("name")
+			return req, nil, nil
+		}
 		h.logger.Error("Failed to get image file", "error", err)
-		return req, err
+		return req, nil, err
 	}
-	defer file.Close()
 
 	req.ImageHeader = *fileHeader
 	req.Image = file
 	req.Name = r.FormValue("name")
 
-	return req, nil
+	return req, file, nil
 }
 
 func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -56,12 +61,14 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := h.parseRequest(r)
+	req, file, err := h.parseRequest(r, true)
 	if err != nil {
 		h.logger.Error("Failed to parse request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	defer file.Close()
 
 	if err := common.ValidateImage(req.ImageHeader); err != nil {
 		h.logger.Error("Failed to validate image", "error", err)
@@ -114,12 +121,14 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := h.parseRequest(r)
+	req, file, err := h.parseRequest(r, false)
 	if err != nil {
 		h.logger.Error("Failed to parse request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	defer file.Close()
 
 	if req.Image != nil {
 		if err := common.ValidateImage(req.ImageHeader); err != nil {

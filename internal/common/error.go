@@ -33,4 +33,5 @@ var (
 	ErrMissingFile           = &Errors{Code: BadRequest, Message: "missing file"}
 	ErrNameAndLogoRequired   = &Errors{Code: BadRequest, Message: "name and logo are required"}
 	ErrInvalidRequest        = &Errors{Code: BadRequest, Message: "invalid request"}
+	ErrSecretKeyNotProvided  = &Errors{Code: BadRequest, Message: "secret key not provided"}
 )

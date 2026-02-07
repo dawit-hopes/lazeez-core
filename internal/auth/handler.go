@@ -60,6 +60,7 @@ func (h *authHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r)
 	var req UserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -73,7 +74,7 @@ func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	err = h.authService.UpdateUser(r.Context(), req)
+	err = h.authService.UpdateUser(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update user", "error", err)
 		common.WriteErrorResponse(w, err)

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"time"
 
 	"lazeez-core/config"
 
@@ -50,11 +51,23 @@ func NewApp() (*App, error) {
 	}, nil
 }
 
-// Run starts the HTTP server
+// Run starts the HTTP server with proper timeout configurations
 func (a *App) Run() error {
 	port := getPort()
+
+	// Configure server with security timeouts
+	server := &http.Server{
+		Addr:              ":" + port,
+		Handler:           a.Router,
+		ReadHeaderTimeout: 5 * time.Second,   // Time to read request headers
+		ReadTimeout:       15 * time.Second,  // Time to read entire request body
+		WriteTimeout:      15 * time.Second,  // Time to write response
+		IdleTimeout:       120 * time.Second, // Time to keep idle connections open
+		MaxHeaderBytes:    1 << 20,           // 1MB max header size
+	}
+
 	a.Logger.Info("Starting server", "port", port)
-	return http.ListenAndServe(":"+port, a.Router)
+	return server.ListenAndServe()
 }
 
 // Close gracefully closes all connections

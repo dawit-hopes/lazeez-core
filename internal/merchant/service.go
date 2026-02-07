@@ -9,7 +9,7 @@ import (
 type MerchantService interface {
 	Create(ctx context.Context, req MerchantRequest) (Merchant, error)
 	Get(ctx context.Context, id string) (Merchant, error)
-	Update(ctx context.Context, req MerchantRequest) (Merchant, error)
+	Update(ctx context.Context, id string, req MerchantRequest) (Merchant, error)
 	Delete(ctx context.Context, id string) error
 	GetAll(ctx context.Context) ([]*Merchant, error)
 }
@@ -55,13 +55,13 @@ func (s *merchantService) Get(ctx context.Context, id string) (Merchant, error) 
 	return s.merchantRepository.Get(ctx, id)
 }
 
-func (s *merchantService) Update(ctx context.Context, req MerchantRequest) (Merchant, error) {
+func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) (Merchant, error) {
 	merchant := Merchant{
 		Name: req.Name,
 	}
 	s.logger.Info("Updating merchant", "merchant", merchant)
 	// check if merchant exists
-	existingMerchant, err := s.Get(ctx, merchant.ID)
+	existingMerchant, err := s.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
 		return existingMerchant, err

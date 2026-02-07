@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"lazeez-core/internal/common"
 	"os"
 )
 
@@ -24,12 +25,12 @@ func getDatabaseDSN() string {
 }
 
 // getSecretKey returns the JWT secret key from environment
-func getSecretKey() string {
+func getSecretKey() (string, error) {
 	secretKey := os.Getenv("JWT_SECRET_KEY")
 	if secretKey == "" {
-		return "default-secret-key-change-in-production" // TODO: Remove default in production
+		return "", common.ErrSecretKeyNotProvided
 	}
-	return secretKey
+	return secretKey, nil
 }
 
 // getPort returns the server port from environment

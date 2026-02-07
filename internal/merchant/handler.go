@@ -103,6 +103,7 @@ func (h *merchantHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r)
 	if err := h.parseMultipart(r, 32<<20); err != nil {
 		h.logger.Error("Failed to parse multipart form", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -132,7 +133,7 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	merchant, err := h.merchantService.Update(r.Context(), req)
+	merchant, err := h.merchantService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update merchant", "error", err)
 		common.WriteErrorResponse(w, err)

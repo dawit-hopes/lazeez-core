@@ -40,7 +40,11 @@ type Dependencies struct {
 // initializeDependencies initializes all dependencies in the correct order
 func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, error) {
 	// Initialize shared services
-	keyService := key.NewKeyService(logger, getSecretKey())
+	secretKey, err := getSecretKey()
+	if err != nil {
+		return nil, err
+	}
+	keyService := key.NewKeyService(logger, secretKey)
 
 	// Initialize DAL instances
 	authDAL := common.NewDAL[*auth.User](db, func() *auth.User { return &auth.User{} })
