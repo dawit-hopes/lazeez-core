@@ -22,7 +22,7 @@ func (s *authService) checkUserExistsByPhoneNumber(ctx context.Context, phoneNum
 		return nil, err
 	}
 	// User exists, return it
-	return &existingUser, nil
+		return &existingUser, nil
 }
 
 func (s *authService) normalizePhoneNumber(phoneNumber string) string {

@@ -81,11 +81,15 @@ func (r *DAL[T]) List(ctx context.Context, filters map[string]any, limit, offset
 		limit = 10000
 	}
 
+	// Always return newest records first
+	orderBy := " ORDER BY created_at DESC"
+
 	argCount := len(args)
-	query := fmt.Sprintf("SELECT %s FROM %s %s LIMIT $%d OFFSET $%d",
+	query := fmt.Sprintf("SELECT %s FROM %s %s%s LIMIT $%d OFFSET $%d",
 		strings.Join(selectCols, ", "),
 		instance.Table(),
 		whereClause,
+		orderBy,
 		argCount+1,
 		argCount+2,
 	)

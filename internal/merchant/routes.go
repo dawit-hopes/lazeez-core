@@ -2,6 +2,7 @@ package merchant
 
 import (
 	"lazeez-core/internal/common"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -9,27 +10,27 @@ import (
 func NewMerchantRoutes(router chi.Router, handler MerchantHandler) {
 	routes := []common.Route{
 		{
-			Method:  "POST",
+			Method:  http.MethodPost,
 			Path:    "/merchants",
 			Handler: handler.Create,
 		},
 		{
-			Method:  "GET",
+			Method:  http.MethodGet,
 			Path:    "/merchants/{id}",
 			Handler: handler.Get,
 		},
 		{
-			Method:  "PUT",
+			Method:  http.MethodPatch,
 			Path:    "/merchants/{id}",
 			Handler: handler.Update,
 		},
 		{
-			Method:  "DELETE",
+			Method:  http.MethodDelete,
 			Path:    "/merchants/{id}",
 			Handler: handler.Delete,
 		},
 		{
-			Method:  "GET",
+			Method:  http.MethodGet,
 			Path:    "/merchants",
 			Handler: handler.GetAll,
 		},

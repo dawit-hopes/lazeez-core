@@ -44,3 +44,19 @@ func (b *Branch) Values() []any {
 func (b *Branch) Addr() []any {
 	return []any{&b.ID, &b.MerchantID, &b.BranchName, &b.Address, &b.PhoneNumber, &b.DeletedAt, &b.IsDeleted, &b.CreatedAt, &b.UpdatedAt}
 }
+
+func (b *Branch) ToDTO() BranchResponse {
+	return BranchResponse{
+		BaseDTO: common.BaseDTO{
+			ID:        b.ID,
+			IsDeleted: b.IsDeleted,
+			CreatedAt: b.CreatedAt,
+			UpdatedAt: b.UpdatedAt,
+			DeletedAt: common.ToNullTimePtr(b.DeletedAt),
+		},
+		MerchantID:  b.MerchantID,
+		BranchName:  b.BranchName,
+		Address:     b.Address,
+		PhoneNumber: b.PhoneNumber,
+	}
+}

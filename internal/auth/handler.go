@@ -49,7 +49,7 @@ func (h *authHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	user, err := h.authService.GetUserByID(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get user by ID", "error", err)
@@ -60,7 +60,7 @@ func (h *authHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	var req UserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -84,7 +84,7 @@ func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	err := h.authService.DeleteUser(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to delete user", "error", err)

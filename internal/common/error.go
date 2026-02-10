@@ -23,7 +23,7 @@ var (
 	ErrPasswordRequired      = &Errors{Code: BadRequest, Message: "password is required"}
 	ErrInvalidPassword       = &Errors{Code: BadRequest, Message: "invalid password"}
 	ErrPasswordTooShort      = &Errors{Code: BadRequest, Message: "password is too short"}
-	ErrMerchantAlreadyExists = &Errors{Code: BadRequest, Message: "merchant already exists"}
+	ErrMerchantAlreadyExists = &Errors{Code: BadRequest, Message: "merchant with this information already exists"}
 	ErrMerchantNotFound      = &Errors{Code: NotFound, Message: "merchant not found"}
 	ErrInternalServerError   = &Errors{Code: InternalServerError, Message: "internal server error"}
 	ErrUserNotFound          = &Errors{Code: NotFound, Message: "user not found"}
@@ -34,4 +34,5 @@ var (
 	ErrNameAndLogoRequired   = &Errors{Code: BadRequest, Message: "name and logo are required"}
 	ErrInvalidRequest        = &Errors{Code: BadRequest, Message: "invalid request"}
 	ErrSecretKeyNotProvided  = &Errors{Code: BadRequest, Message: "secret key not provided"}
+	ErrBranchAlreadyExists   = &Errors{Code: BadRequest, Message: "branch with this information already exists"}
 )

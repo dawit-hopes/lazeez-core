@@ -2,6 +2,7 @@ package branch
 
 import (
 	"lazeez-core/internal/common"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -9,24 +10,34 @@ import (
 func NewBranchRoutes(router chi.Router, handler BranchHandler) {
 	routes := []common.Route{
 		{
-			Method:  "POST",
+			Method:  http.MethodPost,
 			Path:    "/branches",
 			Handler: handler.Create,
 		},
 		{
-			Method:  "GET",
+			Method:  http.MethodGet,
 			Path:    "/branches/{id}",
 			Handler: handler.Get,
 		},
 		{
-			Method:  "PUT",
+			Method:  http.MethodPatch,
 			Path:    "/branches/{id}",
 			Handler: handler.Update,
 		},
 		{
-			Method:  "DELETE",
+			Method:  http.MethodDelete,
 			Path:    "/branches/{id}",
 			Handler: handler.Delete,
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/branches",
+			Handler: handler.GetAll,
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/branches/merchant/{merchantID}",
+			Handler: handler.GetAllByMerchantID,
 		},
 	}
 	common.RegisterRoutes(router, routes)

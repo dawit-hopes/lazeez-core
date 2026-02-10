@@ -7,10 +7,12 @@ import (
 )
 
 type BranchService interface {
-	Create(ctx context.Context, req CreateBranchRequest) (Branch, error)
-	Get(ctx context.Context, id string) (Branch, error)
-	Update(ctx context.Context, id string, req UpdateBranchRequest) (Branch, error)
+	Create(ctx context.Context, req CreateBranchRequest) error
+	Get(ctx context.Context, id string) (*BranchResponse, error)
+	Update(ctx context.Context, id string, req UpdateBranchRequest) error
 	Delete(ctx context.Context, id string) error
+	GetAll(ctx context.Context) ([]*BranchResponse, error)
+	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*BranchResponse, error)
 }
 
 type branchService struct {
@@ -25,7 +27,13 @@ func NewBranchService(branchRepository BranchRepository, logger config.Logger) B
 	}
 }
 
-func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) (Branch, error) {
+func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) error {
+	err := s.branchRepository.CheckExists(ctx, req.MerchantID, req.BranchName, req.PhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to check if branch exists", "error", err)
+		return err
+	}
+
 	branch := Branch{
 		MerchantID:  req.MerchantID,
 		BranchName:  req.BranchName,
@@ -37,32 +45,34 @@ func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) (Br
 
 	s.logger.Info("Creating branch", "branch", branch)
 
-	createdBranch, err := s.branchRepository.Create(ctx, branch)
+	err = s.branchRepository.Create(ctx, branch)
 	if err != nil {
 		s.logger.Error("Failed to create branch", "error", err)
-		return branch, err
+		return err
 	}
 
-	return createdBranch, nil
+	return nil
 }
 
-func (s *branchService) Get(ctx context.Context, id string) (Branch, error) {
+func (s *branchService) Get(ctx context.Context, id string) (*BranchResponse, error) {
 	s.logger.Info("Getting branch by ID", "id", id)
 	branch, err := s.branchRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get branch", "error", err)
-		return Branch{}, err
+		return nil, err
 	}
-	return branch, nil
+
+	branchDTO := branch.ToDTO()
+	return &branchDTO, nil
 }
 
-func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchRequest) (Branch, error) {
+func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchRequest) error {
 	s.logger.Info("Updating branch", "id", id)
 
 	existingBranch, err := s.branchRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get branch", "error", err)
-		return Branch{}, err
+		return err
 	}
 
 	if req.BranchName != "" {
@@ -75,13 +85,13 @@ func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchR
 		existingBranch.PhoneNumber = req.PhoneNumber
 	}
 
-	updatedBranch, err := s.branchRepository.Update(ctx, existingBranch)
+	err = s.branchRepository.Update(ctx, existingBranch)
 	if err != nil {
 		s.logger.Error("Failed to update branch", "error", err)
-		return Branch{}, err
+		return err
 	}
 
-	return updatedBranch, nil
+	return nil
 }
 
 func (s *branchService) Delete(ctx context.Context, id string) error {
@@ -94,4 +104,34 @@ func (s *branchService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *branchService) GetAll(ctx context.Context) ([]*BranchResponse, error) {
+	s.logger.Info("Getting all branches")
+	branches, err := s.branchRepository.GetAll(ctx)
+	if err != nil {
+		s.logger.Error("Failed to get all branches", "error", err)
+		return nil, err
+	}
+	branchDTOs := make([]*BranchResponse, len(branches))
+	for i, branch := range branches {
+		result := branch.ToDTO()
+		branchDTOs[i] = &result
+	}
+	return branchDTOs, nil
+}
+
+func (s *branchService) GetAllByMerchantID(ctx context.Context, merchantID string) ([]*BranchResponse, error) {
+	s.logger.Info("Getting all branches by merchant ID", "merchantID", merchantID)
+	branches, err := s.branchRepository.GetAllByMerchantID(ctx, merchantID)
+	if err != nil {
+		s.logger.Error("Failed to get all branches by merchant ID", "error", err)
+		return nil, err
+	}
+	branchDTOs := make([]*BranchResponse, len(branches))
+	for i, branch := range branches {
+		result := branch.ToDTO()
+		branchDTOs[i] = &result
+	}
+	return branchDTOs, nil
 }

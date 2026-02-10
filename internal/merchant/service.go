@@ -61,28 +61,32 @@ func (s *merchantService) Get(ctx context.Context, id string) (MerchantDTO, erro
 }
 
 func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) error {
-	merchant := Merchant{
-		Name: req.Name,
-	}
-	s.logger.Info("Updating merchant", "merchant", merchant)
-	// check if merchant exists
-	existingMerchant, err := s.Get(ctx, id)
+	s.logger.Info("Updating merchant", "id", id, "name", req.Name)
+
+	// Load existing merchant from repository
+	existingMerchant, err := s.merchantRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
 		return err
 	}
 
-	// check if merchant name is already taken
-	err = s.merchantRepository.CheckExists(ctx, merchant.Name)
-	if err != nil {
-		s.logger.Error("Failed to check if merchant exists", "error", err)
-		return err
+	// If name is provided and changed, ensure it's not taken by another merchant
+	if req.Name != "" && req.Name != existingMerchant.Name {
+		if err := s.merchantRepository.CheckExists(ctx, req.Name); err != nil {
+			s.logger.Error("Failed to check if merchant exists", "error", err)
+			return err
+		}
+		existingMerchant.Name = req.Name
 	}
 
-	// update merchant name
-	existingMerchant.Name = merchant.Name
 	if req.Logo != nil {
 		// we will upload the image to the cloud storage and update the image url in the database
+	}
+
+	_, err = s.merchantRepository.Update(ctx, existingMerchant)
+	if err != nil {
+		s.logger.Error("Failed to update merchant", "error", err)
+		return err
 	}
 	return nil
 }

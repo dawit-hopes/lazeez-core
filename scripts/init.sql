@@ -17,8 +17,9 @@ CREATE TABLE IF NOT EXISTS merchants (
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
--- Create index on name for faster lookups
+-- Create index on name and created_at for faster lookups and sorting
 CREATE INDEX IF NOT EXISTS idx_merchants_name ON merchants(name) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_merchants_created_at ON merchants(created_at) WHERE is_deleted = FALSE;
 
 -- ============================================
 -- BRANCHES TABLE
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS branches (
 -- Create indexes for faster lookups
 CREATE INDEX IF NOT EXISTS idx_branches_merchant_id ON branches(merchant_id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_branches_phone_number ON branches(phone_number) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_branches_created_at ON branches(created_at) WHERE is_deleted = FALSE;
 
 -- ============================================
 -- USERS TABLE
@@ -65,6 +67,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_phone_number ON users(phone_number) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_users_branch_id ON users(branch_id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at) WHERE is_deleted = FALSE;
 
 -- ============================================
 -- MENUS TABLE
@@ -81,6 +84,7 @@ CREATE TABLE IF NOT EXISTS menus (
 
 -- Create index on name for faster lookups
 CREATE INDEX IF NOT EXISTS idx_menus_name ON menus(name) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_menus_created_at ON menus(created_at) WHERE is_deleted = FALSE;
 
 -- ============================================
 -- TRIGGERS FOR UPDATED_AT

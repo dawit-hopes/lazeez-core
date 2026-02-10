@@ -49,3 +49,13 @@ func (r *Response) ToJSON() []byte {
 	}
 	return json
 }
+
+func (b *Base) ToDTO() BaseDTO {
+	return BaseDTO{
+		ID:        b.ID,
+		IsDeleted: b.IsDeleted,
+		CreatedAt: b.CreatedAt,
+		UpdatedAt: b.UpdatedAt,
+		DeletedAt: ToNullTimePtr(b.DeletedAt),
+	}
+}
