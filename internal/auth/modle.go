@@ -35,13 +35,13 @@ func (u *User) Table() string {
 }
 
 func (u *User) Columns() []string {
-	return []string{"id", "user_name", "phone_number", "password", "role", "branch_id", "is_locked", "is_first_login", "logging_attempts", "created_at", "updated_at", "deleted_at", "is_deleted"}
+	return []string{"id", "full_name", "phone_number", "password", "role", "branch_id", "is_locked", "is_first_login", "logging_attempts", "deleted_at", "is_deleted"}
 }
 
 func (u *User) Values() []any {
-	return []any{u.ID, u.FullName, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.CreatedAt, u.UpdatedAt, u.DeletedAt, u.IsDeleted}
+	return []any{u.ID, u.FullName, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.DeletedAt, u.IsDeleted}
 }
 
 func (u *User) Addr() []any {
-	return []any{&u.ID, &u.FullName, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.IsDeleted}
+	return []any{&u.ID, &u.FullName, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.DeletedAt, &u.IsDeleted, &u.CreatedAt, &u.UpdatedAt}
 }

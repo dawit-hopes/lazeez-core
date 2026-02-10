@@ -135,13 +135,13 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	merchant, err := h.merchantService.Update(r.Context(), id, req)
+	err = h.merchantService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update merchant", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: merchant, Message: "Merchant updated successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{Message: "Merchant updated successfully", StatusCode: http.StatusOK})
 }
 
 func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {

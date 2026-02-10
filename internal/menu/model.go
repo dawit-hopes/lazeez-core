@@ -22,13 +22,13 @@ func (m *Menu) Table() string {
 }
 
 func (m *Menu) Columns() []string {
-	return []string{"id", "name", "image", "created_at", "updated_at", "deleted_at", "is_deleted"}
+	return []string{"id", "name", "image", "deleted_at", "is_deleted"}
 }
 
 func (m *Menu) Values() []any {
-	return []any{m.ID, m.Name, m.Image, m.CreatedAt, m.UpdatedAt, m.DeletedAt, m.IsDeleted}
+	return []any{m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted}
 }
 
 func (m *Menu) Addr() []any {
-	return []any{&m.ID, &m.Name, &m.Image, &m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.IsDeleted}
+	return []any{&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.CreatedAt, &m.UpdatedAt}
 }

@@ -32,9 +32,21 @@ func NewDAL[T Mappable](db *sql.DB, factory func() T) *DAL[T] {
 func (r *DAL[T]) Get(ctx context.Context, filters map[string]any) (T, error) {
 	instance := r.factory()
 
+	// Include created_at and updated_at in SELECT
+	cols := instance.Columns()
+	selectCols := append(cols, "created_at", "updated_at")
+
+	// Always filter out soft-deleted records unless explicitly requested
+	if filters == nil {
+		filters = make(map[string]any)
+	}
+	if _, exists := filters["is_deleted"]; !exists {
+		filters["is_deleted"] = false
+	}
+
 	whereClause, args := r.buildWhereClause(filters, 0)
 	query := fmt.Sprintf("SELECT %s FROM %s %s LIMIT 1",
-		strings.Join(instance.Columns(), ", "),
+		strings.Join(selectCols, ", "),
 		instance.Table(),
 		whereClause,
 	)
@@ -50,11 +62,28 @@ func (r *DAL[T]) Get(ctx context.Context, filters map[string]any) (T, error) {
 func (r *DAL[T]) List(ctx context.Context, filters map[string]any, limit, offset int) ([]T, error) {
 	instance := r.factory()
 
+	// Include created_at and updated_at in SELECT
+	cols := instance.Columns()
+	selectCols := append(cols, "created_at", "updated_at")
+
+	// Always filter out soft-deleted records unless explicitly requested
+	if filters == nil {
+		filters = make(map[string]any)
+	}
+	if _, exists := filters["is_deleted"]; !exists {
+		filters["is_deleted"] = false
+	}
+
 	whereClause, args := r.buildWhereClause(filters, 0)
+
+	// Handle limit: if 0, use a large number to get all records
+	if limit <= 0 {
+		limit = 10000
+	}
 
 	argCount := len(args)
 	query := fmt.Sprintf("SELECT %s FROM %s %s LIMIT $%d OFFSET $%d",
-		strings.Join(instance.Columns(), ", "),
+		strings.Join(selectCols, ", "),
 		instance.Table(),
 		whereClause,
 		argCount+1,
@@ -88,11 +117,14 @@ func (r *DAL[T]) Create(ctx context.Context, model T) (T, error) {
 		placeholders[i] = fmt.Sprintf("$%d", i+1)
 	}
 
+	// Build RETURNING clause with all columns including created_at and updated_at
+	returningCols := append(cols, "created_at", "updated_at")
+
 	query := fmt.Sprintf("INSERT INTO %s (%s, updated_at, created_at) VALUES (%s, NOW(), NOW()) RETURNING %s",
 		model.Table(),
 		strings.Join(cols, ", "),
 		strings.Join(placeholders, ", "),
-		strings.Join(cols, ", "),
+		strings.Join(returningCols, ", "),
 	)
 
 	err := r.db.QueryRowContext(ctx, query, model.Values()...).Scan(model.Addr()...)
@@ -109,10 +141,13 @@ func (r *DAL[T]) Update(ctx context.Context, id string, model T) (T, error) {
 		setClauses[i] = fmt.Sprintf("%s = $%d", col, i+2)
 	}
 
+	// Include created_at and updated_at in RETURNING
+	returningCols := append(cols, "created_at", "updated_at")
+
 	query := fmt.Sprintf("UPDATE %s SET %s, updated_at = NOW() WHERE id = $1 RETURNING %s",
 		model.Table(),
 		strings.Join(setClauses, ", "),
-		strings.Join(cols, ", "),
+		strings.Join(returningCols, ", "),
 	)
 
 	args := append([]any{id}, values...)

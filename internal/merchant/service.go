@@ -7,11 +7,11 @@ import (
 )
 
 type MerchantService interface {
-	Create(ctx context.Context, req MerchantRequest) (Merchant, error)
-	Get(ctx context.Context, id string) (Merchant, error)
-	Update(ctx context.Context, id string, req MerchantRequest) (Merchant, error)
+	Create(ctx context.Context, req MerchantRequest) (MerchantDTO, error)
+	Get(ctx context.Context, id string) (MerchantDTO, error)
+	Update(ctx context.Context, id string, req MerchantRequest) error
+	GetAll(ctx context.Context) ([]*MerchantDTO, error)
 	Delete(ctx context.Context, id string) error
-	GetAll(ctx context.Context) ([]*Merchant, error)
 }
 
 type merchantService struct {
@@ -26,7 +26,7 @@ func NewMerchantService(merchantRepository MerchantRepository, logger config.Log
 	}
 }
 
-func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (Merchant, error) {
+func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (MerchantDTO, error) {
 	merchant := Merchant{
 		Name: req.Name,
 	}
@@ -35,7 +35,7 @@ func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (Merc
 	err := s.merchantRepository.CheckExists(ctx, merchant.Name)
 	if err != nil {
 		s.logger.Error("Failed to check if merchant exists", "error", err)
-		return merchant, err
+		return MerchantDTO{}, err
 	}
 
 	if req.Logo != nil {
@@ -45,17 +45,22 @@ func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (Merc
 	newMerchant, err := s.merchantRepository.Create(ctx, merchant)
 	if err != nil {
 		s.logger.Error("Failed to create merchant", "error", err)
-		return merchant, err
+		return MerchantDTO{}, err
 	}
-	return newMerchant, nil
+	return newMerchant.ToDTO(), nil
 }
 
-func (s *merchantService) Get(ctx context.Context, id string) (Merchant, error) {
+func (s *merchantService) Get(ctx context.Context, id string) (MerchantDTO, error) {
 	s.logger.Info("Getting merchant by ID", "id", id)
-	return s.merchantRepository.Get(ctx, id)
+	merchant, err := s.merchantRepository.Get(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to get merchant by ID", "error", err)
+		return MerchantDTO{}, err
+	}
+	return merchant.ToDTO(), nil
 }
 
-func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) (Merchant, error) {
+func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) error {
 	merchant := Merchant{
 		Name: req.Name,
 	}
@@ -64,14 +69,14 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 	existingMerchant, err := s.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
-		return existingMerchant, err
+		return err
 	}
 
 	// check if merchant name is already taken
 	err = s.merchantRepository.CheckExists(ctx, merchant.Name)
 	if err != nil {
 		s.logger.Error("Failed to check if merchant exists", "error", err)
-		return existingMerchant, err
+		return err
 	}
 
 	// update merchant name
@@ -79,7 +84,7 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 	if req.Logo != nil {
 		// we will upload the image to the cloud storage and update the image url in the database
 	}
-	return s.merchantRepository.Update(ctx, existingMerchant)
+	return nil
 }
 
 func (s *merchantService) Delete(ctx context.Context, id string) error {
@@ -97,12 +102,17 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *merchantService) GetAll(ctx context.Context) ([]*Merchant, error) {
+func (s *merchantService) GetAll(ctx context.Context) ([]*MerchantDTO, error) {
 	s.logger.Info("Getting all merchants")
 	merchants, err := s.merchantRepository.GetAll(ctx)
 	if err != nil {
 		s.logger.Error("Failed to get all merchants", "error", err)
 		return nil, err
 	}
-	return merchants, nil
+	merchantDTOs := make([]*MerchantDTO, len(merchants))
+	for i, merchant := range merchants {
+		result := merchant.ToDTO()
+		merchantDTOs[i] = &result
+	}
+	return merchantDTOs, nil
 }

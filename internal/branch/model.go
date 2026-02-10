@@ -34,13 +34,13 @@ func (b *Branch) Table() string {
 }
 
 func (b *Branch) Columns() []string {
-	return []string{"id", "merchant_id", "branch_name", "address", "phone_number", "created_at", "updated_at", "deleted_at", "is_deleted"}
+	return []string{"id", "merchant_id", "branch_name", "address", "phone_number", "deleted_at", "is_deleted"}
 }
 
 func (b *Branch) Values() []any {
-	return []any{b.ID, b.MerchantID, b.BranchName, b.Address, b.PhoneNumber, b.CreatedAt, b.UpdatedAt, b.DeletedAt, b.IsDeleted}
+	return []any{b.ID, b.MerchantID, b.BranchName, b.Address, b.PhoneNumber, b.DeletedAt, b.IsDeleted}
 }
 
 func (b *Branch) Addr() []any {
-	return []any{&b.ID, &b.MerchantID, &b.BranchName, &b.Address, &b.PhoneNumber, &b.CreatedAt, &b.UpdatedAt, &b.DeletedAt, &b.IsDeleted}
+	return []any{&b.ID, &b.MerchantID, &b.BranchName, &b.Address, &b.PhoneNumber, &b.DeletedAt, &b.IsDeleted, &b.CreatedAt, &b.UpdatedAt}
 }

@@ -10,7 +10,7 @@ func (u *UserRequest) Validate() error {
 	return validation.ValidateStruct(u,
 		validation.Field(&u.PhoneNumber,
 			validation.Required.Error("phone number is required"),
-			validation.Match(regexp.MustCompile(`^251[79]\d{8}$`)).Error("phone number must be a valid Ethiopian phone number"),
+			validation.Match(regexp.MustCompile(`^\+?251[79]\d{8}$`)).Error("phone number must be a valid Ethiopian phone number"),
 		),
 		validation.Field(&u.FullName,
 			validation.Required.Error("full name is required"),
@@ -24,14 +24,18 @@ func (u *UserRequest) Validate() error {
 
 func (u *SetPasswordRequest) Validate() error {
 	return validation.ValidateStruct(u,
-		validation.Field(&u.PhoneNumber, validation.Required.Error("phone number is required"), validation.Match(regexp.MustCompile(`^[0-9]+$`)).Error("phone number must be a number")),
+		validation.Field(&u.PhoneNumber, 
+			validation.Required.Error("phone number is required"), 
+			validation.Match(regexp.MustCompile(`^\+?251[79]\d{8}$`)).Error("phone number must be a valid Ethiopian phone number")),
 		validation.Field(&u.Password, validation.Required.Error("password is required"), validation.Length(8, 100).Error("password must be between 8 and 100 characters")),
 	)
 }
 
 func (u *LoginRequest) Validate() error {
 	return validation.ValidateStruct(u,
-		validation.Field(&u.PhoneNumber, validation.Required.Error("phone number is required"), validation.Match(regexp.MustCompile(`^[0-9]+$`)).Error("phone number must be a number")),
+		validation.Field(&u.PhoneNumber, 
+			validation.Required.Error("phone number is required"), 
+			validation.Match(regexp.MustCompile(`^\+?251[79]\d{8}$`)).Error("phone number must be a valid Ethiopian phone number")),
 		validation.Field(&u.Password, validation.Required.Error("password is required"), validation.Length(8, 100).Error("password must be between 8 and 100 characters")),
 	)
 }
@@ -39,7 +43,6 @@ func (u *LoginRequest) Validate() error {
 func (u *UserLookUpRequest) Validate() error {
 	return validation.ValidateStruct(u,
 		validation.Field(&u.PhoneNumber, validation.Required.Error("phone number is required"),
-			validation.Match(regexp.MustCompile(`^[0-9]+$`)).Error("phone number must be a number"),
-			validation.Match(regexp.MustCompile(`^251[79]\d{8}$`)).Error("phone number must be a valid Ethiopian phone number")),
+			validation.Match(regexp.MustCompile(`^\+?251[79]\d{8}$`)).Error("phone number must be a valid Ethiopian phone number")),
 	)
 }
