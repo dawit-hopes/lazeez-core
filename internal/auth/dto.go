@@ -1,5 +1,9 @@
 package auth
 
+import (
+	"lazeez-core/internal/common"
+)
+
 type UserRequest struct {
 	PhoneNumber string `json:"phone_number"`
 	FullName    string `json:"full_name"`
@@ -43,4 +47,16 @@ type LoginResponse struct {
 
 type UserLookUpRequest struct {
 	PhoneNumber string `json:"phone_number"`
+}
+
+type UserDTO struct {
+	common.BaseDTO
+	PhoneNumber     string `json:"phone_number" `
+	FullName        string `json:"full_name" `
+	Password        string `json:"-" `
+	Role            Role   `json:"role" `
+	BranchID        string `json:"branch_id" `
+	IsLocked        bool   `json:"is_locked" `
+	IsFirstLogin    bool   `json:"is_first_login" `
+	LoggingAttempts int    `json:"logging_attempts" `
 }

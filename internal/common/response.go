@@ -3,7 +3,6 @@ package common
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -23,6 +22,7 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 		var customerError *Errors
 		statusCode := http.StatusInternalServerError
 		message := "Internal Server Error"
+		var fieldErrors map[string][]string
 
 		// Check if it's a custom error type
 		if errors.As(err, &customerError) {
@@ -31,15 +31,16 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 		} else if validationErrors, ok := err.(validation.Errors); ok {
 			// Handle ozzo-validation errors
 			statusCode = http.StatusBadRequest
-			var errorMessages []string
+			fieldErrors = make(map[string][]string)
 			for field, fieldError := range validationErrors {
 				if fieldErr, ok := fieldError.(validation.Error); ok {
-					errorMessages = append(errorMessages, fmt.Sprintf("%s: %s", field, fieldErr.Error()))
+					fieldErrors[field] = append(fieldErrors[field], fieldErr.Error())
 				} else {
-					errorMessages = append(errorMessages, fmt.Sprintf("%s: %s", field, fieldError.Error()))
+					fieldErrors[field] = append(fieldErrors[field], fieldError.Error())
 				}
 			}
-			message = strings.Join(errorMessages, "; ")
+			// High-level message, details are in Errors map
+			message = "validation error"
 		} else {
 			// For other errors, check if it's a validation error by checking the error message
 			// or use the error message directly for better debugging
@@ -55,6 +56,7 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 			Data:       nil,
 			Message:    message,
 			StatusCode: statusCode,
+			Errors:     fieldErrors,
 		})
 
 		return

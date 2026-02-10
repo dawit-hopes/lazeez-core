@@ -15,12 +15,14 @@ var (
 
 type AuthService interface {
 	CreateUser(ctx context.Context, req UserRequest) error
-	GetUserByID(ctx context.Context, id string) (User, error)
+	GetUserByID(ctx context.Context, id string) (UserDTO, error)
 	UpdateUser(ctx context.Context, id string, req UserRequest) error
 	DeleteUser(ctx context.Context, id string) error
 	Login(ctx context.Context, req LoginRequest) (LoginResponse, error)
 	SetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
 	UserLookUp(ctx context.Context, phoneNumber string) (User, error)
+	GetAllUsers(ctx context.Context) ([]*UserDTO, error)
+	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
 }
 
 type authService struct {
@@ -40,29 +42,21 @@ func NewAuthService(authRepository AuthRepository, branchRepository branch.Branc
 }
 
 func (s *authService) CreateUser(ctx context.Context, req UserRequest) error {
-	s.logger.Info("Creating user by phone number", "phone number", req.PhoneNumber)
-	// check if user already exists
-	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
+	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
 	if err != nil {
-		// If there's an error (other than not found), return it
-		s.logger.Error("Failed to check user exists", "error", err)
+		s.logger.Error("Failed to validate phone number", "error", err)
 		return err
 	}
-	// If user exists, return error
-	if existingUser != nil {
-		s.logger.Error("User already exists", "phone number", req.PhoneNumber)
-		return common.ErrUserAlreadyExists
+
+	// check if user already exists
+	if err := s.authRepository.CheckUserExistsByPhoneNumber(ctx, normalizedPhoneNumber); err != nil {
+		s.logger.Error("Failed to check user exists by phone number", "error", err)
+		return err
 	}
 
 	err = s.validateBranch(ctx, req.BranchID, req.MerchantID)
 	if err != nil {
 		s.logger.Error("Failed to validate branch", "error", err)
-		return err
-	}
-
-	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
 		return err
 	}
 
@@ -76,9 +70,15 @@ func (s *authService) CreateUser(ctx context.Context, req UserRequest) error {
 	return nil
 }
 
-func (s *authService) GetUserByID(ctx context.Context, id string) (User, error) {
+func (s *authService) GetUserByID(ctx context.Context, id string) (UserDTO, error) {
 	s.logger.Info("Getting user by ID", "id", id)
-	return s.authRepository.GetUserByID(ctx, id)
+	user, err := s.authRepository.GetUserByID(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to get user by ID", "error", err)
+		return UserDTO{}, err
+	}
+	result := user.ToDTO()
+	return result, nil
 }
 
 func (s *authService) UpdateUser(ctx context.Context, id string, req UserRequest) error {
@@ -191,4 +191,30 @@ func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (
 func (s *authService) UserLookUp(ctx context.Context, phoneNumber string) (User, error) {
 	s.logger.Info("Looking up user by phone number", "phone number", phoneNumber)
 	return s.authRepository.GetUserByPhoneNumber(ctx, phoneNumber)
+}
+
+func (s *authService) GetAllUsers(ctx context.Context) ([]*UserDTO, error) {
+	s.logger.Info("Getting all users")
+	users, err := s.authRepository.GetAllUsers(ctx)
+	if err != nil {
+		s.logger.Error("Failed to get all users", "error", err)
+		return nil, err
+	}
+	userDTOs := make([]*UserDTO, len(users))
+	for i, user := range users {
+		result := user.ToDTO()
+		userDTOs[i] = &result
+	}
+	return userDTOs, nil
+}
+
+func (s *authService) GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error) {
+	s.logger.Info("Getting user by branch ID", "branchID", branchID)
+	user, err := s.authRepository.GetUserByBranchID(ctx, branchID)
+	if err != nil {
+		s.logger.Error("Failed to get user by branch ID", "error", err)
+		return UserDTO{}, err
+	}
+	result := user.ToDTO()
+	return result, nil
 }

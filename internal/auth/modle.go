@@ -45,3 +45,22 @@ func (u *User) Values() []any {
 func (u *User) Addr() []any {
 	return []any{&u.ID, &u.FullName, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.DeletedAt, &u.IsDeleted, &u.CreatedAt, &u.UpdatedAt}
 }
+
+func (u *User) ToDTO() UserDTO {
+	return UserDTO{
+		BaseDTO: common.BaseDTO{
+			ID:        u.ID,
+			IsDeleted: u.IsDeleted,
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
+			DeletedAt: common.ToNullTimePtr(u.DeletedAt),
+		},
+		PhoneNumber:     u.PhoneNumber,
+		FullName:        u.FullName,
+		Role:            u.Role,
+		BranchID:        u.BranchID.String,
+		IsLocked:        u.IsLocked,
+		IsFirstLogin:    u.IsFirstLogin,
+		LoggingAttempts: u.LoggingAttempts,
+	}
+}

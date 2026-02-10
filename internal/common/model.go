@@ -33,9 +33,10 @@ func (e *Errors) Error() string {
 }
 
 type Response struct {
-	Data       any    `json:"data"`
-	Message    string `json:"message"`
-	StatusCode int    `json:"status_code"`
+	Data       any                `json:"data"`
+	Message    string             `json:"message"`
+	StatusCode int                `json:"status_code"`
+	Errors     map[string][]string `json:"errors,omitempty"`
 }
 
 func NewResponse(data any, message string, statusCode int) *Response {

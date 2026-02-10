@@ -15,6 +15,8 @@ type AuthHandler interface {
 	Login(w http.ResponseWriter, r *http.Request)
 	SetPassword(w http.ResponseWriter, r *http.Request)
 	UserLookUp(w http.ResponseWriter, r *http.Request)
+	GetAllUser(w http.ResponseWriter, r *http.Request)
+	GetUserByBranchID(w http.ResponseWriter, r *http.Request)
 }
 
 type authHandler struct {
@@ -34,7 +36,7 @@ func (h *authHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	if err := req.Validate(); err != nil {
+	if err := req.Validate(false); err != nil {
 		h.logger.Error("Failed to validate request body", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
@@ -69,7 +71,7 @@ func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := req.Validate(); err != nil {
+	if err := req.Validate(true); err != nil {
 		h.logger.Error("Failed to validate request body", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
@@ -159,3 +161,26 @@ func (h *authHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User looked up successfully", StatusCode: http.StatusOK})
 }
+
+func (h *authHandler) GetAllUser(w http.ResponseWriter, r *http.Request) {
+	users, err := h.authService.GetAllUsers(r.Context())
+	if err != nil {
+		h.logger.Error("Failed to get all users", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Data: users, Message: "All users fetched successfully", StatusCode: http.StatusOK})
+}
+
+func (h *authHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) {
+	branchID := common.ParseID(r, "branchID")
+	user, err := h.authService.GetUserByBranchID(r.Context(), branchID)
+	if err != nil {
+		h.logger.Error("Failed to get user by branch ID", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
+}
+
+

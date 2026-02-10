@@ -35,4 +35,5 @@ var (
 	ErrInvalidRequest        = &Errors{Code: BadRequest, Message: "invalid request"}
 	ErrSecretKeyNotProvided  = &Errors{Code: BadRequest, Message: "secret key not provided"}
 	ErrBranchAlreadyExists   = &Errors{Code: BadRequest, Message: "branch with this information already exists"}
+	ErrUserWithInformationAlreadyExists = &Errors{Code: BadRequest, Message: "user with this information already exists"}
 )
