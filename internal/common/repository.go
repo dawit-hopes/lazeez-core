@@ -135,26 +135,32 @@ func (r *DAL[T]) Create(ctx context.Context, model T) (T, error) {
 	return model, err
 }
 
-// Update updates a record
-func (r *DAL[T]) Update(ctx context.Context, id string, model T) (T, error) {
+// Update updates a record (or records) matching the given filters.
+// NOTE: Filters MUST uniquely identify a row (e.g. by id) to avoid unintended mass updates.
+func (r *DAL[T]) Update(ctx context.Context, filters map[string]any, model T) (T, error) {
 	cols := model.Columns()
 	setClauses := make([]string, len(cols))
 	values := model.Values()
 
 	for i, col := range cols {
-		setClauses[i] = fmt.Sprintf("%s = $%d", col, i+2)
+		// SET col = $1, col2 = $2, ...
+		setClauses[i] = fmt.Sprintf("%s = $%d", col, i+1)
 	}
 
 	// Include created_at and updated_at in RETURNING
 	returningCols := append(cols, "created_at", "updated_at")
 
-	query := fmt.Sprintf("UPDATE %s SET %s, updated_at = NOW() WHERE id = $1 RETURNING %s",
+	// Build WHERE clause after the SET placeholders
+	whereClause, filterArgs := r.buildWhereClause(filters, len(cols))
+
+	query := fmt.Sprintf("UPDATE %s SET %s, updated_at = NOW() %s RETURNING %s",
 		model.Table(),
 		strings.Join(setClauses, ", "),
+		whereClause,
 		strings.Join(returningCols, ", "),
 	)
 
-	args := append([]any{id}, values...)
+	args := append(values, filterArgs...)
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(model.Addr()...)
 	return model, err

@@ -82,7 +82,7 @@ func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "User updated successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{Message: "User updated successfully", StatusCode: http.StatusOK})
 }
 
 func (h *authHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -182,5 +182,3 @@ func (h *authHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) 
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
 }
-
-

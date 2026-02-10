@@ -47,7 +47,8 @@ func (r *menuRepository) Get(ctx context.Context, id string) (Menu, error) {
 }
 
 func (r *menuRepository) Update(ctx context.Context, menu Menu) (Menu, error) {
-	result, err := r.dal.Update(ctx, menu.ID, &menu)
+	filter := map[string]any{"id": menu.ID}
+	result, err := r.dal.Update(ctx, filter, &menu)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("menu not found", "error", err)

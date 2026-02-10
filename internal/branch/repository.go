@@ -50,7 +50,8 @@ func (r *branchRepository) Get(ctx context.Context, id string) (Branch, error) {
 }
 
 func (r *branchRepository) Update(ctx context.Context, branch Branch) error {
-	_, err := r.dal.Update(ctx, branch.ID, &branch)
+	filter := map[string]any{"id": branch.ID}
+	_, err := r.dal.Update(ctx, filter, &branch)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("branch not found", "error", err)

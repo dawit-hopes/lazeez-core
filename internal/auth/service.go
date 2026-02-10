@@ -83,16 +83,10 @@ func (s *authService) GetUserByID(ctx context.Context, id string) (UserDTO, erro
 
 func (s *authService) UpdateUser(ctx context.Context, id string, req UserRequest) error {
 
-	// check if user already exists
-	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
+	existingUser, err := s.authRepository.GetUserByID(ctx, id)
 	if err != nil {
-		s.logger.Error("Failed to check user exists by phone number", "error", err)
+		s.logger.Error("Failed to get user by ID", "error", err)
 		return err
-	}
-	// User must exist for update
-	if existingUser == nil {
-		s.logger.Error("User not found", "phone number", req.PhoneNumber)
-		return common.ErrUserNotFound
 	}
 
 	if req.PhoneNumber != "" {
@@ -104,7 +98,7 @@ func (s *authService) UpdateUser(ctx context.Context, id string, req UserRequest
 		req.PhoneNumber = normalizedPhoneNumber
 	}
 
-	user := s.updateUserDefaultData(&req, existingUser)
+	user := s.updateUserDefaultData(&req, &existingUser)
 	return s.authRepository.UpdateUser(ctx, *user)
 }
 

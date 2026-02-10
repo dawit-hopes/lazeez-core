@@ -66,8 +66,10 @@ func (r *authRepository) GetUserByPhoneNumber(ctx context.Context, phoneNumber s
 }
 
 func (r *authRepository) UpdateUser(ctx context.Context, user User) error {
-	
-	_, err := r.dal.Update(ctx, user.ID, &user)
+	r.logger.Info("Updating user and ID is", "user", user, "id", user.ID)
+
+	filter := map[string]any{"id": user.ID}
+	_, err := r.dal.Update(ctx, filter, &user)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("user not found", "error", err)
@@ -100,7 +102,8 @@ func (r *authRepository) SetPassword(ctx context.Context, phoneNumber string, pa
 	}
 
 	user := User{Password: password}
-	_, err = r.dal.Update(ctx, existingUser.ID, &user)
+	filter := map[string]any{"id": existingUser.ID}
+	_, err = r.dal.Update(ctx, filter, &user)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("user not found", "error", err)
