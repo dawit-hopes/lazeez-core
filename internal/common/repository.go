@@ -36,14 +36,6 @@ func (r *DAL[T]) Get(ctx context.Context, filters map[string]any) (T, error) {
 	cols := instance.Columns()
 	selectCols := append(cols, "created_at", "updated_at")
 
-	// Always filter out soft-deleted records unless explicitly requested
-	if filters == nil {
-		filters = make(map[string]any)
-	}
-	if _, exists := filters["is_deleted"]; !exists {
-		filters["is_deleted"] = false
-	}
-
 	whereClause, args := r.buildWhereClause(filters, 0)
 	query := fmt.Sprintf("SELECT %s FROM %s %s LIMIT 1",
 		strings.Join(selectCols, ", "),

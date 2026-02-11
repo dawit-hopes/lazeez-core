@@ -6,6 +6,7 @@ import (
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
+	"lazeez-core/internal/session"
 )
 
 var (
@@ -23,21 +24,25 @@ type AuthService interface {
 	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
 	GetAllUsers(ctx context.Context) ([]*UserDTO, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
+	Logout(ctx context.Context, id string) error
 }
 
 type authService struct {
-	authRepository   AuthRepository
-	branchRepository branch.BranchRepository
-	keyService       key.KeyService
-	logger           config.Logger
+	authRepository AuthRepository
+	branchService  branch.BranchService
+	sessionService session.SessionService
+	keyService     key.KeyService
+	logger         config.Logger
 }
 
-func NewAuthService(authRepository AuthRepository, branchRepository branch.BranchRepository, keyService key.KeyService, logger config.Logger) AuthService {
+func NewAuthService(authRepository AuthRepository, branchService branch.BranchService, sessionService session.SessionService, keyService key.KeyService, logger config.Logger) AuthService {
 	return &authService{
-		authRepository:   authRepository,
-		branchRepository: branchRepository,
-		keyService:       keyService,
-		logger:           logger,
+		authRepository: authRepository,
+		branchService:  branchService,
+		sessionService: sessionService,
+		keyService:     keyService,
+
+		logger: logger,
 	}
 }
 
@@ -140,6 +145,19 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 		return LoginResponse{}, err
 	}
 
+	session := session.Session{
+		UserID:       existingUser.ID,
+		RefreshToken: refreshToken,
+		AccessToken:  accessToken,
+		IsRevoked:    false,
+	}
+
+	err = s.sessionService.CreateSession(ctx, session)
+	if err != nil {
+		s.logger.Error("Failed to create session", "error", err)
+		return LoginResponse{}, err
+	}
+
 	return LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -227,4 +245,14 @@ func (s *authService) GetUserByBranchID(ctx context.Context, branchID string) (U
 	}
 	result := user.ToDTO()
 	return result, nil
+}
+
+func (s *authService) Logout(ctx context.Context, id string) error {
+	s.logger.Info("Logging out", "id", id)
+	err := s.sessionService.RevokeSession(ctx, id, true)
+	if err != nil {
+		s.logger.Error("Failed to revoke session", "error", err)
+		return err
+	}
+	return nil
 }

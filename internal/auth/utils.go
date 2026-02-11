@@ -58,7 +58,7 @@ func (s *authService) validatePhoneNumber(phoneNumber string) (string, error) {
 }
 
 func (s *authService) validateBranch(ctx context.Context, branchID, merchantID string) error {
-	branch, err := s.branchRepository.Get(ctx, branchID)
+	branch, err := s.branchService.Get(ctx, branchID)
 	if err != nil {
 		s.logger.Error("Failed to get branch", "error", err)
 		return err

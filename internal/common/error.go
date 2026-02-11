@@ -38,4 +38,6 @@ var (
 	ErrSecretKeyNotProvided  = &Errors{Code: BadRequest, Message: "secret key not provided"}
 	ErrBranchAlreadyExists   = &Errors{Code: BadRequest, Message: "branch with this information already exists"}
 	ErrUserWithInformationAlreadyExists = &Errors{Code: BadRequest, Message: "user with this information already exists"}
+	ErrSessionAlreadyExists = &Errors{Code: BadRequest, Message: "session already exists"}
+	ErrSessionNotFound = &Errors{Code: NotFound, Message: "session not found"}
 )

@@ -53,7 +53,7 @@ func NewAuthRoutes(router chi.Router, handler AuthHandler, middleware middleware
 			Method:      http.MethodGet,
 			Path:        "/users",
 			Handler:     handler.GetAllUser,
-			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
+			// Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 		{
 			Method:      http.MethodGet,

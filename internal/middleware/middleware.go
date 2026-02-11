@@ -5,6 +5,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
+	"lazeez-core/internal/session"
 	"net/http"
 	"os"
 	"strings"
@@ -22,12 +23,13 @@ type contextKey string
 const claimsContextKey contextKey = "claims"
 
 type middleware struct {
-	keyService key.KeyService
-	logger     config.Logger
+	keyService     key.KeyService
+	sessionService session.SessionService
+	logger         config.Logger
 }
 
-func NewMiddleware(keyService key.KeyService, logger config.Logger) Middleware {
-	return &middleware{keyService: keyService, logger: logger}
+func NewMiddleware(keyService key.KeyService, sessionService session.SessionService, logger config.Logger) Middleware {
+	return &middleware{keyService: keyService, sessionService: sessionService, logger: logger}
 }
 
 func (m *middleware) ValidateToken(next http.Handler) http.Handler {
@@ -46,40 +48,19 @@ func (m *middleware) ValidateToken(next http.Handler) http.Handler {
 		}
 
 		token = bearerToken[1]
-
-		claims, err := m.keyService.DecodeJWTToken(token, os.Getenv("JWT_SECRET_KEY"))
+		claim, err := m.decodeToken(token)
 		if err != nil {
-			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			common.WriteErrorResponse(w, err)
 			return
 		}
 
-		uid, ok := claims["uid"].(string)
-		if !ok {
-			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		sessionErr := m.validateSession(r.Context(), claim["uid"].(string), token)
+		if sessionErr != nil {
+			common.WriteErrorResponse(w, sessionErr)
 			return
 		}
 
-		// BranchID may be empty; ensure we safely coerce to string
-		branchID := ""
-		if bidRaw, exists := claims["bid"]; exists && bidRaw != nil {
-			if bidStr, ok := bidRaw.(string); ok {
-				branchID = bidStr
-			}
-		}
-
-		roleStr, ok := claims["rol"].(string)
-		if !ok {
-			common.WriteErrorResponse(w, common.ErrUnAuthorized)
-			return
-		}
-
-		authClaims := map[string]any{
-			"uid": uid,
-			"bid": branchID,
-			"rol": roleStr,
-		}
-
-		ctx := context.WithValue(r.Context(), claimsContextKey, authClaims)
+		ctx := context.WithValue(r.Context(), claimsContextKey, claim)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -113,4 +94,56 @@ func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (m *middleware) validateSession(ctx context.Context, uid string, token string) error {
+	session, err := m.sessionService.GetSession(ctx, uid)
+	if err != nil {
+		return common.ErrUnAuthorized
+	}
+
+	if session.IsRevoked {
+		return common.ErrUnAuthorized
+	}
+
+	if session.AccessToken != token {
+		return common.ErrUnAuthorized
+	}
+
+	if session.UserID != uid {
+		return common.ErrUnAuthorized
+	}
+	return nil
+}
+
+func (m *middleware) decodeToken(token string) (map[string]any, error) {
+
+	claims, err := m.keyService.DecodeJWTToken(token, os.Getenv("JWT_SECRET_KEY"))
+	if err != nil {
+		return nil, common.ErrUnAuthorized
+	}
+
+	uid, ok := claims["uid"].(string)
+	if !ok {
+		return nil, common.ErrUnAuthorized
+	}
+
+	// BranchID may be empty; ensure we safely coerce to string
+	branchID := ""
+	if bidRaw, exists := claims["bid"]; exists && bidRaw != nil {
+		if bidStr, ok := bidRaw.(string); ok {
+			branchID = bidStr
+		}
+	}
+
+	roleStr, ok := claims["rol"].(string)
+	if !ok {
+		return nil, common.ErrUnAuthorized
+	}
+
+	return map[string]any{
+		"uid": uid,
+		"bid": branchID,
+		"rol": roleStr,
+	}, nil
 }

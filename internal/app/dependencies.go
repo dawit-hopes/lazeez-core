@@ -11,6 +11,7 @@ import (
 	"lazeez-core/internal/menu"
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/middleware"
+	"lazeez-core/internal/session"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -54,16 +55,19 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	branchDAL := common.NewDAL[*branch.Branch](db, func() *branch.Branch { return &branch.Branch{} })
 	merchantDAL := common.NewDAL[*merchant.Merchant](db, func() *merchant.Merchant { return &merchant.Merchant{} })
 	menuDAL := common.NewDAL[*menu.Menu](db, func() *menu.Menu { return &menu.Menu{} })
+	sessionDAL := common.NewDAL[*session.Session](db, func() *session.Session { return &session.Session{} })
 
 	// Initialize repositories
 	authRepo := auth.NewAuthRepository(authDAL, logger)
 	branchRepo := branch.NewBranchRepository(branchDAL, logger)
 	merchantRepo := merchant.NewMerchantRepository(merchantDAL, logger)
 	menuRepo := menu.NewMenuRepository(menuDAL, logger)
+	sessionRepo := session.NewSessionRepository(sessionDAL, logger)
 
 	// Initialize services
-	authService := auth.NewAuthService(authRepo, branchRepo, keyService, logger)
 	branchService := branch.NewBranchService(branchRepo, logger)
+	sessionService := session.NewSessionService(sessionRepo, logger)
+	authService := auth.NewAuthService(authRepo, branchService, sessionService, keyService, logger)
 	merchantService := merchant.NewMerchantService(merchantRepo, logger)
 	menuService := menu.NewMenuService(menuRepo, logger)
 
@@ -73,7 +77,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantHandler := merchant.NewMerchantHandler(merchantService, logger)
 	menuHandler := menu.NewMenuHandler(menuService, logger)
 
-	middleware := middleware.NewMiddleware(keyService, logger)
+	middleware := middleware.NewMiddleware(keyService, sessionService, logger)
 
 	return &Dependencies{
 		KeyService: keyService,

@@ -69,6 +69,9 @@ CREATE INDEX IF NOT EXISTS idx_users_branch_id ON users(branch_id) WHERE is_dele
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at) WHERE is_deleted = FALSE;
 
+-- create a super admin user
+INSERT INTO users (phone_number, full_name, role, password, is_locked, is_first_login, logging_attempts) VALUES ('251945557307', 'Super Admin', 'super admin', '$2a$10$8qgRwxx8tZC.t2DVs0jy6u1w4Au4sLz61V5ZVPxdU4V6vFEsiQseC', FALSE, FALSE, 0);
+
 -- ============================================
 -- MENUS TABLE
 -- ============================================
@@ -131,3 +134,27 @@ COMMENT ON COLUMN users.role IS 'User role: super admin or branch_manager';
 COMMENT ON COLUMN users.is_locked IS 'Indicates if user account is locked';
 COMMENT ON COLUMN users.is_first_login IS 'Indicates if this is the user''s first login';
 COMMENT ON COLUMN users.logging_attempts IS 'Number of failed login attempts';
+
+
+-- ============================================
+-- SESSIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    refresh_token TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE    
+);
+
+-- Create index on user_id for faster lookups
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at) WHERE is_deleted = FALSE;
+
+
+

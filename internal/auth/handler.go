@@ -17,6 +17,7 @@ type AuthHandler interface {
 	UserLookUp(w http.ResponseWriter, r *http.Request)
 	GetAllUser(w http.ResponseWriter, r *http.Request)
 	GetUserByBranchID(w http.ResponseWriter, r *http.Request)
+	Logout(w http.ResponseWriter, r *http.Request)
 }
 
 type authHandler struct {
@@ -181,4 +182,15 @@ func (h *authHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
+}
+
+func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.authService.Logout(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to logout", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Logout successful", StatusCode: http.StatusOK})
 }
