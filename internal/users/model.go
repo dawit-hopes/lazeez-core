@@ -1,4 +1,4 @@
-package auth
+package users
 
 import (
 	"database/sql"
@@ -22,12 +22,6 @@ type User struct {
 	IsLocked        bool           `json:"is_locked" db:"is_locked"`
 	IsFirstLogin    bool           `json:"is_first_login" db:"is_first_login"`
 	LoggingAttempts int            `json:"logging_attempts" db:"logging_attempts"`
-}
-
-type AuthPayload struct {
-	UserID   string `json:"uid"`
-	BranchID string `json:"bid,omitempty"`
-	Role     Role   `json:"rol"`
 }
 
 func (u *User) Table() string {
@@ -63,10 +57,4 @@ func (u *User) ToDTO() UserDTO {
 		IsFirstLogin:    u.IsFirstLogin,
 		LoggingAttempts: u.LoggingAttempts,
 	}
-}
-
-type AuthClaims struct {
-	UserID   string `json:"uid"`
-	BranchID string `json:"bid,omitempty"`
-	Role     Role   `json:"rol"`
 }

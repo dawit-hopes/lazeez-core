@@ -97,22 +97,29 @@ func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 }
 
 func (m *middleware) validateSession(ctx context.Context, uid string, token string) error {
+	m.logger.Info("validating session", "uid", uid)
+	m.logger.Info("**********************************")
 	session, err := m.sessionService.GetSession(ctx, uid)
 	if err != nil {
+		m.logger.Error("failed to get session", "error", err)
 		return common.ErrUnAuthorized
 	}
 
 	if session.IsRevoked {
+		m.logger.Error("session is revoked")
 		return common.ErrUnAuthorized
 	}
 
 	if session.AccessToken != token {
+		m.logger.Error("access token is invalid")
 		return common.ErrUnAuthorized
 	}
 
 	if session.UserID != uid {
+		m.logger.Error("user id is invalid")
 		return common.ErrUnAuthorized
 	}
+	m.logger.Info("session validated successfully")
 	return nil
 }
 

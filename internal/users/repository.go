@@ -1,4 +1,4 @@
-package auth
+package users
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"lazeez-core/internal/common"
 )
 
-type AuthRepository interface {
+type UserRepository interface {
 	CreateUser(ctx context.Context, user User) error
 	GetUserByID(ctx context.Context, id string) (User, error)
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (User, error)
@@ -22,16 +22,16 @@ type AuthRepository interface {
 	LockUser(ctx context.Context, id string) error
 }
 
-type authRepository struct {
+type userRepository struct {
 	dal    *common.DAL[*User]
 	logger config.Logger
 }
 
-func NewAuthRepository(dal *common.DAL[*User], logger config.Logger) AuthRepository {
-	return &authRepository{dal: dal, logger: logger}
+func NewUserRepository(dal *common.DAL[*User], logger config.Logger) UserRepository {
+	return &userRepository{dal: dal, logger: logger}
 }
 
-func (r *authRepository) CreateUser(ctx context.Context, user User) error {
+func (r *userRepository) CreateUser(ctx context.Context, user User) error {
 	_, err := r.dal.Create(ctx, &user)
 	if err != nil {
 		r.logger.Error("failed to create user", "error", err)
@@ -40,7 +40,7 @@ func (r *authRepository) CreateUser(ctx context.Context, user User) error {
 	return nil
 }
 
-func (r *authRepository) GetUserByID(ctx context.Context, id string) (User, error) {
+func (r *userRepository) GetUserByID(ctx context.Context, id string) (User, error) {
 	filter := map[string]any{"id": id, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
@@ -54,7 +54,7 @@ func (r *authRepository) GetUserByID(ctx context.Context, id string) (User, erro
 	return *result, nil
 }
 
-func (r *authRepository) GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (User, error) {
+func (r *userRepository) GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (User, error) {
 	filter := map[string]any{"phone_number": phoneNumber, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
@@ -68,7 +68,7 @@ func (r *authRepository) GetUserByPhoneNumber(ctx context.Context, phoneNumber s
 	return *result, nil
 }
 
-func (r *authRepository) UpdateUser(ctx context.Context, user User) error {
+func (r *userRepository) UpdateUser(ctx context.Context, user User) error {
 	r.logger.Info("Updating user and ID is", "user", user, "id", user.ID)
 
 	filter := map[string]any{"id": user.ID}
@@ -96,7 +96,7 @@ func (r *authRepository) UpdateUser(ctx context.Context, user User) error {
 	return nil
 }
 
-func (r *authRepository) DeleteUser(ctx context.Context, id string) error {
+func (r *userRepository) DeleteUser(ctx context.Context, id string) error {
 	err := r.dal.Delete(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -109,7 +109,7 @@ func (r *authRepository) DeleteUser(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *authRepository) SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error {
+func (r *userRepository) SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error {
 	updates := map[string]any{
 		"password": password,
 	}
@@ -130,7 +130,7 @@ func (r *authRepository) SetPassword(ctx context.Context, phoneNumber, id, passw
 	return nil
 }
 
-func (r *authRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error {
+func (r *userRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error {
 	filter := map[string]any{"phone_number": phoneNumber, "is_deleted": false}
 	_, err := r.dal.Get(ctx, filter)
 	if err != nil {
@@ -143,7 +143,7 @@ func (r *authRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phone
 	return common.ErrUserWithInformationAlreadyExists
 }
 
-func (r *authRepository) GetAllUsers(ctx context.Context) ([]*User, error) {
+func (r *userRepository) GetAllUsers(ctx context.Context) ([]*User, error) {
 	results, err := r.dal.List(ctx, map[string]any{
 		"is_deleted": false,
 	}, 0, 0)
@@ -154,7 +154,7 @@ func (r *authRepository) GetAllUsers(ctx context.Context) ([]*User, error) {
 	return results, nil
 }
 
-func (r *authRepository) GetUserByBranchID(ctx context.Context, branchID string) (User, error) {
+func (r *userRepository) GetUserByBranchID(ctx context.Context, branchID string) (User, error) {
 	filter := map[string]any{"branch_id": branchID, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
@@ -168,7 +168,7 @@ func (r *authRepository) GetUserByBranchID(ctx context.Context, branchID string)
 	return *result, nil
 }
 
-func (r *authRepository) UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error {
+func (r *userRepository) UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error {
 	filter := map[string]any{"id": id}
 	updates := map[string]any{"logging_attempts": attempts}
 	err := r.dal.Update(ctx, filter, updates)
@@ -179,7 +179,7 @@ func (r *authRepository) UpdateLoggingAttempts(ctx context.Context, id string, a
 	return nil
 }
 
-func (r *authRepository) ResetLoggingAttempts(ctx context.Context, id string) error {
+func (r *userRepository) ResetLoggingAttempts(ctx context.Context, id string) error {
 	filter := map[string]any{"id": id}
 	updates := map[string]any{"logging_attempts": 0}
 	err := r.dal.Update(ctx, filter, updates)
@@ -190,8 +190,7 @@ func (r *authRepository) ResetLoggingAttempts(ctx context.Context, id string) er
 	return nil
 }
 
-
-func (r *authRepository) LockUser(ctx context.Context, id string) error {
+func (r *userRepository) LockUser(ctx context.Context, id string) error {
 	filter := map[string]any{"id": id}
 	updates := map[string]any{"is_locked": true}
 	err := r.dal.Update(ctx, filter, updates)

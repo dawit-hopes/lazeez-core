@@ -12,6 +12,7 @@ import (
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/middleware"
 	"lazeez-core/internal/session"
+	"lazeez-core/internal/users"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -21,19 +22,21 @@ type Dependencies struct {
 	KeyService key.KeyService
 
 	// Repositories
-	AuthRepo     auth.AuthRepository
+	UserRepo     users.UserRepository
 	BranchRepo   branch.BranchRepository
 	MerchantRepo merchant.MerchantRepository
 	MenuRepo     menu.MenuRepository
 
 	// Services
 	AuthService     auth.AuthService
+	UserService     users.UserService
 	BranchService   branch.BranchService
 	MerchantService merchant.MerchantService
 	MenuService     menu.MenuService
 
 	// Handlers
 	AuthHandler     auth.AuthHandler
+	UserHandler     users.UserHandler
 	BranchHandler   branch.BranchHandler
 	MerchantHandler merchant.MerchantHandler
 	MenuHandler     menu.MenuHandler
@@ -51,14 +54,14 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	keyService := key.NewKeyService(logger, secretKey)
 
 	// Initialize DAL instances
-	authDAL := common.NewDAL[*auth.User](db, func() *auth.User { return &auth.User{} })
+	userDAL := common.NewDAL[*users.User](db, func() *users.User { return &users.User{} })
 	branchDAL := common.NewDAL[*branch.Branch](db, func() *branch.Branch { return &branch.Branch{} })
 	merchantDAL := common.NewDAL[*merchant.Merchant](db, func() *merchant.Merchant { return &merchant.Merchant{} })
 	menuDAL := common.NewDAL[*menu.Menu](db, func() *menu.Menu { return &menu.Menu{} })
 	sessionDAL := common.NewDAL[*session.Session](db, func() *session.Session { return &session.Session{} })
 
 	// Initialize repositories
-	authRepo := auth.NewAuthRepository(authDAL, logger)
+	userRepo := users.NewUserRepository(userDAL, logger)
 	branchRepo := branch.NewBranchRepository(branchDAL, logger)
 	merchantRepo := merchant.NewMerchantRepository(merchantDAL, logger)
 	menuRepo := menu.NewMenuRepository(menuDAL, logger)
@@ -67,12 +70,14 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	// Initialize services
 	branchService := branch.NewBranchService(branchRepo, logger)
 	sessionService := session.NewSessionService(sessionRepo, logger)
-	authService := auth.NewAuthService(authRepo, branchService, sessionService, keyService, logger)
+	userService := users.NewUserService(userRepo, branchService, logger)
+	authService := auth.NewAuthService(userService, sessionService, keyService, logger)
 	merchantService := merchant.NewMerchantService(merchantRepo, logger)
 	menuService := menu.NewMenuService(menuRepo, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
+	userHandler := users.NewUserHandler(userService, logger)
 	branchHandler := branch.NewBranchHandler(branchService, logger)
 	merchantHandler := merchant.NewMerchantHandler(merchantService, logger)
 	menuHandler := menu.NewMenuHandler(menuService, logger)
@@ -82,17 +87,19 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	return &Dependencies{
 		KeyService: keyService,
 
-		AuthRepo:     authRepo,
+		UserRepo:     userRepo,
 		BranchRepo:   branchRepo,
 		MerchantRepo: merchantRepo,
 		MenuRepo:     menuRepo,
 
 		AuthService:     authService,
+		UserService:     userService,
 		BranchService:   branchService,
 		MerchantService: merchantService,
 		MenuService:     menuService,
 
 		AuthHandler:     authHandler,
+		UserHandler:     userHandler,
 		BranchHandler:   branchHandler,
 		MerchantHandler: merchantHandler,
 		MenuHandler:     menuHandler,
@@ -108,6 +115,7 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	router.NotFound(deps.Middleware.NotFoundHandler)
 
 	auth.NewAuthRoutes(router, deps.AuthHandler, deps.Middleware)
+	users.NewUserRoutes(router, deps.UserHandler, deps.Middleware)
 	branch.NewBranchRoutes(router, deps.BranchHandler, deps.Middleware)
 	merchant.NewMerchantRoutes(router, deps.MerchantHandler, deps.Middleware)
 	menu.NewMenuRoutes(router, deps.MenuHandler, deps.Middleware)

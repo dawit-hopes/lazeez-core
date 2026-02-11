@@ -36,7 +36,7 @@ func (r *sessionRepository) Create(ctx context.Context, session Session) (Sessio
 }
 
 func (r *sessionRepository) Get(ctx context.Context, id string) (Session, error) {
-	filter := map[string]any{"id": id}
+	filter := map[string]any{"user_id": id, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -83,7 +83,7 @@ func (r *sessionRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *sessionRepository) GetByUserID(ctx context.Context, userID string) (Session, error) {
-	filter := map[string]any{"user_id": userID}
+	filter := map[string]any{"user_id": userID, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

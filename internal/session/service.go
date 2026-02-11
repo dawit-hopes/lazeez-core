@@ -24,19 +24,34 @@ func NewSessionService(sessionRepository SessionRepository, logger config.Logger
 }
 
 func (s *sessionService) CreateSession(ctx context.Context, session Session) error {
-	_, err := s.sessionRepository.GetByUserID(ctx, session.UserID)
+	existingSession, err := s.sessionRepository.GetByUserID(ctx, session.UserID)
 	if err != nil {
 		s.logger.Error("failed to get session", "error", err)
 		return err
 	}
 
-	id := common.GenerateUUID()
-	session.ID = id
+	if existingSession.ID != "" {
+		existingSession.RefreshToken = session.RefreshToken
+		existingSession.AccessToken = session.AccessToken
+		existingSession.IsRevoked = false
+		_, err = s.sessionRepository.Update(ctx, existingSession)
+		if err != nil {
+			s.logger.Error("failed to update session", "error", err)
+			return err
+		}
+		s.logger.Info("session updated successfully")
+		return nil
+	}	
+
+	// No existing session - create new
+	session.ID = common.GenerateUUID()
 	_, err = s.sessionRepository.Create(ctx, session)
 	if err != nil {
 		s.logger.Error("failed to create session", "error", err)
 		return err
 	}
+
+	s.logger.Info("session created successfully")
 	return nil
 }
 

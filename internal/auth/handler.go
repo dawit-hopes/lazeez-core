@@ -8,15 +8,8 @@ import (
 )
 
 type AuthHandler interface {
-	CreateUser(w http.ResponseWriter, r *http.Request)
-	GetUserByID(w http.ResponseWriter, r *http.Request)
-	UpdateUser(w http.ResponseWriter, r *http.Request)
-	DeleteUser(w http.ResponseWriter, r *http.Request)
 	Login(w http.ResponseWriter, r *http.Request)
 	SetPassword(w http.ResponseWriter, r *http.Request)
-	UserLookUp(w http.ResponseWriter, r *http.Request)
-	GetAllUser(w http.ResponseWriter, r *http.Request)
-	GetUserByBranchID(w http.ResponseWriter, r *http.Request)
 	Logout(w http.ResponseWriter, r *http.Request)
 }
 
@@ -27,74 +20,6 @@ type authHandler struct {
 
 func NewAuthHandler(authService AuthService, logger config.Logger) AuthHandler {
 	return &authHandler{authService: authService, logger: logger}
-}
-
-func (h *authHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	var req UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	if err := req.Validate(false); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	err = h.authService.CreateUser(r.Context(), req)
-	if err != nil {
-		h.logger.Error("Failed to create user", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "User created successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	user, err := h.authService.GetUserByID(r.Context(), id)
-	if err != nil {
-		h.logger.Error("Failed to get user by ID", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	var req UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
-	if err := req.Validate(true); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	err = h.authService.UpdateUser(r.Context(), id, req)
-	if err != nil {
-		h.logger.Error("Failed to update user", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Message: "User updated successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.authService.DeleteUser(r.Context(), id)
-	if err != nil {
-		h.logger.Error("Failed to delete user", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Message: "User deleted successfully", StatusCode: http.StatusOK})
 }
 
 func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -139,49 +64,6 @@ func (h *authHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Password set successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
-	var req UserLookUpRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	if err := req.Validate(); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	user, err := h.authService.UserLookUp(r.Context(), req.PhoneNumber)
-	if err != nil {
-		h.logger.Error("Failed to look up user by phone number", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User looked up successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) GetAllUser(w http.ResponseWriter, r *http.Request) {
-	users, err := h.authService.GetAllUsers(r.Context())
-	if err != nil {
-		h.logger.Error("Failed to get all users", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: users, Message: "All users fetched successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) {
-	branchID := common.ParseID(r, "branchID")
-	user, err := h.authService.GetUserByBranchID(r.Context(), branchID)
-	if err != nil {
-		h.logger.Error("Failed to get user by branch ID", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
 }
 
 func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
