@@ -17,6 +17,9 @@ type AuthRepository interface {
 	CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error
 	GetAllUsers(ctx context.Context) ([]*User, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (User, error)
+	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
+	ResetLoggingAttempts(ctx context.Context, id string) error
+	LockUser(ctx context.Context, id string) error
 }
 
 type authRepository struct {
@@ -163,4 +166,38 @@ func (r *authRepository) GetUserByBranchID(ctx context.Context, branchID string)
 		return User{}, err
 	}
 	return *result, nil
+}
+
+func (r *authRepository) UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{"logging_attempts": attempts}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to update logging attempts", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (r *authRepository) ResetLoggingAttempts(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{"logging_attempts": 0}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to reset logging attempts", "error", err)
+		return err
+	}
+	return nil
+}
+
+
+func (r *authRepository) LockUser(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{"is_locked": true}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to lock user", "error", err)
+		return err
+	}
+	return nil
 }

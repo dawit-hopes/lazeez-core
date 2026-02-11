@@ -40,4 +40,5 @@ var (
 	ErrUserWithInformationAlreadyExists = &Errors{Code: BadRequest, Message: "user with this information already exists"}
 	ErrSessionAlreadyExists = &Errors{Code: BadRequest, Message: "session already exists"}
 	ErrSessionNotFound = &Errors{Code: NotFound, Message: "session not found"}
+	ErrUserLocked = &Errors{Code: Unauthorized, Message: "user is locked"}
 )

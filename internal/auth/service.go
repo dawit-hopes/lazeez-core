@@ -111,6 +111,40 @@ func (s *authService) DeleteUser(ctx context.Context, id string) error {
 	return s.authRepository.DeleteUser(ctx, id)
 }
 
+func (s *authService) validateUser(ctx context.Context, user *User, ok bool) error {
+	if !ok {
+		s.logger.Error("Invalid password", "phone number", user.PhoneNumber)
+		err := s.authRepository.UpdateLoggingAttempts(ctx, user.ID, user.LoggingAttempts+1)
+		if err != nil {
+			s.logger.Error("Failed to update logging attempts", "error", err)
+			return err
+		}
+		return common.ErrUnAuthorized
+	}
+
+	if user.LoggingAttempts >= 0 {
+		err := s.authRepository.ResetLoggingAttempts(ctx, user.ID)
+		if err != nil {
+			s.logger.Error("Failed to reset logging attempts", "error", err)
+			return err
+		}
+	}
+
+	if user.IsLocked {
+		s.logger.Error("User is locked", "phone number", user.PhoneNumber)
+		return common.ErrUserLocked
+	}
+
+	if user.LoggingAttempts >= 5 {
+		err := s.authRepository.LockUser(ctx, user.ID)
+		if err != nil {
+			s.logger.Error("Failed to lock user", "error", err)
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginResponse, error) {
 	s.logger.Info("Logging in", "phone number", req.PhoneNumber)
 	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
@@ -134,9 +168,10 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 		s.logger.Error("Failed to verify password", "error", err)
 		return LoginResponse{}, err
 	}
-	if !ok {
-		s.logger.Error("Invalid password", "phone number", req.PhoneNumber)
-		return LoginResponse{}, common.ErrUnAuthorized
+
+	if err := s.validateUser(ctx, existingUser, ok); err != nil {
+		s.logger.Error("Failed to validate user", "error", err)
+		return LoginResponse{}, err
 	}
 
 	accessToken, refreshToken, err := s.generateTokens(existingUser)
