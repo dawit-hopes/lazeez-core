@@ -50,7 +50,13 @@ func (r *merchantRepository) Get(ctx context.Context, id string) (Merchant, erro
 
 func (r *merchantRepository) Update(ctx context.Context, merchant Merchant) (Merchant, error) {
 	filter := map[string]any{"id": merchant.ID}
-	result, err := r.dal.Update(ctx, filter, &merchant)
+	updates := map[string]any{
+		"name":       merchant.Name,
+		"logo":       merchant.Logo,
+		"deleted_at": merchant.DeletedAt,
+		"is_deleted": merchant.IsDeleted,
+	}
+	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("merchant not found", "error", err)
@@ -59,7 +65,7 @@ func (r *merchantRepository) Update(ctx context.Context, merchant Merchant) (Mer
 		r.logger.Error("failed to update merchant", "error", err)
 		return Merchant{}, err
 	}
-	return *result, nil
+	return merchant, nil
 }
 
 func (r *merchantRepository) Delete(ctx context.Context, id string) error {

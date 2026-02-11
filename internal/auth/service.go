@@ -20,7 +20,7 @@ type AuthService interface {
 	DeleteUser(ctx context.Context, id string) error
 	Login(ctx context.Context, req LoginRequest) (LoginResponse, error)
 	SetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
-	UserLookUp(ctx context.Context, phoneNumber string) (User, error)
+	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
 	GetAllUsers(ctx context.Context) ([]*UserDTO, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
 }
@@ -82,7 +82,6 @@ func (s *authService) GetUserByID(ctx context.Context, id string) (UserDTO, erro
 }
 
 func (s *authService) UpdateUser(ctx context.Context, id string, req UserRequest) error {
-
 	existingUser, err := s.authRepository.GetUserByID(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get user by ID", "error", err)
@@ -109,7 +108,13 @@ func (s *authService) DeleteUser(ctx context.Context, id string) error {
 
 func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginResponse, error) {
 	s.logger.Info("Logging in", "phone number", req.PhoneNumber)
-	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
+	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return LoginResponse{}, err
+	}
+
+	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, normalizedPhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return LoginResponse{}, err
@@ -138,21 +143,22 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 	return LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		User:         existingUser,
+		User:         existingUser.ToDTO(),
 	}, nil
 }
 
 func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error) {
-	s.logger.Info("Setting password", "phone number", req.PhoneNumber)
-	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, req.PhoneNumber)
+	// normalize phone number
+	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return nil, err
+	}
+	// check if user exists
+	existingUser, err := s.checkUserExistsByPhoneNumber(ctx, normalizedPhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return nil, err
-	}
-	// User must exist to set password
-	if existingUser == nil {
-		s.logger.Error("User not found", "phone number", req.PhoneNumber)
-		return nil, common.ErrUserNotFound
 	}
 
 	err = s.validatePassword(req.Password)
@@ -167,7 +173,7 @@ func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (
 		return nil, err
 	}
 
-	err = s.authRepository.SetPassword(ctx, req.PhoneNumber, encryptedPassword)
+	err = s.authRepository.SetPassword(ctx, req.PhoneNumber, existingUser.ID, encryptedPassword, existingUser.IsFirstLogin)
 	if err != nil {
 		s.logger.Error("Failed to set password", "error", err)
 		return nil, err
@@ -179,12 +185,22 @@ func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (
 		return nil, err
 	}
 
-	return &LoginResponse{AccessToken: accessToken, RefreshToken: refreshToken, User: existingUser}, nil
+	return &LoginResponse{AccessToken: accessToken, RefreshToken: refreshToken, User: existingUser.ToDTO()}, nil
 }
 
-func (s *authService) UserLookUp(ctx context.Context, phoneNumber string) (User, error) {
+func (s *authService) UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error) {
+	normalizedPhoneNumber, err := s.validatePhoneNumber(phoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return UserDTO{}, err
+	}
 	s.logger.Info("Looking up user by phone number", "phone number", phoneNumber)
-	return s.authRepository.GetUserByPhoneNumber(ctx, phoneNumber)
+	user, err := s.authRepository.GetUserByPhoneNumber(ctx, normalizedPhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to get user by phone number", "error", err)
+		return UserDTO{}, err
+	}
+	return user.ToDTO(), nil
 }
 
 func (s *authService) GetAllUsers(ctx context.Context) ([]*UserDTO, error) {

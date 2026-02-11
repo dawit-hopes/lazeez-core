@@ -12,7 +12,7 @@ type AuthRepository interface {
 	GetUserByID(ctx context.Context, id string) (User, error)
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (User, error)
 	UpdateUser(ctx context.Context, user User) error
-	SetPassword(ctx context.Context, phoneNumber string, password string) error
+	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
 	DeleteUser(ctx context.Context, id string) error
 	CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error
 	GetAllUsers(ctx context.Context) ([]*User, error)
@@ -69,7 +69,19 @@ func (r *authRepository) UpdateUser(ctx context.Context, user User) error {
 	r.logger.Info("Updating user and ID is", "user", user, "id", user.ID)
 
 	filter := map[string]any{"id": user.ID}
-	_, err := r.dal.Update(ctx, filter, &user)
+	updates := map[string]any{
+		"full_name":        user.FullName,
+		"phone_number":     user.PhoneNumber,
+		"password":         user.Password,
+		"role":             user.Role,
+		"branch_id":        user.BranchID,
+		"is_locked":        user.IsLocked,
+		"is_first_login":   user.IsFirstLogin,
+		"logging_attempts": user.LoggingAttempts,
+		"deleted_at":       user.DeletedAt,
+		"is_deleted":       user.IsDeleted,
+	}
+	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("user not found", "error", err)
@@ -94,16 +106,16 @@ func (r *authRepository) DeleteUser(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *authRepository) SetPassword(ctx context.Context, phoneNumber string, password string) error {
-	existingUser, err := r.GetUserByPhoneNumber(ctx, phoneNumber)
-	if err != nil {
-		r.logger.Error("user not found", "error", err)
-		return err
+func (r *authRepository) SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error {
+	updates := map[string]any{
+		"password": password,
+	}
+	if isFirstLogin {
+		updates["is_first_login"] = false
 	}
 
-	user := User{Password: password}
-	filter := map[string]any{"id": existingUser.ID}
-	_, err = r.dal.Update(ctx, filter, &user)
+	filter := map[string]any{"id": id}
+	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("user not found", "error", err)

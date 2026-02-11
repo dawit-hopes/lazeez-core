@@ -20,9 +20,11 @@ var (
 	ErrBranchNotFound        = &Errors{Code: NotFound, Message: "branch not found"}
 	ErrMenuNotFound          = &Errors{Code: NotFound, Message: "menu not found"}
 	ErrUnAuthorized          = &Errors{Code: Unauthorized, Message: "unauthorized"}
-	ErrPasswordRequired      = &Errors{Code: BadRequest, Message: "password is required"}
-	ErrInvalidPassword       = &Errors{Code: BadRequest, Message: "invalid password"}
-	ErrPasswordTooShort      = &Errors{Code: BadRequest, Message: "password is too short"}
+	ErrPasswordRequired      = &Errors{Code: BadRequest, Message: "password is required and cannot be empty"}
+	ErrInvalidPassword       = &Errors{Code: BadRequest, Message: "password is invalid"}
+	ErrPasswordTooShort      = &Errors{Code: BadRequest, Message: "password is too short; it must be at least 9 characters long"}
+	ErrPasswordMissingLetter = &Errors{Code: BadRequest, Message: "password must contain at least one letter (a-z or A-Z)"}
+	ErrPasswordMissingNumberOrSpecial = &Errors{Code: BadRequest, Message: "password must contain at least one number (0-9) or one special character"}
 	ErrMerchantAlreadyExists = &Errors{Code: BadRequest, Message: "merchant with this information already exists"}
 	ErrMerchantNotFound      = &Errors{Code: NotFound, Message: "merchant not found"}
 	ErrInternalServerError   = &Errors{Code: InternalServerError, Message: "internal server error"}

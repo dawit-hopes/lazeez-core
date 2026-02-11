@@ -9,7 +9,7 @@ import (
 
 type Repository[T Mappable] interface {
 	Create(ctx context.Context, model T) (T, error)
-	Update(ctx context.Context, model T) (T, error)
+	Update(ctx context.Context, filters map[string]any, updates map[string]any) error
 	Get(ctx context.Context, filters map[string]any) (T, error)
 	List(ctx context.Context, filters map[string]any, limit, offset int) ([]T, error)
 	Delete(ctx context.Context, id string) error
@@ -135,35 +135,46 @@ func (r *DAL[T]) Create(ctx context.Context, model T) (T, error) {
 	return model, err
 }
 
-// Update updates a record (or records) matching the given filters.
-// NOTE: Filters MUST uniquely identify a row (e.g. by id) to avoid unintended mass updates.
-func (r *DAL[T]) Update(ctx context.Context, filters map[string]any, model T) (T, error) {
-	cols := model.Columns()
-	setClauses := make([]string, len(cols))
-	values := model.Values()
-
-	for i, col := range cols {
-		// SET col = $1, col2 = $2, ...
-		setClauses[i] = fmt.Sprintf("%s = $%d", col, i+1)
+func (r *DAL[T]) Update(ctx context.Context, filters map[string]any, updates map[string]any) error {
+	if len(updates) == 0 {
+		return nil
 	}
 
-	// Include created_at and updated_at in RETURNING
-	returningCols := append(cols, "created_at", "updated_at")
+	instance := r.factory()
 
-	// Build WHERE clause after the SET placeholders
-	whereClause, filterArgs := r.buildWhereClause(filters, len(cols))
+	setClauses := make([]string, 0, len(updates))
+	values := make([]any, 0, len(updates))
+	i := 1
+	for col, val := range updates {
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, i))
+		values = append(values, val)
+		i++
+	}
 
-	query := fmt.Sprintf("UPDATE %s SET %s, updated_at = NOW() %s RETURNING %s",
-		model.Table(),
+	whereClause, filterArgs := r.buildWhereClause(filters, len(updates))
+
+	query := fmt.Sprintf("UPDATE %s SET %s, updated_at = NOW() %s",
+		instance.Table(),
 		strings.Join(setClauses, ", "),
 		whereClause,
-		strings.Join(returningCols, ", "),
 	)
 
 	args := append(values, filterArgs...)
 
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(model.Addr()...)
-	return model, err
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
 
 // Delete deletes a record
