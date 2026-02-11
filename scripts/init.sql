@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-    CONSTRAINT chk_users_role CHECK (role IN ('super admin', 'branch_manager'))
+    CONSTRAINT chk_users_role CHECK (role IN ('super_admin', 'branch_manager'))
 );
 
 -- Create indexes for faster lookups
@@ -70,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role) WHERE is_deleted = FALS
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at) WHERE is_deleted = FALSE;
 
 -- create a super admin user
-INSERT INTO users (phone_number, full_name, role, password, is_locked, is_first_login, logging_attempts) VALUES ('251945557307', 'Super Admin', 'super admin', '$2a$10$8qgRwxx8tZC.t2DVs0jy6u1w4Au4sLz61V5ZVPxdU4V6vFEsiQseC', FALSE, FALSE, 0);
+INSERT INTO users (phone_number, full_name, role, password, is_locked, is_first_login, logging_attempts) VALUES ('251945557307', 'Super Admin', 'super_admin', '$2a$10$8qgRwxx8tZC.t2DVs0jy6u1w4Au4sLz61V5ZVPxdU4V6vFEsiQseC', FALSE, FALSE, 0);
 
 -- ============================================
 -- MENUS TABLE

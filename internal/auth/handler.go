@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
@@ -9,8 +10,9 @@ import (
 
 type AuthHandler interface {
 	Login(w http.ResponseWriter, r *http.Request)
-	SetPassword(w http.ResponseWriter, r *http.Request)
+	FirstTimeLogin(w http.ResponseWriter, r *http.Request)
 	Logout(w http.ResponseWriter, r *http.Request)
+	ResetPassword(w http.ResponseWriter, r *http.Request)
 }
 
 type authHandler struct {
@@ -44,7 +46,26 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Login successful", StatusCode: http.StatusOK})
 }
 
-func (h *authHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) FirstTimeLogin(w http.ResponseWriter, r *http.Request) {
+	h.handleSetPassword(w, r, h.authService.FirstTimeLogin, "Password set successfully", "Failed to set password")
+}
+
+func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.authService.Logout(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to logout", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Logout successful", StatusCode: http.StatusOK})
+}
+
+func (h *authHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	h.handleSetPassword(w, r, h.authService.ResetPassword, "Password reset successfully", "Failed to reset password")
+}
+
+func (h *authHandler) handleSetPassword(w http.ResponseWriter, r *http.Request, fn func(context.Context, SetPasswordRequest) (*LoginResponse, error), successMsg, errorMsg string) {
 	var req SetPasswordRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -57,22 +78,11 @@ func (h *authHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	loginResponse, err := h.authService.SetPassword(r.Context(), req)
+	loginResponse, err := fn(r.Context(), req)
 	if err != nil {
-		h.logger.Error("Failed to set password", "error", err)
+		h.logger.Error(errorMsg, "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Password set successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.authService.Logout(r.Context(), id)
-	if err != nil {
-		h.logger.Error("Failed to logout", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Message: "Logout successful", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: successMsg, StatusCode: http.StatusOK})
 }

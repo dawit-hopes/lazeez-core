@@ -17,14 +17,19 @@ func NewAuthRoutes(router chi.Router, handler AuthHandler, mw middleware.Middlew
 		},
 		{
 			Method:  http.MethodPost,
-			Path:    "/set-password",
-			Handler: handler.SetPassword,
+			Path:    "/first-time-login",
+			Handler: handler.FirstTimeLogin,
 		},
 		{
 			Method:      http.MethodPost,
 			Path:        "/logout/{id}",
 			Handler:     handler.Logout,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/reset-password",
+			Handler: handler.ResetPassword,
 		},
 	}
 	common.RegisterRoutes(router, routes)

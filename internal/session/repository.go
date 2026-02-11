@@ -98,7 +98,7 @@ func (r *sessionRepository) GetByUserID(ctx context.Context, userID string) (Ses
 
 func (r *sessionRepository) Revoke(ctx context.Context, id string, action bool) error {
 	updates := map[string]any{"is_revoked": action}
-	err := r.dal.Update(ctx, map[string]any{"id": id}, updates)
+	err := r.dal.Update(ctx, map[string]any{"user_id": id}, updates)
 	if err != nil {
 		r.logger.Error("failed to revoke session", "error", err)
 		return common.ErrInternalServerError

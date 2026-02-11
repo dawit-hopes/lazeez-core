@@ -8,7 +8,7 @@ import (
 type Role string
 
 const (
-	RoleAdmin         Role = "super admin"
+	RoleAdmin         Role = "super_admin"
 	RoleBranchManager Role = "branch_manager"
 )
 

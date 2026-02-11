@@ -16,15 +16,16 @@ var (
 
 type AuthService interface {
 	Login(ctx context.Context, req LoginRequest) (LoginResponse, error)
-	SetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
+	FirstTimeLogin(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
+	ResetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
 	Logout(ctx context.Context, id string) error
 }
 
 type authService struct {
-	userService     users.UserService
-	sessionService  session.SessionService
-	keyService      key.KeyService
-	logger          config.Logger
+	userService    users.UserService
+	sessionService session.SessionService
+	keyService     key.KeyService
+	logger         config.Logger
 }
 
 func NewAuthService(userService users.UserService, sessionService session.SessionService, keyService key.KeyService, logger config.Logger) AuthService {
@@ -90,7 +91,11 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 	ok, err := s.keyService.VerifyPassword(req.Password, existingUser.Password)
 	if err != nil {
 		s.logger.Error("Failed to verify password", "error", err)
-		return LoginResponse{}, err
+		// Treat as invalid password - update attempts and return user-friendly error
+		if validateErr := s.validateUser(ctx, existingUser, false); validateErr != nil {
+			return LoginResponse{}, validateErr
+		}
+		return LoginResponse{}, common.ErrUnAuthorized
 	}
 
 	if err := s.validateUser(ctx, existingUser, ok); err != nil {
@@ -109,7 +114,6 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 		RefreshToken: refreshToken,
 		AccessToken:  accessToken,
 		IsRevoked:    false,
-
 	}
 
 	s.logger.Info("session", "session", sess.UserID)
@@ -127,7 +131,15 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 	}, nil
 }
 
-func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error) {
+func (s *authService) FirstTimeLogin(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error) {
+	return s.setPasswordAndLogin(ctx, req, true)
+}
+
+func (s *authService) ResetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error) {
+	return s.setPasswordAndLogin(ctx, req, false)
+}
+
+func (s *authService) setPasswordAndLogin(ctx context.Context, req SetPasswordRequest, requireFirstLogin bool) (*LoginResponse, error) {
 	normalizedPhoneNumber, err := s.userService.ValidatePhoneNumber(req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
@@ -142,6 +154,15 @@ func (s *authService) SetPassword(ctx context.Context, req SetPasswordRequest) (
 	if existingUser == nil {
 		s.logger.Error("User not found", "phone number", req.PhoneNumber)
 		return nil, common.ErrUserNotFound
+	}
+
+	if requireFirstLogin && !existingUser.IsFirstLogin {
+		s.logger.Error("User is not first time login", "phone number", req.PhoneNumber)
+		return nil, common.ErrUserNotFirstTimeLogin
+	}
+	if !requireFirstLogin && existingUser.IsFirstLogin {
+		s.logger.Error("User is first time login", "phone number", req.PhoneNumber)
+		return nil, common.ErrUserIsFirstTimeLogin
 	}
 
 	err = s.validatePassword(req.Password)

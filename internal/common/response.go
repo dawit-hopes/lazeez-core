@@ -42,8 +42,6 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 			// High-level message, details are in Errors map
 			message = "validation error"
 		} else {
-			// For other errors, check if it's a validation error by checking the error message
-			// or use the error message directly for better debugging
 			errMsg := err.Error()
 			if strings.Contains(errMsg, "validation") || strings.Contains(errMsg, "required") || strings.Contains(errMsg, "invalid") {
 				statusCode = http.StatusBadRequest

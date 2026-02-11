@@ -89,16 +89,25 @@ func (m *middleware) MethodNotAllowedHandler(w http.ResponseWriter, r *http.Requ
 
 func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
 
 func (m *middleware) validateSession(ctx context.Context, uid string, token string) error {
-	m.logger.Info("validating session", "uid", uid)
-	m.logger.Info("**********************************")
 	session, err := m.sessionService.GetSession(ctx, uid)
 	if err != nil {
 		m.logger.Error("failed to get session", "error", err)
