@@ -64,3 +64,9 @@ func (u *User) ToDTO() UserDTO {
 		LoggingAttempts: u.LoggingAttempts,
 	}
 }
+
+type AuthClaims struct {
+	UserID   string `json:"uid"`
+	BranchID string `json:"bid,omitempty"`
+	Role     Role   `json:"rol"`
+}

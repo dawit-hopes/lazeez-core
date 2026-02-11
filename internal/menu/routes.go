@@ -2,31 +2,37 @@ package menu
 
 import (
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func NewMenuRoutes(router chi.Router, handler MenuHandler) {
+func NewMenuRoutes(router chi.Router, handler MenuHandler, middleware middleware.Middleware) {
 	routes := []common.Route{
 		{
-			Method:  "POST",
-			Path:    "/menus",
-			Handler: handler.Create,
+			Method:      http.MethodPost,
+			Path:        "/menus",
+			Handler:     handler.Create,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 		{
-			Method:  "GET",
-			Path:    "/menus/{id}",
-			Handler: handler.Get,
+			Method:      http.MethodGet,
+			Path:        "/menus/{id}",
+			Handler:     handler.Get,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 		{
-			Method:  "PUT",
-			Path:    "/menus/{id}",
-			Handler: handler.Update,
+			Method:      http.MethodPut,
+			Path:        "/menus/{id}",
+			Handler:     handler.Update,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 		{
-			Method:  "DELETE",
-			Path:    "/menus/{id}",
-			Handler: handler.Delete,
+			Method:      http.MethodDelete,
+			Path:        "/menus/{id}",
+			Handler:     handler.Delete,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 	}
 	common.RegisterRoutes(router, routes)

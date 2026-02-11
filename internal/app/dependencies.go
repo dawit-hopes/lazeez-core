@@ -10,6 +10,7 @@ import (
 	"lazeez-core/internal/key"
 	"lazeez-core/internal/menu"
 	"lazeez-core/internal/merchant"
+	"lazeez-core/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -35,6 +36,8 @@ type Dependencies struct {
 	BranchHandler   branch.BranchHandler
 	MerchantHandler merchant.MerchantHandler
 	MenuHandler     menu.MenuHandler
+
+	Middleware middleware.Middleware
 }
 
 // initializeDependencies initializes all dependencies in the correct order
@@ -70,6 +73,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantHandler := merchant.NewMerchantHandler(merchantService, logger)
 	menuHandler := menu.NewMenuHandler(menuService, logger)
 
+	middleware := middleware.NewMiddleware(keyService, logger)
+
 	return &Dependencies{
 		KeyService: keyService,
 
@@ -87,13 +92,19 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		BranchHandler:   branchHandler,
 		MerchantHandler: merchantHandler,
 		MenuHandler:     menuHandler,
+
+		Middleware: middleware,
 	}, nil
 }
 
 // registerRoutes registers all routes with the router
 func registerRoutes(router chi.Router, deps *Dependencies) {
-	auth.NewAuthRoutes(router, deps.AuthHandler)
-	branch.NewBranchRoutes(router, deps.BranchHandler)
-	merchant.NewMerchantRoutes(router, deps.MerchantHandler)
-	menu.NewMenuRoutes(router, deps.MenuHandler)
+	router.Use(deps.Middleware.CORSHandler)
+	router.MethodNotAllowed(deps.Middleware.MethodNotAllowedHandler)
+	router.NotFound(deps.Middleware.NotFoundHandler)
+
+	auth.NewAuthRoutes(router, deps.AuthHandler, deps.Middleware)
+	branch.NewBranchRoutes(router, deps.BranchHandler, deps.Middleware)
+	merchant.NewMerchantRoutes(router, deps.MerchantHandler, deps.Middleware)
+	menu.NewMenuRoutes(router, deps.MenuHandler, deps.Middleware)
 }

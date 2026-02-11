@@ -137,7 +137,12 @@ func (s *authService) validatePassword(password string) error {
 }
 
 func (s *authService) generateTokens(user *User) (string, string, error) {
-	payload := map[string]any{"uid": user.ID, "bid": user.BranchID, "rol": user.Role}
+	// Normalize BranchID to a plain string for JWT payload
+	branchID := ""
+	if user.BranchID.Valid {
+		branchID = user.BranchID.String
+	}
+	payload := map[string]any{"uid": user.ID, "bid": branchID, "rol": user.Role}
 
 	accessToken, err := s.keyService.GenerateJWTToken(payload, accessTokenExpirationMinutes)
 	if err != nil {
