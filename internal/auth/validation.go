@@ -23,3 +23,9 @@ func (u *SetPasswordRequest) Validate() error {
 		validation.Field(&u.Password, validation.Required.Error("password is required"), validation.Length(8, 100).Error("password must be between 8 and 100 characters")),
 	)
 }
+
+func (u *RefreshTokenRequest) Validate() error {
+	return validation.ValidateStruct(u,
+		validation.Field(&u.RefreshToken, validation.Required.Error("refresh token is required")),
+	)
+}

@@ -13,6 +13,7 @@ type AuthHandler interface {
 	FirstTimeLogin(w http.ResponseWriter, r *http.Request)
 	Logout(w http.ResponseWriter, r *http.Request)
 	ResetPassword(w http.ResponseWriter, r *http.Request)
+	RefreshToken(w http.ResponseWriter, r *http.Request)
 }
 
 type authHandler struct {
@@ -85,4 +86,23 @@ func (h *authHandler) handleSetPassword(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: successMsg, StatusCode: http.StatusOK})
+}
+
+
+func (h *authHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		h.logger.Error("Failed to get refresh token from cookie", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	refreshToken := cookie.Value
+	loginResponse, err := h.authService.RefreshToken(r.Context(), refreshToken)
+	if err != nil {
+		h.logger.Error("Failed to refresh token", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Token refreshed successfully", StatusCode: http.StatusOK})
 }

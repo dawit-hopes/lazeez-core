@@ -2,7 +2,6 @@ package auth
 
 import (
 	"lazeez-core/internal/common"
-	"lazeez-core/internal/users"
 	"regexp"
 )
 
@@ -36,12 +35,12 @@ func (s *authService) validatePassword(password string) error {
 	return nil
 }
 
-func (s *authService) generateTokens(user *users.User) (string, string, error) {
+func (s *authService) generateTokens(user map[string]any) (string, string, error) {
 	branchID := ""
-	if user.BranchID.Valid {
-		branchID = user.BranchID.String
+	if user["branch_id"] != nil {
+		branchID = user["branch_id"].(string)
 	}
-	payload := map[string]any{"uid": user.ID, "bid": branchID, "rol": user.Role}
+	payload := map[string]any{"uid": user["id"], "bid": branchID, "rol": user["role"]}
 
 	accessToken, err := s.keyService.GenerateJWTToken(payload, accessTokenExpirationMinutes)
 	if err != nil {

@@ -31,6 +31,11 @@ func NewAuthRoutes(router chi.Router, handler AuthHandler, mw middleware.Middlew
 			Path:    "/reset-password",
 			Handler: handler.ResetPassword,
 		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/refresh-token",
+			Handler: handler.RefreshToken,
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }

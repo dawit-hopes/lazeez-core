@@ -17,3 +17,7 @@ type LoginResponse struct {
 	RefreshToken string        `json:"refresh_token"`
 	User         users.UserDTO `json:"user"`
 }
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}

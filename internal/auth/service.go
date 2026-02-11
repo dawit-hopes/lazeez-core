@@ -19,6 +19,7 @@ type AuthService interface {
 	FirstTimeLogin(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
 	ResetPassword(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error)
 	Logout(ctx context.Context, id string) error
+	RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error)
 }
 
 type authService struct {
@@ -103,7 +104,8 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 		return LoginResponse{}, err
 	}
 
-	accessToken, refreshToken, err := s.generateTokens(existingUser)
+	payload := map[string]any{"id": existingUser.ID, "role": existingUser.Role, "branch_id": existingUser.BranchID}
+	accessToken, refreshToken, err := s.generateTokens(payload)
 	if err != nil {
 		s.logger.Error("Failed to generate tokens", "error", err)
 		return LoginResponse{}, err
@@ -183,7 +185,8 @@ func (s *authService) setPasswordAndLogin(ctx context.Context, req SetPasswordRe
 		return nil, err
 	}
 
-	accessToken, refreshToken, err := s.generateTokens(existingUser)
+	payload := map[string]any{"id": existingUser.ID, "role": existingUser.Role, "branch_id": existingUser.BranchID.String}
+	accessToken, refreshToken, err := s.generateTokens(payload)
 	if err != nil {
 		s.logger.Error("Failed to generate tokens", "error", err)
 		return nil, err
@@ -200,4 +203,38 @@ func (s *authService) Logout(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error) {
+	session, err := s.sessionService.GetSession(ctx, refreshToken)
+	if err != nil {
+		s.logger.Error("Failed to get session", "error", err)
+		return nil, err
+	}
+
+	if session.IsRevoked {
+		s.logger.Error("Session is revoked", "refresh token", refreshToken)
+		return nil, common.ErrSessionRevoked
+	}
+
+	if session.RefreshToken != refreshToken {
+		s.logger.Error("Refresh token is invalid", "refresh token", refreshToken)
+		return nil, common.ErrInvalidRefreshToken
+	}
+
+	user, err := s.userService.GetUserByID(ctx, session.UserID)
+	if err != nil {
+		s.logger.Error("Failed to get user by ID", "error", err)
+		return nil, err
+	}
+
+	payload := map[string]any{"id": user.ID, "role": user.Role, "branch_id": user.BranchID}
+
+	accessToken, refreshToken, err := s.generateTokens(payload)
+	if err != nil {
+		s.logger.Error("Failed to generate tokens", "error", err)
+		return nil, err
+	}
+
+	return &LoginResponse{AccessToken: accessToken, RefreshToken: refreshToken, User: user}, nil
 }
