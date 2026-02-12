@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+.vscode
+.idea
+.DS_Store
+*.md
+tmp
+.air.toml
+scripts/docker-compose.yml

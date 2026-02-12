@@ -71,7 +71,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	branchService := branch.NewBranchService(branchRepo, logger)
 	sessionService := session.NewSessionService(sessionRepo, logger)
 	userService := users.NewUserService(userRepo, branchService, logger)
-	authService := auth.NewAuthService(userService, sessionService, keyService, logger)
+	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
 	merchantService := merchant.NewMerchantService(merchantRepo, logger)
 	menuService := menu.NewMenuService(menuRepo, logger)
 

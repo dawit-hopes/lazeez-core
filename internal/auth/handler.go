@@ -6,6 +6,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"net/http"
+	"time"
 )
 
 type AuthHandler interface {
@@ -44,6 +45,8 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	h.setCookies(w, loginResponse.RefreshToken)
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Login successful", StatusCode: http.StatusOK})
 }
 
@@ -88,7 +91,6 @@ func (h *authHandler) handleSetPassword(w http.ResponseWriter, r *http.Request, 
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: successMsg, StatusCode: http.StatusOK})
 }
 
-
 func (h *authHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
@@ -104,5 +106,18 @@ func (h *authHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	h.setCookies(w, loginResponse.RefreshToken)
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Token refreshed successfully", StatusCode: http.StatusOK})
+}
+
+func (h *authHandler) setCookies(w http.ResponseWriter, refreshToken string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(time.Hour * 24 * 30),
+	})
 }

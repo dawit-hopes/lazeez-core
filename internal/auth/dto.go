@@ -14,10 +14,7 @@ type SetPasswordRequest struct {
 
 type LoginResponse struct {
 	AccessToken  string        `json:"access_token"`
-	RefreshToken string        `json:"refresh_token"`
+	RefreshToken string        `json:"-"`
 	User         users.UserDTO `json:"user"`
 }
 
-type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
