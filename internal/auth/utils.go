@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"lazeez-core/internal/common"
 	"regexp"
 )
@@ -37,8 +38,15 @@ func (s *authService) validatePassword(password string) error {
 
 func (s *authService) generateTokens(user map[string]any) (string, string, error) {
 	branchID := ""
-	if user["branch_id"] != nil {
-		branchID = user["branch_id"].(string)
+	if bid := user["branch_id"]; bid != nil {
+		switch v := bid.(type) {
+		case string:
+			branchID = v
+		case sql.NullString:
+			if v.Valid {
+				branchID = v.String
+			}
+		}
 	}
 	payload := map[string]any{"uid": user["id"], "bid": branchID, "rol": user["role"]}
 

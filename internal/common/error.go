@@ -45,4 +45,6 @@ var (
 	ErrUserIsFirstTimeLogin             = &Errors{Code: BadRequest, Message: "user is first time user."}
 	ErrSessionRevoked                   = &Errors{Code: Unauthorized, Message: "session is revoked"}
 	ErrInvalidRefreshToken              = &Errors{Code: Unauthorized, Message: "invalid refresh token"}
+	ErrWrongUsernameOrPassword          = &Errors{Code: Unauthorized, Message: "wrong username or password"}
+	ErrRefreshTokenNotFound             = &Errors{Code: BadRequest, Message: "refresh token not found"}
 )

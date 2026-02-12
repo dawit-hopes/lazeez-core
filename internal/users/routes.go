@@ -36,7 +36,7 @@ func NewUserRoutes(router chi.Router, handler UserHandler, mw middleware.Middlew
 		},
 		{
 			Method:  http.MethodPost,
-			Path:    "/user-look-up",
+			Path:    "/users/look-up",
 			Handler: handler.UserLookUp,
 		},
 		{

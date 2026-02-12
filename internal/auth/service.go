@@ -38,7 +38,18 @@ func NewAuthService(userService users.UserService, sessionService session.Sessio
 	}
 }
 
-func (s *authService) validateUser(ctx context.Context, user *users.User, ok bool) error {
+func (s *authService) validateUser(ctx context.Context, user *users.User, req LoginRequest) error {
+	ok, err := s.keyService.VerifyPassword(req.Password, user.Password)
+	if err != nil {
+		s.logger.Error("Failed to verify password", "error", err)
+		err := s.userService.UpdateLoggingAttempts(ctx, user.ID, user.LoggingAttempts+1)
+		if err != nil {
+			s.logger.Error("Failed to update logging attempts", "error", err)
+			return err
+		}
+		return common.ErrWrongUsernameOrPassword
+	}
+
 	if !ok {
 		s.logger.Error("Invalid password", "phone number", user.PhoneNumber)
 		err := s.userService.UpdateLoggingAttempts(ctx, user.ID, user.LoggingAttempts+1)
@@ -46,7 +57,7 @@ func (s *authService) validateUser(ctx context.Context, user *users.User, ok boo
 			s.logger.Error("Failed to update logging attempts", "error", err)
 			return err
 		}
-		return common.ErrUnAuthorized
+		return common.ErrWrongUsernameOrPassword
 	}
 
 	if user.LoggingAttempts >= 0 {
@@ -57,18 +68,18 @@ func (s *authService) validateUser(ctx context.Context, user *users.User, ok boo
 		}
 	}
 
-	if user.IsLocked {
-		s.logger.Error("User is locked", "phone number", user.PhoneNumber)
-		return common.ErrUserLocked
-	}
+	// if user.IsLocked {
+	// 	s.logger.Error("User is locked", "phone number", user.PhoneNumber)
+	// 	return common.ErrUserLocked
+	// }
 
-	if user.LoggingAttempts >= 5 {
-		err := s.userService.LockUser(ctx, user.ID)
-		if err != nil {
-			s.logger.Error("Failed to lock user", "error", err)
-			return err
-		}
-	}
+	// if user.LoggingAttempts >= 5 {
+	// 	err := s.userService.LockUser(ctx, user.ID)
+	// 	if err != nil {
+	// 		s.logger.Error("Failed to lock user", "error", err)
+	// 		return err
+	// 	}
+	// }
 	return nil
 }
 
@@ -89,17 +100,8 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 		s.logger.Error("User not found", "phone number", req.PhoneNumber)
 		return LoginResponse{}, common.ErrUserNotFound
 	}
-	ok, err := s.keyService.VerifyPassword(req.Password, existingUser.Password)
-	if err != nil {
-		s.logger.Error("Failed to verify password", "error", err)
-		// Treat as invalid password - update attempts and return user-friendly error
-		if validateErr := s.validateUser(ctx, existingUser, false); validateErr != nil {
-			return LoginResponse{}, validateErr
-		}
-		return LoginResponse{}, common.ErrUnAuthorized
-	}
 
-	if err := s.validateUser(ctx, existingUser, ok); err != nil {
+	if err := s.validateUser(ctx, existingUser, req); err != nil {
 		s.logger.Error("Failed to validate user", "error", err)
 		return LoginResponse{}, err
 	}
@@ -122,8 +124,8 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (LoginRespons
 
 	sessionErr := s.sessionService.CreateSession(ctx, sess)
 	if sessionErr != nil {
-		s.logger.Error("Failed to create session", "error", err)
-		return LoginResponse{}, err
+		s.logger.Error("Failed to create session", "error", sessionErr)
+		return LoginResponse{}, sessionErr
 	}
 
 	return LoginResponse{

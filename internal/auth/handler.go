@@ -93,7 +93,7 @@ func (h *authHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
 		h.logger.Error("Failed to get refresh token from cookie", "error", err)
-		common.WriteErrorResponse(w, err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
 

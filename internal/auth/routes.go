@@ -12,28 +12,28 @@ func NewAuthRoutes(router chi.Router, handler AuthHandler, mw middleware.Middlew
 	routes := []common.Route{
 		{
 			Method:  http.MethodPost,
-			Path:    "/login",
+			Path:    "/auth/login",
 			Handler: handler.Login,
 		},
 		{
 			Method:  http.MethodPost,
-			Path:    "/first-time-login",
+			Path:    "/auth/first-time-login",
 			Handler: handler.FirstTimeLogin,
 		},
 		{
 			Method:      http.MethodPost,
-			Path:        "/logout/{id}",
+			Path:        "/auth/logout/{id}",
 			Handler:     handler.Logout,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
 			Method:  http.MethodPost,
-			Path:    "/reset-password",
+			Path:    "/auth/reset-password",
 			Handler: handler.ResetPassword,
 		},
 		{
 			Method:  http.MethodPost,
-			Path:    "/refresh-token",
+			Path:    "/auth/refresh",
 			Handler: handler.RefreshToken,
 		},
 	}

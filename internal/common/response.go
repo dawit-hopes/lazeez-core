@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
@@ -41,13 +40,8 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 			}
 			// High-level message, details are in Errors map
 			message = "validation error"
-		} else {
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "validation") || strings.Contains(errMsg, "required") || strings.Contains(errMsg, "invalid") {
-				statusCode = http.StatusBadRequest
-				message = errMsg
-			}
 		}
+		// For non-domain errors, always return generic message to avoid leaking internal details
 
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(Response{

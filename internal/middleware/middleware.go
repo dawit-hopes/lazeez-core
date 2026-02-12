@@ -9,13 +9,15 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/go-chi/cors"
 )
 
 type Middleware interface {
 	ValidateToken(next http.Handler) http.Handler
-	CORSHandler(next http.Handler) http.Handler
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
 	MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request)
+	CORSHandler(next http.Handler) http.Handler
 }
 
 type contextKey string
@@ -87,26 +89,6 @@ func (m *middleware) MethodNotAllowedHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (m *middleware) CORSHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			origin = "*"
-		}
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Max-Age", "86400")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
 func (m *middleware) validateSession(ctx context.Context, uid string, token string) error {
 	session, err := m.sessionService.GetSession(ctx, uid)
 	if err != nil {
@@ -162,4 +144,27 @@ func (m *middleware) decodeToken(token string) (map[string]any, error) {
 		"bid": branchID,
 		"rol": roleStr,
 	}, nil
+}
+
+var localURLs = []string{
+	"http://localhost:8081",
+	"http://10.121.241.209:8081",
+	"http://172.21.0.1:8081",
+	"http://172.19.0.1:8081",
+	"http://172.23.0.1:8081",
+	"http://172.24.0.1:8081",
+}
+
+func (m *middleware) CORSHandler(next http.Handler) http.Handler {
+	return cors.Handler(cors.Options{
+		AllowedOrigins: localURLs,
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders: []string{
+			"Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token",
+			"Origin", "Accept",
+		},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           86400,
+	})(next)
 }
