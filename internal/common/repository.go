@@ -13,6 +13,7 @@ type Repository[T Mappable] interface {
 	Get(ctx context.Context, filters map[string]any) (T, error)
 	List(ctx context.Context, filters map[string]any, limit, offset int) ([]T, error)
 	Delete(ctx context.Context, id string) error
+	DeleteByFilters(ctx context.Context, filters map[string]any) error
 	Count(ctx context.Context) (int, error)
 }
 
@@ -64,6 +65,59 @@ func (r *DAL[T]) List(ctx context.Context, filters map[string]any, limit, offset
 	}
 	if _, exists := filters["is_deleted"]; !exists {
 		filters["is_deleted"] = false
+	}
+
+	whereClause, args := r.buildWhereClause(filters, 0)
+
+	// Handle limit: if 0, use a large number to get all records
+	if limit <= 0 {
+		limit = 10000
+	}
+
+	// Always return newest records first
+	orderBy := " ORDER BY created_at DESC"
+
+	argCount := len(args)
+	query := fmt.Sprintf("SELECT %s FROM %s %s%s LIMIT $%d OFFSET $%d",
+		strings.Join(selectCols, ", "),
+		instance.Table(),
+		whereClause,
+		orderBy,
+		argCount+1,
+		argCount+2,
+	)
+
+	args = append(args, limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []T
+	for rows.Next() {
+		item := r.factory()
+		if err := rows.Scan(item.Addr()...); err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, nil
+}
+
+// ListIncludeDeleted retrieves multiple records by filters without automatically
+// filtering out soft-deleted records. Callers must specify any is_deleted
+// constraints explicitly in filters if desired.
+func (r *DAL[T]) ListIncludeDeleted(ctx context.Context, filters map[string]any, limit, offset int) ([]T, error) {
+	instance := r.factory()
+
+	// Include created_at and updated_at in SELECT
+	cols := instance.Columns()
+	selectCols := append(cols, "created_at", "updated_at")
+
+	if filters == nil {
+		filters = make(map[string]any)
 	}
 
 	whereClause, args := r.buildWhereClause(filters, 0)
@@ -177,6 +231,46 @@ func (r *DAL[T]) Delete(ctx context.Context, id string) error {
 	return err
 }
 
+// SoftDeleteWhere performs a set-based soft delete on the table for T using
+// an arbitrary WHERE clause. This lets you delete related records in bulk,
+// e.g. all users whose branch belongs to a given merchant.
+//
+// Example:
+//   err := userDAL.SoftDeleteWhere(
+//       ctx,
+//       "branch_id IN (SELECT id FROM branches WHERE merchant_id = $1 AND is_deleted = FALSE)",
+//       merchantID,
+//   )
+func (r *DAL[T]) SoftDeleteWhere(ctx context.Context, where string, args ...any) error {
+	where = strings.TrimSpace(where)
+	if where == "" {
+		// Avoid accidentally deleting every row
+		return nil
+	}
+
+	temp := r.factory()
+	query := fmt.Sprintf(
+		"UPDATE %s SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW() WHERE %s",
+		temp.Table(),
+		where,
+	)
+
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
 // Count counts the number of records
 func (r *DAL[T]) Count(ctx context.Context) (int, error) {
 	temp := r.factory()
@@ -203,4 +297,34 @@ func (r *DAL[T]) buildWhereClause(filters map[string]any, startAt int) (string, 
 	}
 
 	return "WHERE " + strings.Join(clauses, " AND "), args
+}
+
+
+func (r *DAL[T]) DeleteByFilters(ctx context.Context, filters map[string]any) error {
+	if len(filters) == 0 {
+		return nil
+	}
+
+	instance := r.factory()
+	whereClause, args := r.buildWhereClause(filters, 0)
+	query := fmt.Sprintf(
+		"UPDATE %s SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW() %s",
+		instance.Table(),
+		whereClause,
+	)
+
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }

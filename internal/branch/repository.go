@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 )
 
 type BranchRepository interface {
@@ -18,12 +19,17 @@ type BranchRepository interface {
 }
 
 type branchRepository struct {
-	dal    *common.DAL[*Branch]
-	logger config.Logger
+	dal     *common.DAL[*Branch]
+	joinDAL *common.JoinDAL
+	logger  config.Logger
 }
 
-func NewBranchRepository(dal *common.DAL[*Branch], logger config.Logger) BranchRepository {
-	return &branchRepository{dal: dal, logger: logger}
+func NewBranchRepository(dal *common.DAL[*Branch], joinDAL *common.JoinDAL, logger config.Logger) BranchRepository {
+	return &branchRepository{
+		dal:     dal,
+		joinDAL: joinDAL,
+		logger:  logger,
+	}
 }
 
 func (r *branchRepository) Create(ctx context.Context, branch Branch) error {
@@ -72,15 +78,32 @@ func (r *branchRepository) Update(ctx context.Context, branch Branch) error {
 }
 
 func (r *branchRepository) Delete(ctx context.Context, id string) error {
-	err := r.dal.Delete(ctx, id)
+	const deleteBranchCascadeQuery = `
+WITH updated_users AS (
+	UPDATE users u
+	SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW()
+	WHERE u.branch_id = $1 AND u.is_deleted = FALSE
+)
+UPDATE branches b
+SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW()
+WHERE b.id = $1 AND b.is_deleted = FALSE;
+`
+
+	result, err := r.joinDAL.Exec(ctx, deleteBranchCascadeQuery, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			r.logger.Error("branch not found", "error", err)
-			return common.ErrBranchNotFound
-		}
-		r.logger.Error("failed to delete branch", "error", err)
+		r.logger.Error("failed to cascade delete branch", "branch_id", id, "error", err)
 		return common.ErrInternalServerError
 	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		r.logger.Error("branch not found", "branch_id", id)
+		return common.ErrBranchNotFound
+	}
+
 	return nil
 }
 
@@ -98,7 +121,15 @@ func (r *branchRepository) CheckExists(ctx context.Context, merchantID string, b
 }
 
 func (r *branchRepository) GetAll(ctx context.Context) ([]*Branch, error) {
-	results, err := r.dal.List(ctx, map[string]any{}, 0, 0)
+	role, _ := middleware.GetRoleFromContext(ctx)
+
+	var results []*Branch
+	var err error
+	if role == "super_admin" {
+		results, err = r.dal.ListIncludeDeleted(ctx, map[string]any{}, 0, 0)
+	} else {
+		results, err = r.dal.List(ctx, map[string]any{}, 0, 0)
+	}
 	if err != nil {
 		r.logger.Error("failed to get all branches", "error", err)
 		return nil, err
@@ -109,7 +140,16 @@ func (r *branchRepository) GetAll(ctx context.Context) ([]*Branch, error) {
 func (r *branchRepository) GetAllByMerchantID(ctx context.Context, merchantID string) ([]*Branch, error) {
 	r.logger.Info("getting all branches by merchant ID", "merchantID", merchantID)
 	filter := map[string]any{"merchant_id": merchantID}
-	results, err := r.dal.List(ctx, filter, 0, 0)
+
+	role, _ := middleware.GetRoleFromContext(ctx)
+
+	var results []*Branch
+	var err error
+	if role == "super_admin" {
+		results, err = r.dal.ListIncludeDeleted(ctx, filter, 0, 0)
+	} else {
+		results, err = r.dal.List(ctx, filter, 0, 0)
+	}
 	if err != nil {
 		r.logger.Error("failed to get all branches by merchant ID", "error", err)
 		return nil, err

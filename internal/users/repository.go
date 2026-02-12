@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 )
 
 type UserRepository interface {
@@ -144,9 +145,18 @@ func (r *userRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phone
 }
 
 func (r *userRepository) GetAllUsers(ctx context.Context) ([]*User, error) {
-	results, err := r.dal.List(ctx, map[string]any{
-		"is_deleted": false,
-	}, 0, 0)
+	role, _ := middleware.GetRoleFromContext(ctx)
+
+	var results []*User
+	var err error
+	// Super admin can see deleted + non-deleted; others see only non-deleted
+	if role != "" && role == string(RoleAdmin) {
+		results, err = r.dal.ListIncludeDeleted(ctx, map[string]any{}, 0, 0)
+	} else {
+		results, err = r.dal.List(ctx, map[string]any{
+			"is_deleted": false,
+		}, 0, 0)
+	}
 	if err != nil {
 		r.logger.Error("failed to get all users", "error", err)
 		return nil, err

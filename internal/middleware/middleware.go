@@ -168,3 +168,14 @@ func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 		MaxAge:           86400,
 	})(next)
 }
+
+// GetRoleFromContext extracts the role (\"rol\") claim from the request context.
+// It returns the role string and a boolean indicating whether it was present.
+func GetRoleFromContext(ctx context.Context) (string, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(map[string]any)
+	if !ok || claims == nil {
+		return "", false
+	}
+	role, ok := claims["rol"].(string)
+	return role, ok
+}

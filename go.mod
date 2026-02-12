@@ -18,4 +18,12 @@ require (
 	golang.org/x/sync v0.19.0
 )
 
-require github.com/go-chi/cors v1.2.2
+require (
+	github.com/cloudinary/cloudinary-go/v2 v2.14.1
+	github.com/go-chi/cors v1.2.2
+)
+
+require (
+	github.com/creasty/defaults v1.7.0 // indirect
+	github.com/gorilla/schema v1.4.1 // indirect
+)

@@ -43,6 +43,13 @@ func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) err
 
 	branch.ID = common.GenerateUUID()
 
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return err
+	}
+	branch.PhoneNumber = normalizedPhoneNumber
+
 	s.logger.Info("Creating branch", "branch", branch)
 
 	err = s.branchRepository.Create(ctx, branch)
@@ -135,3 +142,5 @@ func (s *branchService) GetAllByMerchantID(ctx context.Context, merchantID strin
 	}
 	return branchDTOs, nil
 }
+
+

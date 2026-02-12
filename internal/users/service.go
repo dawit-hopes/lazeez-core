@@ -4,6 +4,7 @@ import (
 	"context"
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
+	"lazeez-core/internal/common"
 )
 
 type UserService interface {
@@ -20,13 +21,12 @@ type UserService interface {
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
 	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
-	ValidatePhoneNumber(phoneNumber string) (string, error)
 }
 
 type userService struct {
-	userRepository  UserRepository
-	branchService   branch.BranchService
-	logger          config.Logger
+	userRepository UserRepository
+	branchService  branch.BranchService
+	logger         config.Logger
 }
 
 func NewUserService(userRepository UserRepository, branchService branch.BranchService, logger config.Logger) UserService {
@@ -38,7 +38,7 @@ func NewUserService(userRepository UserRepository, branchService branch.BranchSe
 }
 
 func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
-	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
 		return err
@@ -85,7 +85,7 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req UserRequest
 	}
 
 	if req.PhoneNumber != "" {
-		normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+		normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
 		if err != nil {
 			s.logger.Error("Failed to validate phone number", "error", err)
 			return err
@@ -103,7 +103,7 @@ func (s *userService) DeleteUser(ctx context.Context, id string) error {
 }
 
 func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error) {
-	normalizedPhoneNumber, err := s.validatePhoneNumber(phoneNumber)
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(phoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
 		return UserDTO{}, err
@@ -166,8 +166,4 @@ func (s *userService) LockUser(ctx context.Context, id string) error {
 
 func (s *userService) SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error {
 	return s.userRepository.SetPassword(ctx, phoneNumber, id, password, isFirstLogin)
-}
-
-func (s *userService) ValidatePhoneNumber(phoneNumber string) (string, error) {
-	return s.validatePhoneNumber(phoneNumber)
 }

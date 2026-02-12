@@ -4,6 +4,7 @@ import (
 	"context"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/files"
 )
 
 type MenuService interface {
@@ -15,13 +16,15 @@ type MenuService interface {
 
 type menuService struct {
 	menuRepository MenuRepository
+	fileService    files.FileService
 	logger         config.Logger
 }
 
-func NewMenuService(menuRepository MenuRepository, logger config.Logger) MenuService {
+func NewMenuService(menuRepository MenuRepository, fileService files.FileService, logger config.Logger) MenuService {
 	return &menuService{
 		menuRepository: menuRepository,
 		logger:         logger,
+		fileService:    fileService,
 	}
 }
 
@@ -30,9 +33,15 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (Menu, error)
 		Name: req.Name,
 	}
 
+	if req.Image != nil {
+		imageURL, err := s.fileService.UploadFile(ctx, &req.ImageHeader)
+		if err != nil {
+			s.logger.Error("Failed to upload image", "error", err)
+			return menu, err
+		}
+		menu.Image = imageURL
+	}
 	menu.ID = common.GenerateUUID()
-
-	s.logger.Info("Creating menu", "menu", menu)
 
 	createdMenu, err := s.menuRepository.Create(ctx, menu)
 	if err != nil {
@@ -44,7 +53,6 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (Menu, error)
 }
 
 func (s *menuService) Get(ctx context.Context, id string) (Menu, error) {
-	s.logger.Info("Getting menu by ID", "id", id)
 	menu, err := s.menuRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get menu", "error", err)
@@ -54,8 +62,6 @@ func (s *menuService) Get(ctx context.Context, id string) (Menu, error) {
 }
 
 func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) (Menu, error) {
-	s.logger.Info("Updating menu", "id", id)
-
 	existingMenu, err := s.menuRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get menu", "error", err)
@@ -66,7 +72,12 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) (M
 		existingMenu.Name = req.Name
 	}
 	if req.Image != nil {
-		// we will upload the image to the cloud storage and update the image url in the database
+		imageURL, err := s.fileService.UploadFile(ctx, &req.ImageHeader)
+		if err != nil {
+			s.logger.Error("Failed to upload image", "error", err)
+			return Menu{}, err
+		}
+		existingMenu.Image = imageURL
 	}
 
 	updatedMenu, err := s.menuRepository.Update(ctx, existingMenu)
@@ -79,8 +90,6 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) (M
 }
 
 func (s *menuService) Delete(ctx context.Context, id string) error {
-	s.logger.Info("Deleting menu", "id", id)
-
 	if err := s.menuRepository.Delete(ctx, id); err != nil {
 		s.logger.Error("Failed to delete menu", "error", err)
 		return err

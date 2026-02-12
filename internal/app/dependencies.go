@@ -7,6 +7,7 @@ import (
 	"lazeez-core/internal/auth"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/files"
 	"lazeez-core/internal/key"
 	"lazeez-core/internal/menu"
 	"lazeez-core/internal/merchant"
@@ -60,10 +61,17 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	menuDAL := common.NewDAL[*menu.Menu](db, func() *menu.Menu { return &menu.Menu{} })
 	sessionDAL := common.NewDAL[*session.Session](db, func() *session.Session { return &session.Session{} })
 
+	joinDAL := common.NewJoinDAL(db)
+	cld, err := initCloudinary(logger)
+	if err != nil {
+		return nil, err
+	}
+	fileService := files.NewFileService(logger, cld)
+
 	// Initialize repositories
 	userRepo := users.NewUserRepository(userDAL, logger)
-	branchRepo := branch.NewBranchRepository(branchDAL, logger)
-	merchantRepo := merchant.NewMerchantRepository(merchantDAL, logger)
+	branchRepo := branch.NewBranchRepository(branchDAL, joinDAL, logger)
+	merchantRepo := merchant.NewMerchantRepository(merchantDAL, joinDAL, logger)
 	menuRepo := menu.NewMenuRepository(menuDAL, logger)
 	sessionRepo := session.NewSessionRepository(sessionDAL, logger)
 
@@ -72,8 +80,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	sessionService := session.NewSessionService(sessionRepo, logger)
 	userService := users.NewUserService(userRepo, branchService, logger)
 	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
-	merchantService := merchant.NewMerchantService(merchantRepo, logger)
-	menuService := menu.NewMenuService(menuRepo, logger)
+	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
+	menuService := menu.NewMenuService(menuRepo, fileService, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)

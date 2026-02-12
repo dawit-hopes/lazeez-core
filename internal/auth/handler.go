@@ -62,6 +62,8 @@ func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	h.removeCookies(w)
 	common.WriteSuccessResponse(w, common.Response{Message: "Logout successful", StatusCode: http.StatusOK})
 }
 
@@ -119,5 +121,16 @@ func (h *authHandler) setCookies(w http.ResponseWriter, refreshToken string) {
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(time.Hour * 24 * 30),
+	})
+}
+
+func (h *authHandler) removeCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(-time.Hour * 24 * 30),
 	})
 }

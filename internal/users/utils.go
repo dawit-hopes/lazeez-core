@@ -4,49 +4,10 @@ import (
 	"context"
 	"lazeez-core/internal/common"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-func (s *userService) normalizePhoneNumber(phoneNumber string) string {
-	nonNumericRegex := regexp.MustCompile(`[^0-9]`)
-	// 1. Strip everything except digits in one pass
-	clean := nonNumericRegex.ReplaceAllString(phoneNumber, "")
-
-	// 2. Handle empty strings to prevent index panics
-	if clean == "" {
-		return ""
-	}
-
-	// 3. Normalize local formats to 251
-	if strings.HasPrefix(clean, "0") {
-		return "251" + clean[1:]
-	}
-
-	// 4. If they start with 9 or 7, assume they forgot the prefix
-	if len(clean) == 9 && (clean[0] == '9' || clean[0] == '7') {
-		return "251" + clean
-	}
-
-	return clean
-}
-
-func (s *userService) validatePhoneNumber(phoneNumber string) (string, error) {
-	s.logger.Info("Validating phone number", "phone number", phoneNumber)
-
-	normalizedPhoneNumber := s.normalizePhoneNumber(phoneNumber)
-	if normalizedPhoneNumber == "" {
-		return "", common.ErrPhoneNumberRequired
-	}
-
-	re := regexp.MustCompile(`^251[79]\d{8}$`)
-	if !re.MatchString(normalizedPhoneNumber) {
-		return "", common.ErrInvalidPhoneNumber
-	}
-	return normalizedPhoneNumber, nil
-}
 
 func (s *userService) validateBranch(ctx context.Context, branchID, merchantID string) error {
 	branchRes, err := s.branchService.Get(ctx, branchID)

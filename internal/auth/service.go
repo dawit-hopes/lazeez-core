@@ -89,7 +89,7 @@ func (s *authService) validateUser(ctx context.Context, user *users.User, req Lo
 
 func (s *authService) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
 	s.logger.Info("Logging in", "phone number", req.PhoneNumber)
-	normalizedPhoneNumber, err := s.userService.ValidatePhoneNumber(req.PhoneNumber)
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
 		return nil, err
@@ -137,7 +137,7 @@ func (s *authService) ResetPassword(ctx context.Context, req SetPasswordRequest)
 }
 
 func (s *authService) setPasswordAndLogin(ctx context.Context, req SetPasswordRequest, requireFirstLogin bool) (*LoginResponse, error) {
-	normalizedPhoneNumber, err := s.userService.ValidatePhoneNumber(req.PhoneNumber)
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
 		return nil, err
