@@ -114,6 +114,9 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
 		return err
 	}
+	if existingMerchant.IsDeleted {
+		
+	}
 	err = s.merchantRepository.Delete(ctx, existingMerchant.ID)
 	if err != nil {
 		s.logger.Error("Failed to delete merchant", "error", err)
