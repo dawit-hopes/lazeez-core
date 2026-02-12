@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
@@ -8,13 +9,11 @@ import (
 )
 
 type AuthHandler interface {
-	CreateUser(w http.ResponseWriter, r *http.Request)
-	GetUserByID(w http.ResponseWriter, r *http.Request)
-	UpdateUser(w http.ResponseWriter, r *http.Request)
-	DeleteUser(w http.ResponseWriter, r *http.Request)
 	Login(w http.ResponseWriter, r *http.Request)
-	SetPassword(w http.ResponseWriter, r *http.Request)
-	UserLookUp(w http.ResponseWriter, r *http.Request)
+	FirstTimeLogin(w http.ResponseWriter, r *http.Request)
+	Logout(w http.ResponseWriter, r *http.Request)
+	ResetPassword(w http.ResponseWriter, r *http.Request)
+	RefreshToken(w http.ResponseWriter, r *http.Request)
 }
 
 type authHandler struct {
@@ -24,74 +23,6 @@ type authHandler struct {
 
 func NewAuthHandler(authService AuthService, logger config.Logger) AuthHandler {
 	return &authHandler{authService: authService, logger: logger}
-}
-
-func (h *authHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	var req UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	if err := req.Validate(); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	err = h.authService.CreateUser(r.Context(), req)
-	if err != nil {
-		h.logger.Error("Failed to create user", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "User created successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
-	user, err := h.authService.GetUserByID(r.Context(), id)
-	if err != nil {
-		h.logger.Error("Failed to get user by ID", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
-	var req UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
-	if err := req.Validate(); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	err = h.authService.UpdateUser(r.Context(), id, req)
-	if err != nil {
-		h.logger.Error("Failed to update user", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "User updated successfully", StatusCode: http.StatusOK})
-}
-
-func (h *authHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
-	err := h.authService.DeleteUser(r.Context(), id)
-	if err != nil {
-		h.logger.Error("Failed to delete user", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	common.WriteSuccessResponse(w, common.Response{Message: "User deleted successfully", StatusCode: http.StatusOK})
 }
 
 func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +47,26 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Login successful", StatusCode: http.StatusOK})
 }
 
-func (h *authHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) FirstTimeLogin(w http.ResponseWriter, r *http.Request) {
+	h.handleSetPassword(w, r, h.authService.FirstTimeLogin, "Password set successfully", "Failed to set password")
+}
+
+func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.authService.Logout(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to logout", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Logout successful", StatusCode: http.StatusOK})
+}
+
+func (h *authHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	h.handleSetPassword(w, r, h.authService.ResetPassword, "Password reset successfully", "Failed to reset password")
+}
+
+func (h *authHandler) handleSetPassword(w http.ResponseWriter, r *http.Request, fn func(context.Context, SetPasswordRequest) (*LoginResponse, error), successMsg, errorMsg string) {
 	var req SetPasswordRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -129,33 +79,30 @@ func (h *authHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	loginResponse, err := h.authService.SetPassword(r.Context(), req)
+	loginResponse, err := fn(r.Context(), req)
 	if err != nil {
-		h.logger.Error("Failed to set password", "error", err)
+		h.logger.Error(errorMsg, "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Password set successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: successMsg, StatusCode: http.StatusOK})
 }
 
-func (h *authHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
-	var req UserLookUpRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+
+func (h *authHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		h.logger.Error("Failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
+		h.logger.Error("Failed to get refresh token from cookie", "error", err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
-	if err := req.Validate(); err != nil {
-		h.logger.Error("Failed to validate request body", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	user, err := h.authService.UserLookUp(r.Context(), req.PhoneNumber)
+
+	refreshToken := cookie.Value
+	loginResponse, err := h.authService.RefreshToken(r.Context(), refreshToken)
 	if err != nil {
-		h.logger.Error("Failed to look up user by phone number", "error", err)
+		h.logger.Error("Failed to refresh token", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User looked up successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: "Token refreshed successfully", StatusCode: http.StatusOK})
 }

@@ -33,9 +33,10 @@ func (e *Errors) Error() string {
 }
 
 type Response struct {
-	Data       any    `json:"data"`
-	Message    string `json:"message"`
-	StatusCode int    `json:"status_code"`
+	Data       any                `json:"data"`
+	Message    string             `json:"message"`
+	StatusCode int                `json:"status_code"`
+	Errors     map[string][]string `json:"errors,omitempty"`
 }
 
 func NewResponse(data any, message string, statusCode int) *Response {
@@ -48,4 +49,14 @@ func (r *Response) ToJSON() []byte {
 		return nil
 	}
 	return json
+}
+
+func (b *Base) ToDTO() BaseDTO {
+	return BaseDTO{
+		ID:        b.ID,
+		IsDeleted: b.IsDeleted,
+		CreatedAt: b.CreatedAt,
+		UpdatedAt: b.UpdatedAt,
+		DeletedAt: ToNullTimePtr(b.DeletedAt),
+	}
 }

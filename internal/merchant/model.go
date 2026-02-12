@@ -13,13 +13,27 @@ func (m *Merchant) Table() string {
 }
 
 func (m *Merchant) Columns() []string {
-	return []string{"id", "name", "logo", "created_at", "updated_at", "deleted_at", "is_deleted"}
+	return []string{"id", "name", "logo", "deleted_at", "is_deleted"}
 }
 
 func (m *Merchant) Values() []any {
-	return []any{m.ID, m.Name, m.Logo, m.CreatedAt, m.UpdatedAt, m.DeletedAt, m.IsDeleted}
+	return []any{m.ID, m.Name, m.Logo, m.DeletedAt, m.IsDeleted}
 }
 
 func (m *Merchant) Addr() []any {
-	return []any{&m.ID, &m.Name, &m.Logo, &m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.IsDeleted}
+	return []any{&m.ID, &m.Name, &m.Logo, &m.DeletedAt, &m.IsDeleted, &m.CreatedAt, &m.UpdatedAt}
+}
+
+func (m *Merchant) ToDTO() MerchantDTO {
+	return MerchantDTO{
+		BaseDTO: common.BaseDTO{
+			ID:        m.ID,
+			IsDeleted: m.IsDeleted,
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			DeletedAt: common.ToNullTimePtr(m.DeletedAt),
+		},
+		Name: m.Name,
+		Logo: m.Logo,
+	}
 }

@@ -1,0 +1,173 @@
+package users
+
+import (
+	"context"
+	"lazeez-core/config"
+	"lazeez-core/internal/branch"
+)
+
+type UserService interface {
+	CreateUser(ctx context.Context, req UserRequest) error
+	GetUserByID(ctx context.Context, id string) (UserDTO, error)
+	UpdateUser(ctx context.Context, id string, req UserRequest) error
+	DeleteUser(ctx context.Context, id string) error
+	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
+	GetAllUsers(ctx context.Context) ([]*UserDTO, error)
+	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
+	// Internal methods for auth module
+	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error)
+	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
+	ResetLoggingAttempts(ctx context.Context, id string) error
+	LockUser(ctx context.Context, id string) error
+	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
+	ValidatePhoneNumber(phoneNumber string) (string, error)
+}
+
+type userService struct {
+	userRepository  UserRepository
+	branchService   branch.BranchService
+	logger          config.Logger
+}
+
+func NewUserService(userRepository UserRepository, branchService branch.BranchService, logger config.Logger) UserService {
+	return &userService{
+		userRepository: userRepository,
+		branchService:  branchService,
+		logger:         logger,
+	}
+}
+
+func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
+	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return err
+	}
+
+	// check if user already exists
+	if err := s.userRepository.CheckUserExistsByPhoneNumber(ctx, normalizedPhoneNumber); err != nil {
+		s.logger.Error("Failed to check user exists by phone number", "error", err)
+		return err
+	}
+
+	err = s.validateBranch(ctx, req.BranchID, req.MerchantID)
+	if err != nil {
+		s.logger.Error("Failed to validate branch", "error", err)
+		return err
+	}
+
+	req.PhoneNumber = normalizedPhoneNumber
+	newUser := s.createUserDefaultData(&req)
+	err = s.userRepository.CreateUser(ctx, *newUser)
+	if err != nil {
+		s.logger.Error("Failed to create user", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (s *userService) GetUserByID(ctx context.Context, id string) (UserDTO, error) {
+	s.logger.Info("Getting user by ID", "id", id)
+	user, err := s.userRepository.GetUserByID(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to get user by ID", "error", err)
+		return UserDTO{}, err
+	}
+	result := user.ToDTO()
+	return result, nil
+}
+
+func (s *userService) UpdateUser(ctx context.Context, id string, req UserRequest) error {
+	existingUser, err := s.userRepository.GetUserByID(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to get user by ID", "error", err)
+		return err
+	}
+
+	if req.PhoneNumber != "" {
+		normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+		if err != nil {
+			s.logger.Error("Failed to validate phone number", "error", err)
+			return err
+		}
+		req.PhoneNumber = normalizedPhoneNumber
+	}
+
+	user := s.updateUserDefaultData(&req, &existingUser)
+	return s.userRepository.UpdateUser(ctx, *user)
+}
+
+func (s *userService) DeleteUser(ctx context.Context, id string) error {
+	s.logger.Info("Deleting user", "id", id)
+	return s.userRepository.DeleteUser(ctx, id)
+}
+
+func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error) {
+	normalizedPhoneNumber, err := s.validatePhoneNumber(phoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return UserDTO{}, err
+	}
+	s.logger.Info("Looking up user by phone number", "phone number", phoneNumber)
+	user, err := s.userRepository.GetUserByPhoneNumber(ctx, normalizedPhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to get user by phone number", "error", err)
+		return UserDTO{}, err
+	}
+	return user.ToDTO(), nil
+}
+
+func (s *userService) GetAllUsers(ctx context.Context) ([]*UserDTO, error) {
+	s.logger.Info("Getting all users")
+	users, err := s.userRepository.GetAllUsers(ctx)
+	if err != nil {
+		s.logger.Error("Failed to get all users", "error", err)
+		return nil, err
+	}
+	userDTOs := make([]*UserDTO, len(users))
+	for i, user := range users {
+		result := user.ToDTO()
+		userDTOs[i] = &result
+	}
+	return userDTOs, nil
+}
+
+func (s *userService) GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error) {
+	s.logger.Info("Getting user by branch ID", "branchID", branchID)
+	user, err := s.userRepository.GetUserByBranchID(ctx, branchID)
+	if err != nil {
+		s.logger.Error("Failed to get user by branch ID", "error", err)
+		return UserDTO{}, err
+	}
+	result := user.ToDTO()
+	return result, nil
+}
+
+func (s *userService) GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error) {
+	user, err := s.userRepository.GetUserByPhoneNumber(ctx, phoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to get user by phone number", "error", err)
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *userService) UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error {
+	return s.userRepository.UpdateLoggingAttempts(ctx, id, attempts)
+}
+
+func (s *userService) ResetLoggingAttempts(ctx context.Context, id string) error {
+	return s.userRepository.ResetLoggingAttempts(ctx, id)
+}
+
+func (s *userService) LockUser(ctx context.Context, id string) error {
+	return s.userRepository.LockUser(ctx, id)
+}
+
+func (s *userService) SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error {
+	return s.userRepository.SetPassword(ctx, phoneNumber, id, password, isFirstLogin)
+}
+
+func (s *userService) ValidatePhoneNumber(phoneNumber string) (string, error) {
+	return s.validatePhoneNumber(phoneNumber)
+}

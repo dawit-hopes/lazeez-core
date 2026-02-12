@@ -37,7 +37,13 @@ func (h *merchantHandler) parseRequest(r *http.Request, isRequired bool) (Mercha
 	var req MerchantRequest
 	file, fileHeader, err := r.FormFile("logo")
 	if err != nil {
-		if errors.Is(err, http.ErrMissingFile) && !isRequired {
+		if errors.Is(err, http.ErrMissingFile) {
+			// If file is required, return a proper domain error instead of raw http error
+			if isRequired {
+				h.logger.Error("Logo file is required", "error", err)
+				return req, nil, common.ErrMissingFile
+			}
+			// If not required, allow name-only updates
 			req.Name = r.FormValue("name")
 			return req, nil, nil
 		}
@@ -92,7 +98,7 @@ func (h *merchantHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	merchant, err := h.merchantService.Get(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get merchant", "error", err)
@@ -103,7 +109,7 @@ func (h *merchantHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	if err := h.parseMultipart(r, 32<<20); err != nil {
 		h.logger.Error("Failed to parse multipart form", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -135,17 +141,17 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	merchant, err := h.merchantService.Update(r.Context(), id, req)
+	err = h.merchantService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update merchant", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: merchant, Message: "Merchant updated successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{Message: "Merchant updated successfully", StatusCode: http.StatusOK})
 }
 
 func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	err := h.merchantService.Delete(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to delete merchant", "error", err)

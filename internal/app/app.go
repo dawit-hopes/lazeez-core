@@ -32,6 +32,7 @@ func NewApp() (*App, error) {
 
 	// Initialize router
 	router := chi.NewRouter()
+	
 
 	// Initialize all dependencies
 	deps, err := initializeDependencies(db, logger)

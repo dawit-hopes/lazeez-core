@@ -47,7 +47,14 @@ func (r *menuRepository) Get(ctx context.Context, id string) (Menu, error) {
 }
 
 func (r *menuRepository) Update(ctx context.Context, menu Menu) (Menu, error) {
-	result, err := r.dal.Update(ctx, menu.ID, &menu)
+	filter := map[string]any{"id": menu.ID}
+	updates := map[string]any{
+		"name":       menu.Name,
+		"image":      menu.Image,
+		"deleted_at": menu.DeletedAt,
+		"is_deleted": menu.IsDeleted,
+	}
+	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("menu not found", "error", err)
@@ -56,7 +63,7 @@ func (r *menuRepository) Update(ctx context.Context, menu Menu) (Menu, error) {
 		r.logger.Error("failed to update menu", "error", err)
 		return Menu{}, common.ErrInternalServerError
 	}
-	return *result, nil
+	return menu, nil
 }
 
 func (r *menuRepository) Delete(ctx context.Context, id string) error {

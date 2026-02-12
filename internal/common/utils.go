@@ -16,6 +16,13 @@ func ToNullTime(t time.Time) sql.NullTime {
 	return sql.NullTime{Time: t, Valid: !t.IsZero()}
 }
 
-func ParseID(r *http.Request) string {
-	return chi.URLParam(r, "id")
+func ToNullTimePtr(t sql.NullTime) *time.Time {
+	if t.Valid {
+		return &t.Time
+	}
+	return nil
+}
+
+func ParseID(r *http.Request, parm string) string {
+	return chi.URLParam(r, parm)
 }

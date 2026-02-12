@@ -14,24 +14,37 @@ var (
 )
 
 var (
-	ErrUserAlreadyExists     = &Errors{Code: BadRequest, Message: "user already exists"}
-	ErrPhoneNumberRequired   = &Errors{Code: BadRequest, Message: "phone number is required"}
-	ErrInvalidPhoneNumber    = &Errors{Code: BadRequest, Message: "invalid phone number"}
-	ErrBranchNotFound        = &Errors{Code: NotFound, Message: "branch not found"}
-	ErrMenuNotFound          = &Errors{Code: NotFound, Message: "menu not found"}
-	ErrUnAuthorized          = &Errors{Code: Unauthorized, Message: "unauthorized"}
-	ErrPasswordRequired      = &Errors{Code: BadRequest, Message: "password is required"}
-	ErrInvalidPassword       = &Errors{Code: BadRequest, Message: "invalid password"}
-	ErrPasswordTooShort      = &Errors{Code: BadRequest, Message: "password is too short"}
-	ErrMerchantAlreadyExists = &Errors{Code: BadRequest, Message: "merchant already exists"}
-	ErrMerchantNotFound      = &Errors{Code: NotFound, Message: "merchant not found"}
-	ErrInternalServerError   = &Errors{Code: InternalServerError, Message: "internal server error"}
-	ErrUserNotFound          = &Errors{Code: NotFound, Message: "user not found"}
-	ErrImageSizeTooLarge     = &Errors{Code: BadRequest, Message: "image size is too large"}
-	ErrInvalidImageType      = &Errors{Code: BadRequest, Message: "invalid image type"}
-	ErrInvalidMultipartForm  = &Errors{Code: BadRequest, Message: "invalid multipart form"}
-	ErrMissingFile           = &Errors{Code: BadRequest, Message: "missing file"}
-	ErrNameAndLogoRequired   = &Errors{Code: BadRequest, Message: "name and logo are required"}
-	ErrInvalidRequest        = &Errors{Code: BadRequest, Message: "invalid request"}
-	ErrSecretKeyNotProvided  = &Errors{Code: BadRequest, Message: "secret key not provided"}
+	ErrUserAlreadyExists                = &Errors{Code: BadRequest, Message: "user already exists"}
+	ErrPhoneNumberRequired              = &Errors{Code: BadRequest, Message: "phone number is required"}
+	ErrInvalidPhoneNumber               = &Errors{Code: BadRequest, Message: "invalid phone number"}
+	ErrBranchNotFound                   = &Errors{Code: NotFound, Message: "branch not found"}
+	ErrMenuNotFound                     = &Errors{Code: NotFound, Message: "menu not found"}
+	ErrUnAuthorized                     = &Errors{Code: Unauthorized, Message: "unauthorized"}
+	ErrPasswordRequired                 = &Errors{Code: BadRequest, Message: "password is required and cannot be empty"}
+	ErrInvalidPassword                  = &Errors{Code: BadRequest, Message: "password is invalid"}
+	ErrPasswordTooShort                 = &Errors{Code: BadRequest, Message: "password is too short; it must be at least 9 characters long"}
+	ErrPasswordMissingLetter            = &Errors{Code: BadRequest, Message: "password must contain at least one letter (a-z or A-Z)"}
+	ErrPasswordMissingNumberOrSpecial   = &Errors{Code: BadRequest, Message: "password must contain at least one number (0-9) or one special character"}
+	ErrMerchantAlreadyExists            = &Errors{Code: BadRequest, Message: "merchant with this information already exists"}
+	ErrMerchantNotFound                 = &Errors{Code: NotFound, Message: "merchant not found"}
+	ErrInternalServerError              = &Errors{Code: InternalServerError, Message: "internal server error"}
+	ErrUserNotFound                     = &Errors{Code: NotFound, Message: "user not found"}
+	ErrImageSizeTooLarge                = &Errors{Code: BadRequest, Message: "image size is too large"}
+	ErrInvalidImageType                 = &Errors{Code: BadRequest, Message: "invalid image type"}
+	ErrInvalidMultipartForm             = &Errors{Code: BadRequest, Message: "invalid multipart form"}
+	ErrMissingFile                      = &Errors{Code: BadRequest, Message: "missing file"}
+	ErrNameAndLogoRequired              = &Errors{Code: BadRequest, Message: "name and logo are required"}
+	ErrInvalidRequest                   = &Errors{Code: BadRequest, Message: "invalid request"}
+	ErrSecretKeyNotProvided             = &Errors{Code: BadRequest, Message: "secret key not provided"}
+	ErrBranchAlreadyExists              = &Errors{Code: BadRequest, Message: "branch with this information already exists"}
+	ErrUserWithInformationAlreadyExists = &Errors{Code: BadRequest, Message: "user with this information already exists"}
+	ErrSessionAlreadyExists             = &Errors{Code: BadRequest, Message: "session already exists"}
+	ErrSessionNotFound                  = &Errors{Code: NotFound, Message: "session not found"}
+	ErrUserLocked                       = &Errors{Code: Unauthorized, Message: "user is locked"}
+	ErrUserNotFirstTimeLogin            = &Errors{Code: BadRequest, Message: "user is not first time login."}
+	ErrUserIsFirstTimeLogin             = &Errors{Code: BadRequest, Message: "user is first time user."}
+	ErrSessionRevoked                   = &Errors{Code: Unauthorized, Message: "session is revoked"}
+	ErrInvalidRefreshToken              = &Errors{Code: Unauthorized, Message: "invalid refresh token"}
+	ErrWrongUsernameOrPassword          = &Errors{Code: Unauthorized, Message: "wrong username or password"}
+	ErrRefreshTokenNotFound             = &Errors{Code: BadRequest, Message: "refresh token not found"}
 )

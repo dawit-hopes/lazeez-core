@@ -39,7 +39,13 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 	var req MenuRequest
 	file, fileHeader, err := r.FormFile("image")
 	if err != nil {
-		if errors.Is(err, http.ErrMissingFile) && !isRequired {
+		if errors.Is(err, http.ErrMissingFile) {
+			// If file is required, return a proper domain error instead of raw http error
+			if isRequired {
+				h.logger.Error("Image file is required", "error", err)
+				return req, nil, common.ErrMissingFile
+			}
+			// If not required, allow name-only updates
 			req.Name = r.FormValue("name")
 			return req, nil, nil
 		}
@@ -97,7 +103,7 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 
 	menu, err := h.menuService.Get(r.Context(), id)
 	if err != nil {
@@ -114,7 +120,7 @@ func (h *menuHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 	if err := h.parseMultipart(r, 32<<20); err != nil {
 		h.logger.Error("Failed to parse multipart form", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -155,7 +161,7 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r)
+	id := common.ParseID(r, "id")
 
 	if err := h.menuService.Delete(r.Context(), id); err != nil {
 		h.logger.Error("Failed to delete menu", "error", err)

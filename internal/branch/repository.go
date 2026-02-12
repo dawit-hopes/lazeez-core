@@ -8,10 +8,13 @@ import (
 )
 
 type BranchRepository interface {
-	Create(ctx context.Context, branch Branch) (Branch, error)
+	Create(ctx context.Context, branch Branch) error
 	Get(ctx context.Context, id string) (Branch, error)
-	Update(ctx context.Context, branch Branch) (Branch, error)
+	Update(ctx context.Context, branch Branch) error
 	Delete(ctx context.Context, id string) error
+	CheckExists(ctx context.Context, merchantID string, branchName, phoneNumber string) error
+	GetAll(ctx context.Context) ([]*Branch, error)
+	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*Branch, error)
 }
 
 type branchRepository struct {
@@ -23,13 +26,13 @@ func NewBranchRepository(dal *common.DAL[*Branch], logger config.Logger) BranchR
 	return &branchRepository{dal: dal, logger: logger}
 }
 
-func (r *branchRepository) Create(ctx context.Context, branch Branch) (Branch, error) {
-	result, err := r.dal.Create(ctx, &branch)
+func (r *branchRepository) Create(ctx context.Context, branch Branch) error {
+	_, err := r.dal.Create(ctx, &branch)
 	if err != nil {
 		r.logger.Error("failed to create branch", "error", err)
-		return branch, common.ErrInternalServerError
+		return common.ErrInternalServerError
 	}
-	return *result, nil
+	return nil
 }
 
 func (r *branchRepository) Get(ctx context.Context, id string) (Branch, error) {
@@ -46,17 +49,26 @@ func (r *branchRepository) Get(ctx context.Context, id string) (Branch, error) {
 	return *result, nil
 }
 
-func (r *branchRepository) Update(ctx context.Context, branch Branch) (Branch, error) {
-	result, err := r.dal.Update(ctx, branch.ID, &branch)
+func (r *branchRepository) Update(ctx context.Context, branch Branch) error {
+	filter := map[string]any{"id": branch.ID}
+	updates := map[string]any{
+		"merchant_id":  branch.MerchantID,
+		"branch_name":  branch.BranchName,
+		"address":      branch.Address,
+		"phone_number": branch.PhoneNumber,
+		"deleted_at":   branch.DeletedAt,
+		"is_deleted":   branch.IsDeleted,
+	}
+	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Error("branch not found", "error", err)
-			return Branch{}, common.ErrBranchNotFound
+			return common.ErrBranchNotFound
 		}
 		r.logger.Error("failed to update branch", "error", err)
-		return Branch{}, common.ErrInternalServerError
+		return common.ErrInternalServerError
 	}
-	return *result, nil
+	return nil
 }
 
 func (r *branchRepository) Delete(ctx context.Context, id string) error {
@@ -70,4 +82,37 @@ func (r *branchRepository) Delete(ctx context.Context, id string) error {
 		return common.ErrInternalServerError
 	}
 	return nil
+}
+
+func (r *branchRepository) CheckExists(ctx context.Context, merchantID string, branchName, phoneNumber string) error {
+	filter := map[string]any{"merchant_id": merchantID, "branch_name": branchName, "phone_number": phoneNumber}
+	_, err := r.dal.Get(ctx, filter)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		r.logger.Error("failed to check if branch exists", "error", err)
+		return common.ErrInternalServerError
+	}
+	return common.ErrBranchAlreadyExists
+}
+
+func (r *branchRepository) GetAll(ctx context.Context) ([]*Branch, error) {
+	results, err := r.dal.List(ctx, map[string]any{}, 0, 0)
+	if err != nil {
+		r.logger.Error("failed to get all branches", "error", err)
+		return nil, err
+	}
+	return results, nil
+}
+
+func (r *branchRepository) GetAllByMerchantID(ctx context.Context, merchantID string) ([]*Branch, error) {
+	r.logger.Info("getting all branches by merchant ID", "merchantID", merchantID)
+	filter := map[string]any{"merchant_id": merchantID}
+	results, err := r.dal.List(ctx, filter, 0, 0)
+	if err != nil {
+		r.logger.Error("failed to get all branches by merchant ID", "error", err)
+		return nil, err
+	}
+	return results, nil
 }
