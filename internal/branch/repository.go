@@ -3,6 +3,7 @@ package branch
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/middleware"
@@ -16,6 +17,7 @@ type BranchRepository interface {
 	CheckExists(ctx context.Context, merchantID string, branchName, phoneNumber string) error
 	GetAll(ctx context.Context) ([]*Branch, error)
 	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*Branch, error)
+	UnDelete(ctx context.Context, id string) error
 }
 
 type branchRepository struct {
@@ -45,7 +47,7 @@ func (r *branchRepository) Get(ctx context.Context, id string) (Branch, error) {
 	filter := map[string]any{"id": id}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("branch not found", "error", err)
 			return Branch{}, common.ErrBranchNotFound
 		}
@@ -67,7 +69,7 @@ func (r *branchRepository) Update(ctx context.Context, branch Branch) error {
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("branch not found", "error", err)
 			return common.ErrBranchNotFound
 		}
@@ -91,13 +93,22 @@ WHERE b.id = $1 AND b.is_deleted = FALSE;
 
 	result, err := r.joinDAL.Exec(ctx, deleteBranchCascadeQuery, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("branch not found", "error", err)
+			return common.ErrBranchNotFound
+		}
 		r.logger.Error("failed to cascade delete branch", "branch_id", id, "error", err)
 		return common.ErrInternalServerError
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("branch not found", "error", err)
+			return common.ErrBranchNotFound
+		}
+		r.logger.Error("failed to delete branch", "error", err)
+		return common.ErrInternalServerError
 	}
 	if affected == 0 {
 		r.logger.Error("branch not found", "branch_id", id)
@@ -111,7 +122,7 @@ func (r *branchRepository) CheckExists(ctx context.Context, merchantID string, b
 	filter := map[string]any{"merchant_id": merchantID, "branch_name": branchName, "phone_number": phoneNumber}
 	_, err := r.dal.Get(ctx, filter)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		r.logger.Error("failed to check if branch exists", "error", err)
@@ -155,4 +166,21 @@ func (r *branchRepository) GetAllByMerchantID(ctx context.Context, merchantID st
 		return nil, err
 	}
 	return results, nil
+}
+
+func (r *branchRepository) UnDelete(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{
+		"is_deleted": false,
+	}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("branch not found", "error", err)
+			return common.ErrBranchNotFound
+		}
+		r.logger.Error("failed to undelete branch", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
 }

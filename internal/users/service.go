@@ -15,6 +15,7 @@ type UserService interface {
 	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
 	GetAllUsers(ctx context.Context) ([]*UserDTO, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
+	UnDeleteUser(ctx context.Context, id string) error
 	// Internal methods for auth module
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
@@ -166,4 +167,14 @@ func (s *userService) LockUser(ctx context.Context, id string) error {
 
 func (s *userService) SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error {
 	return s.userRepository.SetPassword(ctx, phoneNumber, id, password, isFirstLogin)
+}
+
+func (s *userService) UnDeleteUser(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting user", "id", id)
+	err := s.userRepository.UnDeleteUser(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete user", "error", err)
+		return err
+	}
+	return nil
 }

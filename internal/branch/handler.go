@@ -12,6 +12,7 @@ type BranchHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
+	UnDelete(w http.ResponseWriter, r *http.Request)
 	GetAll(w http.ResponseWriter, r *http.Request)
 	GetAllByMerchantID(w http.ResponseWriter, r *http.Request)
 }
@@ -111,6 +112,21 @@ func (h *branchHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	common.WriteSuccessResponse(w, common.Response{
 		Message:    "Branch deleted successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *branchHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+
+	if err := h.branchService.UnDelete(r.Context(), id); err != nil {
+		h.logger.Error("Failed to undelete branch", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Message:    "Branch undeleted successfully",
 		StatusCode: http.StatusOK,
 	})
 }

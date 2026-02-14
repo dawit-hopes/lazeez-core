@@ -40,6 +40,12 @@ func NewMerchantRoutes(router chi.Router, handler MerchantHandler, middleware mi
 			Handler:     handler.GetAll,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/merchants/{id}/undelete",
+			Handler:     handler.UnDelete,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }

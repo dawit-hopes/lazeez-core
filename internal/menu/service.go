@@ -12,6 +12,7 @@ type MenuService interface {
 	Get(ctx context.Context, id string) (Menu, error)
 	Update(ctx context.Context, id string, req MenuRequest) (Menu, error)
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 }
 
 type menuService struct {
@@ -95,5 +96,15 @@ func (s *menuService) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (s *menuService) UnDelete(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting menu", "id", id)
+	err := s.menuRepository.UnDelete(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete menu", "error", err)
+		return err
+	}
 	return nil
 }

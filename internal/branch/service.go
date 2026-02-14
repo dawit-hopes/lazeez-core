@@ -11,6 +11,7 @@ type BranchService interface {
 	Get(ctx context.Context, id string) (*BranchResponse, error)
 	Update(ctx context.Context, id string, req UpdateBranchRequest) error
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 	GetAll(ctx context.Context) ([]*BranchResponse, error)
 	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*BranchResponse, error)
 }
@@ -143,4 +144,12 @@ func (s *branchService) GetAllByMerchantID(ctx context.Context, merchantID strin
 	return branchDTOs, nil
 }
 
-
+func (s *branchService) UnDelete(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting branch", "id", id)
+	err := s.branchRepository.UnDelete(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete branch", "error", err)
+		return err
+	}
+	return nil
+}

@@ -21,6 +21,7 @@ type UserRepository interface {
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
+	UnDeleteUser(ctx context.Context, id string) error
 }
 
 type userRepository struct {
@@ -206,6 +207,17 @@ func (r *userRepository) LockUser(ctx context.Context, id string) error {
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		r.logger.Error("failed to lock user", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (r *userRepository) UnDeleteUser(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{"is_deleted": false}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to undelete user", "error", err)
 		return err
 	}
 	return nil

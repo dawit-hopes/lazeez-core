@@ -51,6 +51,12 @@ func NewUserRoutes(router chi.Router, handler UserHandler, mw middleware.Middlew
 			Handler:     handler.GetUserByBranchID,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/users/{id}/undelete",
+			Handler:     handler.UnDeleteUser,
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
@@ -16,6 +17,7 @@ type MerchantRepository interface {
 	Get(ctx context.Context, id string) (*MerchantDTO, error)
 	Update(ctx context.Context, merchant Merchant) error
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 	GetAll(ctx context.Context) ([]*MerchantDTO, error)
 	CheckExists(ctx context.Context, name string) error
 }
@@ -114,7 +116,7 @@ func (r *merchantRepository) Get(ctx context.Context, id string) (*MerchantDTO, 
 		return r.scanMerchantWithRelations(row, &dto)
 	})
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("merchant not found", "error", err)
 			return nil, common.ErrMerchantNotFound
 		}
@@ -134,7 +136,7 @@ func (r *merchantRepository) Update(ctx context.Context, merchant Merchant) erro
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("merchant not found", "error", err)
 			return common.ErrMerchantNotFound
 		}
@@ -166,6 +168,10 @@ WHERE m.id = $1 AND m.is_deleted = FALSE;
 
 	result, err := r.joinDAL.Exec(ctx, deleteMerchantCascadeQuery, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("merchant not found", "error", err)
+			return common.ErrMerchantNotFound
+		}
 		r.logger.Error("failed to cascade delete merchant", "merchant_id", id, "error", err)
 		return err
 	}
@@ -268,7 +274,7 @@ func (r *merchantRepository) CheckExists(ctx context.Context, name string) error
 	filter := map[string]any{"name": name, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		r.logger.Error("failed to check if merchant exists", "error", err)
@@ -278,6 +284,23 @@ func (r *merchantRepository) CheckExists(ctx context.Context, name string) error
 	// If merchant exists, return error
 	if result.ID != "" {
 		return common.ErrMerchantAlreadyExists
+	}
+	return nil
+}
+
+func (r *merchantRepository) UnDelete(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{
+		"is_deleted": false,
+	}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("merchant not found", "error", err)
+			return common.ErrMerchantNotFound
+		}
+		r.logger.Error("failed to undelete merchant", "error", err)
+		return err
 	}
 	return nil
 }

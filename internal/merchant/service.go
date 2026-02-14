@@ -13,6 +13,7 @@ type MerchantService interface {
 	Update(ctx context.Context, id string, req MerchantRequest) error
 	GetAll(ctx context.Context) ([]*MerchantDTO, error)
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 }
 
 type merchantService struct {
@@ -115,7 +116,7 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if existingMerchant.IsDeleted {
-		
+
 	}
 	err = s.merchantRepository.Delete(ctx, existingMerchant.ID)
 	if err != nil {
@@ -138,4 +139,14 @@ func (s *merchantService) GetAll(ctx context.Context) ([]*MerchantDTO, error) {
 		merchantDTOs[i] = result
 	}
 	return merchantDTOs, nil
+}
+
+func (s *merchantService) UnDelete(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting merchant", "id", id)
+	err := s.merchantRepository.UnDelete(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete merchant", "error", err)
+		return err
+	}
+	return nil
 }

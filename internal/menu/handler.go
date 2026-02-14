@@ -13,6 +13,7 @@ type MenuHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
+	UnDelete(w http.ResponseWriter, r *http.Request)
 }
 
 type menuHandler struct {
@@ -173,4 +174,15 @@ func (h *menuHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		Message:    "Menu deleted successfully",
 		StatusCode: http.StatusOK,
 	})
+}
+
+func (h *menuHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.menuService.UnDelete(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to undelete menu", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Menu undeleted successfully", StatusCode: http.StatusOK})
 }

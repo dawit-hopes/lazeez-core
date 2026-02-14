@@ -3,6 +3,7 @@ package menu
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 )
@@ -12,6 +13,7 @@ type MenuRepository interface {
 	Get(ctx context.Context, id string) (Menu, error)
 	Update(ctx context.Context, menu Menu) (Menu, error)
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 }
 
 type menuRepository struct {
@@ -36,7 +38,7 @@ func (r *menuRepository) Get(ctx context.Context, id string) (Menu, error) {
 	filter := map[string]any{"id": id}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("menu not found", "error", err)
 			return Menu{}, common.ErrMenuNotFound
 		}
@@ -56,7 +58,7 @@ func (r *menuRepository) Update(ctx context.Context, menu Menu) (Menu, error) {
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("menu not found", "error", err)
 			return Menu{}, common.ErrMenuNotFound
 		}
@@ -69,11 +71,28 @@ func (r *menuRepository) Update(ctx context.Context, menu Menu) (Menu, error) {
 func (r *menuRepository) Delete(ctx context.Context, id string) error {
 	err := r.dal.Delete(ctx, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Error("menu not found", "error", err)
 			return common.ErrMenuNotFound
 		}
 		r.logger.Error("failed to delete menu", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
+
+func (r *menuRepository) UnDelete(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{
+		"is_deleted": false,
+	}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("menu not found", "error", err)
+			return common.ErrMenuNotFound
+		}
+		r.logger.Error("failed to undelete menu", "error", err)
 		return common.ErrInternalServerError
 	}
 	return nil

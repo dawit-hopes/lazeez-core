@@ -46,6 +46,12 @@ func NewBranchRoutes(router chi.Router, handler BranchHandler, middleware middle
 			Handler:     handler.GetAllByMerchantID,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/branches/{id}/undelete",
+			Handler:     handler.UnDelete,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }
