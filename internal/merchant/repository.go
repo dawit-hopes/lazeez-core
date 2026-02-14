@@ -10,6 +10,7 @@ import (
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/middleware"
 	"lazeez-core/internal/users"
+	"strings"
 )
 
 type MerchantRepository interface {
@@ -271,7 +272,8 @@ func (r *merchantRepository) unmarshalRelations(dto *MerchantDTO, branchesJSON, 
 }
 
 func (r *merchantRepository) CheckExists(ctx context.Context, name string) error {
-	filter := map[string]any{"name": name, "is_deleted": false}
+	lowerCaseName := strings.ToLower(name)
+	filter := map[string]any{"name": lowerCaseName, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

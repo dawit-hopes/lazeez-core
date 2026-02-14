@@ -90,6 +90,23 @@ CREATE INDEX IF NOT EXISTS idx_menus_name ON menus(name) WHERE is_deleted = FALS
 CREATE INDEX IF NOT EXISTS idx_menus_created_at ON menus(created_at) WHERE is_deleted = FALSE;
 
 -- ============================================
+-- CATEGORIES TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    icon TEXT,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create index on name for faster lookups
+CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_categories_created_at ON categories(created_at) WHERE is_deleted = FALSE;
+
+-- ============================================
 -- TRIGGERS FOR UPDATED_AT
 -- ============================================
 -- Function to update updated_at timestamp
@@ -122,6 +139,11 @@ CREATE TRIGGER update_menus_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_categories_updated_at
+    BEFORE UPDATE ON categories
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
 -- COMMENTS FOR DOCUMENTATION
 -- ============================================
@@ -129,6 +151,7 @@ COMMENT ON TABLE merchants IS 'Stores merchant/restaurant information';
 COMMENT ON TABLE branches IS 'Stores branch locations for merchants';
 COMMENT ON TABLE users IS 'Stores user accounts with authentication information';
 COMMENT ON TABLE menus IS 'Stores menu information';
+COMMENT ON TABLE categories IS 'Stores category information with name and icon';
 
 COMMENT ON COLUMN users.role IS 'User role: super admin or branch_manager';
 COMMENT ON COLUMN users.is_locked IS 'Indicates if user account is locked';

@@ -19,6 +19,7 @@ var (
 	ErrInvalidPhoneNumber               = &Errors{Code: BadRequest, Message: "invalid phone number"}
 	ErrBranchNotFound                   = &Errors{Code: NotFound, Message: "branch not found"}
 	ErrMenuNotFound                     = &Errors{Code: NotFound, Message: "menu not found"}
+	ErrCategoryNotFound                 = &Errors{Code: NotFound, Message: "category not found"}
 	ErrUnAuthorized                     = &Errors{Code: Unauthorized, Message: "unauthorized"}
 	ErrPasswordRequired                 = &Errors{Code: BadRequest, Message: "password is required and cannot be empty"}
 	ErrInvalidPassword                  = &Errors{Code: BadRequest, Message: "password is invalid"}
@@ -47,4 +48,5 @@ var (
 	ErrInvalidRefreshToken              = &Errors{Code: Unauthorized, Message: "invalid refresh token"}
 	ErrWrongUsernameOrPassword          = &Errors{Code: Unauthorized, Message: "wrong username or password"}
 	ErrRefreshTokenNotFound             = &Errors{Code: BadRequest, Message: "refresh token not found"}
+	ErrCategoryAlreadyExists            = &Errors{Code: BadRequest, Message: "category with this information already exists"}
 )

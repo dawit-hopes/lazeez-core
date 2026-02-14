@@ -33,7 +33,6 @@ func NewDAL[T Mappable](db *sql.DB, factory func() T) *DAL[T] {
 func (r *DAL[T]) Get(ctx context.Context, filters map[string]any) (T, error) {
 	instance := r.factory()
 
-	// Include created_at and updated_at in SELECT
 	cols := instance.Columns()
 	selectCols := append(cols, "created_at", "updated_at")
 
@@ -236,11 +235,12 @@ func (r *DAL[T]) Delete(ctx context.Context, id string) error {
 // e.g. all users whose branch belongs to a given merchant.
 //
 // Example:
-//   err := userDAL.SoftDeleteWhere(
-//       ctx,
-//       "branch_id IN (SELECT id FROM branches WHERE merchant_id = $1 AND is_deleted = FALSE)",
-//       merchantID,
-//   )
+//
+//	err := userDAL.SoftDeleteWhere(
+//	    ctx,
+//	    "branch_id IN (SELECT id FROM branches WHERE merchant_id = $1 AND is_deleted = FALSE)",
+//	    merchantID,
+//	)
 func (r *DAL[T]) SoftDeleteWhere(ctx context.Context, where string, args ...any) error {
 	where = strings.TrimSpace(where)
 	if where == "" {
@@ -298,7 +298,6 @@ func (r *DAL[T]) buildWhereClause(filters map[string]any, startAt int) (string, 
 
 	return "WHERE " + strings.Join(clauses, " AND "), args
 }
-
 
 func (r *DAL[T]) DeleteByFilters(ctx context.Context, filters map[string]any) error {
 	if len(filters) == 0 {

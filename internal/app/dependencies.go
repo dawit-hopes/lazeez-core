@@ -6,6 +6,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/auth"
 	"lazeez-core/internal/branch"
+	"lazeez-core/internal/category"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/key"
@@ -26,7 +27,8 @@ type Dependencies struct {
 	UserRepo     users.UserRepository
 	BranchRepo   branch.BranchRepository
 	MerchantRepo merchant.MerchantRepository
-	MenuRepo     menu.MenuRepository
+	MenuRepo       menu.MenuRepository
+	CategoryRepo   category.CategoryRepository
 
 	// Services
 	AuthService     auth.AuthService
@@ -34,6 +36,7 @@ type Dependencies struct {
 	BranchService   branch.BranchService
 	MerchantService merchant.MerchantService
 	MenuService     menu.MenuService
+	CategoryService category.CategoryService
 
 	// Handlers
 	AuthHandler     auth.AuthHandler
@@ -41,6 +44,7 @@ type Dependencies struct {
 	BranchHandler   branch.BranchHandler
 	MerchantHandler merchant.MerchantHandler
 	MenuHandler     menu.MenuHandler
+	CategoryHandler category.CategoryHandler
 
 	Middleware middleware.Middleware
 }
@@ -59,6 +63,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	branchDAL := common.NewDAL[*branch.Branch](db, func() *branch.Branch { return &branch.Branch{} })
 	merchantDAL := common.NewDAL[*merchant.Merchant](db, func() *merchant.Merchant { return &merchant.Merchant{} })
 	menuDAL := common.NewDAL[*menu.Menu](db, func() *menu.Menu { return &menu.Menu{} })
+	categoryDAL := common.NewDAL[*category.Category](db, func() *category.Category { return &category.Category{} })
 	sessionDAL := common.NewDAL[*session.Session](db, func() *session.Session { return &session.Session{} })
 
 	joinDAL := common.NewJoinDAL(db)
@@ -73,6 +78,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	branchRepo := branch.NewBranchRepository(branchDAL, joinDAL, logger)
 	merchantRepo := merchant.NewMerchantRepository(merchantDAL, joinDAL, logger)
 	menuRepo := menu.NewMenuRepository(menuDAL, logger)
+	categoryRepo := category.NewCategoryRepository(categoryDAL, logger)
 	sessionRepo := session.NewSessionRepository(sessionDAL, logger)
 
 	// Initialize services
@@ -82,6 +88,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
 	menuService := menu.NewMenuService(menuRepo, fileService, logger)
+	categoryService := category.NewCategoryService(categoryRepo, fileService, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -89,6 +96,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	branchHandler := branch.NewBranchHandler(branchService, logger)
 	merchantHandler := merchant.NewMerchantHandler(merchantService, logger)
 	menuHandler := menu.NewMenuHandler(menuService, logger)
+	categoryHandler := category.NewCategoryHandler(categoryService, logger)
 
 	middleware := middleware.NewMiddleware(keyService, sessionService, logger)
 
@@ -98,19 +106,22 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		UserRepo:     userRepo,
 		BranchRepo:   branchRepo,
 		MerchantRepo: merchantRepo,
-		MenuRepo:     menuRepo,
+		MenuRepo:       menuRepo,
+		CategoryRepo:   categoryRepo,
 
 		AuthService:     authService,
 		UserService:     userService,
 		BranchService:   branchService,
 		MerchantService: merchantService,
 		MenuService:     menuService,
+		CategoryService: categoryService,
 
 		AuthHandler:     authHandler,
 		UserHandler:     userHandler,
 		BranchHandler:   branchHandler,
 		MerchantHandler: merchantHandler,
 		MenuHandler:     menuHandler,
+		CategoryHandler: categoryHandler,
 
 		Middleware: middleware,
 	}, nil
@@ -127,4 +138,5 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	branch.NewBranchRoutes(router, deps.BranchHandler, deps.Middleware)
 	merchant.NewMerchantRoutes(router, deps.MerchantHandler, deps.Middleware)
 	menu.NewMenuRoutes(router, deps.MenuHandler, deps.Middleware)
+	category.NewCategoryRoutes(router, deps.CategoryHandler, deps.Middleware)
 }
