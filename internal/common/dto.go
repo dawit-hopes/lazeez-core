@@ -9,3 +9,9 @@ type BaseDTO struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 	DeletedAt *time.Time `json:"deleted_at"`
 }
+
+type Filter struct {
+	Page   int    `json:"page"`
+	Limit  int    `json:"limit"`
+	Search string `json:"search"`
+}

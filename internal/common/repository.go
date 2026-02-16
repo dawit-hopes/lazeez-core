@@ -51,7 +51,7 @@ func (r *DAL[T]) Get(ctx context.Context, filters map[string]any) (T, error) {
 }
 
 // List retrieves multiple records by filters
-func (r *DAL[T]) List(ctx context.Context, filters map[string]any, limit, offset int) ([]T, error) {
+func (r *DAL[T]) List(ctx context.Context, filters map[string]any, page, limit int) ([]T, error) {
 	instance := r.factory()
 
 	// Include created_at and updated_at in SELECT
@@ -69,9 +69,8 @@ func (r *DAL[T]) List(ctx context.Context, filters map[string]any, limit, offset
 	whereClause, args := r.buildWhereClause(filters, 0)
 
 	// Handle limit: if 0, use a large number to get all records
-	if limit <= 0 {
-		limit = 10000
-	}
+
+	offset := (page - 1) * limit
 
 	// Always return newest records first
 	orderBy := " ORDER BY created_at DESC"
@@ -281,6 +280,17 @@ func (r *DAL[T]) Count(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// ILike is a filter value that generates SQL "col ILIKE $n ESCAPE '\'" for pattern matching.
+// The value is escaped for LIKE special chars (% and _) and wrapped in % for "contains" search.
+type ILike string
+
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "%", `\%`)
+	s = strings.ReplaceAll(s, "_", `\_`)
+	return s
+}
+
 func (r *DAL[T]) buildWhereClause(filters map[string]any, startAt int) (string, []any) {
 	if len(filters) == 0 {
 		return "", nil
@@ -291,8 +301,15 @@ func (r *DAL[T]) buildWhereClause(filters map[string]any, startAt int) (string, 
 
 	i := startAt + 1
 	for col, val := range filters {
-		clauses = append(clauses, fmt.Sprintf("%s = $%d", col, i))
-		args = append(args, val)
+		switch v := val.(type) {
+		case ILike:
+			pattern := "%" + escapeLike(string(v)) + "%"
+			clauses = append(clauses, fmt.Sprintf("%s ILIKE $%d ESCAPE '\\'", col, i))
+			args = append(args, pattern)
+		default:
+			clauses = append(clauses, fmt.Sprintf("%s = $%d", col, i))
+			args = append(args, val)
+		}
 		i++
 	}
 

@@ -9,6 +9,7 @@ import (
 	"lazeez-core/internal/category"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
+	"lazeez-core/internal/ingredient"
 	"lazeez-core/internal/key"
 	"lazeez-core/internal/menu"
 	"lazeez-core/internal/merchant"
@@ -28,7 +29,8 @@ type Dependencies struct {
 	BranchRepo   branch.BranchRepository
 	MerchantRepo merchant.MerchantRepository
 	MenuRepo       menu.MenuRepository
-	CategoryRepo   category.CategoryRepository
+	CategoryRepo     category.CategoryRepository
+	IngredientRepo   ingredient.IngredientRepository
 
 	// Services
 	AuthService     auth.AuthService
@@ -36,7 +38,8 @@ type Dependencies struct {
 	BranchService   branch.BranchService
 	MerchantService merchant.MerchantService
 	MenuService     menu.MenuService
-	CategoryService category.CategoryService
+	CategoryService   category.CategoryService
+	IngredientService ingredient.IngredientService
 
 	// Handlers
 	AuthHandler     auth.AuthHandler
@@ -44,7 +47,8 @@ type Dependencies struct {
 	BranchHandler   branch.BranchHandler
 	MerchantHandler merchant.MerchantHandler
 	MenuHandler     menu.MenuHandler
-	CategoryHandler category.CategoryHandler
+	CategoryHandler   category.CategoryHandler
+	IngredientHandler ingredient.IngredientHandler
 
 	Middleware middleware.Middleware
 }
@@ -64,6 +68,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantDAL := common.NewDAL[*merchant.Merchant](db, func() *merchant.Merchant { return &merchant.Merchant{} })
 	menuDAL := common.NewDAL[*menu.Menu](db, func() *menu.Menu { return &menu.Menu{} })
 	categoryDAL := common.NewDAL[*category.Category](db, func() *category.Category { return &category.Category{} })
+	ingredientDAL := common.NewDAL[*ingredient.Ingredient](db, func() *ingredient.Ingredient { return &ingredient.Ingredient{} })
 	sessionDAL := common.NewDAL[*session.Session](db, func() *session.Session { return &session.Session{} })
 
 	joinDAL := common.NewJoinDAL(db)
@@ -79,6 +84,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantRepo := merchant.NewMerchantRepository(merchantDAL, joinDAL, logger)
 	menuRepo := menu.NewMenuRepository(menuDAL, logger)
 	categoryRepo := category.NewCategoryRepository(categoryDAL, logger)
+	ingredientRepo := ingredient.NewIngredientRepository(ingredientDAL, logger)
 	sessionRepo := session.NewSessionRepository(sessionDAL, logger)
 
 	// Initialize services
@@ -89,6 +95,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
 	menuService := menu.NewMenuService(menuRepo, fileService, logger)
 	categoryService := category.NewCategoryService(categoryRepo, fileService, logger)
+	ingredientService := ingredient.NewIngredientService(ingredientRepo, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -97,6 +104,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantHandler := merchant.NewMerchantHandler(merchantService, logger)
 	menuHandler := menu.NewMenuHandler(menuService, logger)
 	categoryHandler := category.NewCategoryHandler(categoryService, logger)
+	ingredientHandler := ingredient.NewIngredientHandler(ingredientService, logger)
 
 	middleware := middleware.NewMiddleware(keyService, sessionService, logger)
 
@@ -107,21 +115,24 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		BranchRepo:   branchRepo,
 		MerchantRepo: merchantRepo,
 		MenuRepo:       menuRepo,
-		CategoryRepo:   categoryRepo,
+		CategoryRepo:     categoryRepo,
+		IngredientRepo:   ingredientRepo,
 
 		AuthService:     authService,
 		UserService:     userService,
 		BranchService:   branchService,
 		MerchantService: merchantService,
 		MenuService:     menuService,
-		CategoryService: categoryService,
+		CategoryService:   categoryService,
+		IngredientService: ingredientService,
 
 		AuthHandler:     authHandler,
 		UserHandler:     userHandler,
 		BranchHandler:   branchHandler,
 		MerchantHandler: merchantHandler,
 		MenuHandler:     menuHandler,
-		CategoryHandler: categoryHandler,
+		CategoryHandler:   categoryHandler,
+		IngredientHandler: ingredientHandler,
 
 		Middleware: middleware,
 	}, nil
@@ -139,4 +150,5 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	merchant.NewMerchantRoutes(router, deps.MerchantHandler, deps.Middleware)
 	menu.NewMenuRoutes(router, deps.MenuHandler, deps.Middleware)
 	category.NewCategoryRoutes(router, deps.CategoryHandler, deps.Middleware)
+	ingredient.NewIngredientRoutes(router, deps.IngredientHandler, deps.Middleware)
 }

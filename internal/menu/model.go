@@ -7,8 +7,10 @@ import (
 
 type Menu struct {
 	common.Base
-	Name  string `json:"name" db:"name"`
-	Image string `json:"image" db:"image"`
+	Name        string `json:"name" db:"name"`
+	Image       string `json:"image" db:"image"`
+	Description string `json:"description" db:"description"`
+	
 }
 
 type MenuRequest struct {
