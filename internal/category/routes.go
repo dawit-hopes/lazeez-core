@@ -1,4 +1,4 @@
-package users
+package category
 
 import (
 	"lazeez-core/internal/common"
@@ -8,53 +8,42 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func NewUserRoutes(router chi.Router, handler UserHandler, mw middleware.Middleware) {
+func NewCategoryRoutes(router chi.Router, handler CategoryHandler, mw middleware.Middleware) {
 	routes := []common.Route{
 		{
 			Method:      http.MethodPost,
-			Path:        "/users",
-			Handler:     handler.CreateUser,
+			Path:        "/categories",
+			Handler:     handler.Create,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
 			Method:      http.MethodGet,
-			Path:        "/users/{id}",
-			Handler:     handler.GetUserByID,
+			Path:        "/categories/{id}",
+			Handler:     handler.Get,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
-			Method:      http.MethodPatch,
-			Path:        "/users/{id}",
-			Handler:     handler.UpdateUser,
+			Method:      http.MethodPut,
+			Path:        "/categories/{id}",
+			Handler:     handler.Update,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
 			Method:      http.MethodDelete,
-			Path:        "/users/{id}",
-			Handler:     handler.DeleteUser,
-			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
-		},
-		{
-			Method:  http.MethodPost,
-			Path:    "/users/look-up",
-			Handler: handler.UserLookUp,
-		},
-		{
-			Method:      http.MethodGet,
-			Path:        "/users",
-			Handler:     handler.GetAllUser,
+			Path:        "/categories/{id}",
+			Handler:     handler.Delete,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
 			Method:      http.MethodGet,
-			Path:        "/users/branch/{branchID}",
-			Handler:     handler.GetUserByBranchID,
+			Path:        "/categories",
+			Handler:     handler.List,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
 			Method:      http.MethodPost,
-			Path:        "/users/{id}/undelete",
-			Handler:     handler.UnDeleteUser,
+			Path:        "/categories/{id}/undelete",
+			Handler:     handler.UnDelete,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 	}

@@ -12,6 +12,7 @@ type SessionService interface {
 	UpdateSession(ctx context.Context, session Session) (Session, error)
 	DeleteSession(ctx context.Context, id string) error
 	RevokeSession(ctx context.Context, id string, action bool) error
+	GetSessionByUserID(ctx context.Context, userID string) (Session, error)
 }
 
 type sessionService struct {
@@ -84,4 +85,14 @@ func (s *sessionService) RevokeSession(ctx context.Context, id string, action bo
 		return err
 	}
 	return nil
+}
+
+
+func (s *sessionService) GetSessionByUserID(ctx context.Context, userID string) (Session, error) {
+	session, err := s.sessionRepository.GetByUserID(ctx, userID)
+	if err != nil {
+		s.logger.Error("failed to get session by user ID", "error", err)
+		return Session{}, err
+	}
+	return session, nil
 }

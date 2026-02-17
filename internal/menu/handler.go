@@ -4,8 +4,11 @@ import (
 	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 	"mime/multipart"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type MenuHandler interface {
@@ -13,6 +16,8 @@ type MenuHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
+	UnDelete(w http.ResponseWriter, r *http.Request)
+	List(w http.ResponseWriter, r *http.Request)
 }
 
 type menuHandler struct {
@@ -40,13 +45,18 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 	file, fileHeader, err := r.FormFile("image")
 	if err != nil {
 		if errors.Is(err, http.ErrMissingFile) {
-			// If file is required, return a proper domain error instead of raw http error
 			if isRequired {
 				h.logger.Error("Image file is required", "error", err)
 				return req, nil, common.ErrMissingFile
 			}
-			// If not required, allow name-only updates
-			req.Name = r.FormValue("name")
+			// No image; still parse all other form fields for update
+			h.parseFormFields(r, &req)
+			branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+			if !ok {
+				h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+				return req, nil, common.ErrUnAuthorized
+			}
+			req.BranchID = branchID
 			return req, nil, nil
 		}
 		h.logger.Error("Failed to get image file", "error", err)
@@ -55,9 +65,35 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 
 	req.ImageHeader = *fileHeader
 	req.Image = file
-	req.Name = r.FormValue("name")
+	h.parseFormFields(r, &req)
+
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok {
+		h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+		return req, nil, common.ErrUnAuthorized
+	}
+	req.BranchID = branchID
 
 	return req, file, nil
+}
+
+// parseFormFields fills MenuRequest from form values (name, description, price, ingredients, category_id, is_fasting, is_available).
+func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) {
+	req.Name = r.FormValue("name")
+	req.Description = r.FormValue("description")
+	if p := r.FormValue("price"); p != "" {
+		if v, err := strconv.ParseFloat(p, 64); err == nil {
+			req.Price = v
+		}
+	}
+	if ing := r.FormValue("ingredients"); ing != "" {
+		req.Ingredients = strings.Split(ing, ",")
+	}
+	req.CategoryID = r.FormValue("category_id")
+	isFasting := r.FormValue("is_fasting") == "true"
+	isAvailable := r.FormValue("is_available") == "true"
+	req.IsFasting = &isFasting
+	req.IsAvailable = &isAvailable
 }
 
 func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +124,7 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	menu, err := h.menuService.Create(r.Context(), req)
+	err = h.menuService.Create(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to create menu", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -96,7 +132,6 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       menu,
 		Message:    "Menu created successfully",
 		StatusCode: http.StatusOK,
 	})
@@ -104,8 +139,14 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *menuHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok {
+		h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
 
-	menu, err := h.menuService.Get(r.Context(), id)
+	menu, err := h.menuService.Get(r.Context(), id, branchID)
 	if err != nil {
 		h.logger.Error("Failed to get menu", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -138,6 +179,12 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 	}
 
+	if req.IsEmpty() {
+		h.logger.Error("No data to update", "error", common.ErrNoDataToUpdate)
+		common.WriteErrorResponse(w, common.ErrNoDataToUpdate)
+		return
+	}
+
 	if req.Image != nil {
 		if err := common.ValidateImage(req.ImageHeader); err != nil {
 			h.logger.Error("Failed to validate image", "error", err)
@@ -146,7 +193,7 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	menu, err := h.menuService.Update(r.Context(), id, req)
+	err = h.menuService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update menu", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -154,7 +201,6 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       menu,
 		Message:    "Menu updated successfully",
 		StatusCode: http.StatusOK,
 	})
@@ -162,8 +208,14 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *menuHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok {
+		h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
 
-	if err := h.menuService.Delete(r.Context(), id); err != nil {
+	if err := h.menuService.Delete(r.Context(), id, branchID); err != nil {
 		h.logger.Error("Failed to delete menu", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
@@ -171,6 +223,44 @@ func (h *menuHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	common.WriteSuccessResponse(w, common.Response{
 		Message:    "Menu deleted successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *menuHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok {
+		h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+	err := h.menuService.UnDelete(r.Context(), id, branchID)
+	if err != nil {
+		h.logger.Error("Failed to undelete menu", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Menu undeleted successfully", StatusCode: http.StatusOK})
+}
+
+func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
+	filter := common.ParseFilter(r)
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok {
+		h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+	menus, err := h.menuService.List(r.Context(), filter, branchID)
+	if err != nil {
+		h.logger.Error("Failed to list menus", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       menus,
+		Message:    "Menus fetched successfully",
 		StatusCode: http.StatusOK,
 	})
 }

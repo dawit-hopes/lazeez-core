@@ -14,6 +14,7 @@ type MerchantHandler interface {
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
 	GetAll(w http.ResponseWriter, r *http.Request)
+	UnDelete(w http.ResponseWriter, r *http.Request)
 }
 
 type merchantHandler struct {
@@ -162,11 +163,23 @@ func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	merchants, err := h.merchantService.GetAll(r.Context())
+	filter := common.ParseFilter(r)
+	merchants, err := h.merchantService.GetAll(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to get all merchants", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: merchants, Message: "Merchants fetched successfully", StatusCode: http.StatusOK})
+}
+
+func (h *merchantHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.merchantService.UnDelete(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to undelete merchant", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Merchant undeleted successfully", StatusCode: http.StatusOK})
 }

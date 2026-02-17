@@ -11,6 +11,7 @@ type BranchService interface {
 	Get(ctx context.Context, id string) (*BranchResponse, error)
 	Update(ctx context.Context, id string, req UpdateBranchRequest) error
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 	GetAll(ctx context.Context) ([]*BranchResponse, error)
 	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*BranchResponse, error)
 }
@@ -42,6 +43,13 @@ func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) err
 	}
 
 	branch.ID = common.GenerateUUID()
+
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		s.logger.Error("Failed to validate phone number", "error", err)
+		return err
+	}
+	branch.PhoneNumber = normalizedPhoneNumber
 
 	s.logger.Info("Creating branch", "branch", branch)
 
@@ -134,4 +142,14 @@ func (s *branchService) GetAllByMerchantID(ctx context.Context, merchantID strin
 		branchDTOs[i] = &result
 	}
 	return branchDTOs, nil
+}
+
+func (s *branchService) UnDelete(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting branch", "id", id)
+	err := s.branchRepository.UnDelete(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete branch", "error", err)
+		return err
+	}
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 )
 
 type UserRepository interface {
@@ -15,11 +16,12 @@ type UserRepository interface {
 	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
 	DeleteUser(ctx context.Context, id string) error
 	CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error
-	GetAllUsers(ctx context.Context) ([]*User, error)
+	GetAllUsers(ctx context.Context, filter common.Filter) ([]*User, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (User, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
+	UnDeleteUser(ctx context.Context, id string) error
 }
 
 type userRepository struct {
@@ -143,10 +145,22 @@ func (r *userRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phone
 	return common.ErrUserWithInformationAlreadyExists
 }
 
-func (r *userRepository) GetAllUsers(ctx context.Context) ([]*User, error) {
-	results, err := r.dal.List(ctx, map[string]any{
-		"is_deleted": false,
-	}, 0, 0)
+func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) ([]*User, error) {
+	role, _ := middleware.GetRoleFromContext(ctx)
+
+	var results []*User
+	var err error
+	filters := map[string]any{}
+	if filter.Search != "" {
+		filters["full_name"] = common.ILike(filter.Search)
+		filters["phone_number"] = common.ILike(filter.Search)
+	}
+	// Super admin can see deleted + non-deleted; others see only non-deleted
+	if role != "" && role == string(RoleAdmin) {
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, filter.Page)
+	} else {
+		results, err = r.dal.List(ctx, filters, filter.Limit, filter.Page)
+	}
 	if err != nil {
 		r.logger.Error("failed to get all users", "error", err)
 		return nil, err
@@ -196,6 +210,17 @@ func (r *userRepository) LockUser(ctx context.Context, id string) error {
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
 		r.logger.Error("failed to lock user", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (r *userRepository) UnDeleteUser(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{"is_deleted": false}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to undelete user", "error", err)
 		return err
 	}
 	return nil

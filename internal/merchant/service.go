@@ -4,60 +4,71 @@ import (
 	"context"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/files"
 )
 
 type MerchantService interface {
-	Create(ctx context.Context, req MerchantRequest) (MerchantDTO, error)
-	Get(ctx context.Context, id string) (MerchantDTO, error)
+	Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error)
+	Get(ctx context.Context, id string) (*MerchantDTO, error)
 	Update(ctx context.Context, id string, req MerchantRequest) error
-	GetAll(ctx context.Context) ([]*MerchantDTO, error)
+	GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error)
 	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 }
 
 type merchantService struct {
 	merchantRepository MerchantRepository
+	fileService        files.FileService
 	logger             config.Logger
 }
 
-func NewMerchantService(merchantRepository MerchantRepository, logger config.Logger) MerchantService {
+func NewMerchantService(merchantRepository MerchantRepository, fileService files.FileService, logger config.Logger) MerchantService {
 	return &merchantService{
 		merchantRepository: merchantRepository,
+		fileService:        fileService,
 		logger:             logger,
 	}
 }
 
-func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (MerchantDTO, error) {
+func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error) {
 	merchant := Merchant{
 		Name: req.Name,
 	}
-	s.logger.Info("Creating merchant", "merchant", merchant)
 	merchant.ID = common.GenerateUUID()
 	err := s.merchantRepository.CheckExists(ctx, merchant.Name)
 	if err != nil {
 		s.logger.Error("Failed to check if merchant exists", "error", err)
-		return MerchantDTO{}, err
+		return nil, err
 	}
 
 	if req.Logo != nil {
-		// we will upload the image to the cloud storage and update the image url in the database
+		s.logger.Info("Uploading logo", "logo", req.LogoHeader.Filename)
+		imageURL, err := s.fileService.UploadFile(ctx, &req.LogoHeader)
+		if err != nil {
+			s.logger.Error("Failed to upload logo", "error", err)
+			return nil, err
+		}
+
+		s.logger.Info("image url", imageURL)
+		merchant.Logo = imageURL
 	}
 
 	newMerchant, err := s.merchantRepository.Create(ctx, merchant)
 	if err != nil {
 		s.logger.Error("Failed to create merchant", "error", err)
-		return MerchantDTO{}, err
+		return nil, err
 	}
-	return newMerchant.ToDTO(), nil
+	return newMerchant, nil
 }
 
-func (s *merchantService) Get(ctx context.Context, id string) (MerchantDTO, error) {
+func (s *merchantService) Get(ctx context.Context, id string) (*MerchantDTO, error) {
 	s.logger.Info("Getting merchant by ID", "id", id)
 	merchant, err := s.merchantRepository.Get(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
-		return MerchantDTO{}, err
+		return nil, err
 	}
-	return merchant.ToDTO(), nil
+	return merchant, nil
 }
 
 func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) error {
@@ -80,10 +91,16 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 	}
 
 	if req.Logo != nil {
-		// we will upload the image to the cloud storage and update the image url in the database
+		imageURL, err := s.fileService.UploadFile(ctx, &req.LogoHeader)
+		if err != nil {
+			s.logger.Error("Failed to upload logo", "error", err)
+			return err
+		}
+		s.logger.Info("Uploaded logo", "imageURL", imageURL)
+		existingMerchant.Logo = imageURL
 	}
 
-	_, err = s.merchantRepository.Update(ctx, existingMerchant)
+	err = s.merchantRepository.Update(ctx, existingMerchant.ToModel())
 	if err != nil {
 		s.logger.Error("Failed to update merchant", "error", err)
 		return err
@@ -98,6 +115,9 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 		s.logger.Error("Failed to get merchant by ID", "error", err)
 		return err
 	}
+	if existingMerchant.IsDeleted {
+
+	}
 	err = s.merchantRepository.Delete(ctx, existingMerchant.ID)
 	if err != nil {
 		s.logger.Error("Failed to delete merchant", "error", err)
@@ -106,17 +126,27 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *merchantService) GetAll(ctx context.Context) ([]*MerchantDTO, error) {
+func (s *merchantService) GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error) {
 	s.logger.Info("Getting all merchants")
-	merchants, err := s.merchantRepository.GetAll(ctx)
+	merchants, err := s.merchantRepository.GetAll(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to get all merchants", "error", err)
 		return nil, err
 	}
 	merchantDTOs := make([]*MerchantDTO, len(merchants))
 	for i, merchant := range merchants {
-		result := merchant.ToDTO()
-		merchantDTOs[i] = &result
+		result := merchant
+		merchantDTOs[i] = result
 	}
 	return merchantDTOs, nil
+}
+
+func (s *merchantService) UnDelete(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting merchant", "id", id)
+	err := s.merchantRepository.UnDelete(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete merchant", "error", err)
+		return err
+	}
+	return nil
 }

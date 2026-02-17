@@ -28,6 +28,7 @@ func getDatabaseDSN() string {
 func getSecretKey() (string, error) {
 	secretKey := os.Getenv("JWT_SECRET_KEY")
 	if secretKey == "" {
+		fmt.Println("JWT_SECRET_KEY is not set")
 		return "", common.ErrSecretKeyNotProvided
 	}
 	return secretKey, nil

@@ -15,6 +15,7 @@ type UserHandler interface {
 	UserLookUp(w http.ResponseWriter, r *http.Request)
 	GetAllUser(w http.ResponseWriter, r *http.Request)
 	GetUserByBranchID(w http.ResponseWriter, r *http.Request)
+	UnDeleteUser(w http.ResponseWriter, r *http.Request)
 }
 
 type userHandler struct {
@@ -117,7 +118,8 @@ func (h *userHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *userHandler) GetAllUser(w http.ResponseWriter, r *http.Request) {
-	users, err := h.userService.GetAllUsers(r.Context())
+	filter := common.ParseFilter(r)
+	users, err := h.userService.GetAllUsers(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to get all users", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -135,4 +137,15 @@ func (h *userHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{Data: user, Message: "User fetched successfully", StatusCode: http.StatusOK})
+}
+
+func (h *userHandler) UnDeleteUser(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.userService.UnDeleteUser(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to undelete user", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "User undeleted successfully", StatusCode: http.StatusOK})
 }

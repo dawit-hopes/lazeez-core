@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
@@ -139,6 +140,10 @@ func (m *middleware) decodeToken(token string) (map[string]any, error) {
 		return nil, common.ErrUnAuthorized
 	}
 
+	fmt.Println("branchID", branchID)
+	fmt.Println("roleStr", roleStr)
+	fmt.Println("uid", uid)
+
 	return map[string]any{
 		"uid": uid,
 		"bid": branchID,
@@ -167,4 +172,24 @@ func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 		AllowCredentials: true,
 		MaxAge:           86400,
 	})(next)
+}
+
+// GetRoleFromContext extracts the role (\"rol\") claim from the request context.
+// It returns the role string and a boolean indicating whether it was present.
+func GetRoleFromContext(ctx context.Context) (string, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(map[string]any)
+	if !ok || claims == nil {
+		return "", false
+	}
+	role, ok := claims["rol"].(string)
+	return role, ok
+}
+
+func GetBranchIDFromContext(ctx context.Context) (string, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(map[string]any)
+	if !ok || claims == nil {
+		return "", false
+	}
+	branchID, ok := claims["bid"].(string)
+	return branchID, ok
 }

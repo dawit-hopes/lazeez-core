@@ -4,6 +4,7 @@ import (
 	"context"
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
+	"lazeez-core/internal/common"
 )
 
 type UserService interface {
@@ -12,21 +13,21 @@ type UserService interface {
 	UpdateUser(ctx context.Context, id string, req UserRequest) error
 	DeleteUser(ctx context.Context, id string) error
 	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
-	GetAllUsers(ctx context.Context) ([]*UserDTO, error)
+	GetAllUsers(ctx context.Context, filter common.Filter) ([]*UserDTO, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
+	UnDeleteUser(ctx context.Context, id string) error
 	// Internal methods for auth module
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
 	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
-	ValidatePhoneNumber(phoneNumber string) (string, error)
 }
 
 type userService struct {
-	userRepository  UserRepository
-	branchService   branch.BranchService
-	logger          config.Logger
+	userRepository UserRepository
+	branchService  branch.BranchService
+	logger         config.Logger
 }
 
 func NewUserService(userRepository UserRepository, branchService branch.BranchService, logger config.Logger) UserService {
@@ -38,7 +39,7 @@ func NewUserService(userRepository UserRepository, branchService branch.BranchSe
 }
 
 func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
-	normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
 		return err
@@ -85,7 +86,7 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req UserRequest
 	}
 
 	if req.PhoneNumber != "" {
-		normalizedPhoneNumber, err := s.validatePhoneNumber(req.PhoneNumber)
+		normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
 		if err != nil {
 			s.logger.Error("Failed to validate phone number", "error", err)
 			return err
@@ -103,7 +104,7 @@ func (s *userService) DeleteUser(ctx context.Context, id string) error {
 }
 
 func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error) {
-	normalizedPhoneNumber, err := s.validatePhoneNumber(phoneNumber)
+	normalizedPhoneNumber, err := common.ValidatePhoneNumber(phoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to validate phone number", "error", err)
 		return UserDTO{}, err
@@ -117,9 +118,9 @@ func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserD
 	return user.ToDTO(), nil
 }
 
-func (s *userService) GetAllUsers(ctx context.Context) ([]*UserDTO, error) {
+func (s *userService) GetAllUsers(ctx context.Context, filter common.Filter) ([]*UserDTO, error) {
 	s.logger.Info("Getting all users")
-	users, err := s.userRepository.GetAllUsers(ctx)
+	users, err := s.userRepository.GetAllUsers(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to get all users", "error", err)
 		return nil, err
@@ -168,6 +169,12 @@ func (s *userService) SetPassword(ctx context.Context, phoneNumber, id, password
 	return s.userRepository.SetPassword(ctx, phoneNumber, id, password, isFirstLogin)
 }
 
-func (s *userService) ValidatePhoneNumber(phoneNumber string) (string, error) {
-	return s.validatePhoneNumber(phoneNumber)
+func (s *userService) UnDeleteUser(ctx context.Context, id string) error {
+	s.logger.Info("Undeleting user", "id", id)
+	err := s.userRepository.UnDeleteUser(ctx, id)
+	if err != nil {
+		s.logger.Error("Failed to undelete user", "error", err)
+		return err
+	}
+	return nil
 }
