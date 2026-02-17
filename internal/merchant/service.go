@@ -11,7 +11,7 @@ type MerchantService interface {
 	Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error)
 	Get(ctx context.Context, id string) (*MerchantDTO, error)
 	Update(ctx context.Context, id string, req MerchantRequest) error
-	GetAll(ctx context.Context) ([]*MerchantDTO, error)
+	GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error)
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 }
@@ -126,9 +126,9 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *merchantService) GetAll(ctx context.Context) ([]*MerchantDTO, error) {
+func (s *merchantService) GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error) {
 	s.logger.Info("Getting all merchants")
-	merchants, err := s.merchantRepository.GetAll(ctx)
+	merchants, err := s.merchantRepository.GetAll(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to get all merchants", "error", err)
 		return nil, err

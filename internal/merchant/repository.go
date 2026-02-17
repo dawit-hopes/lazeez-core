@@ -19,7 +19,7 @@ type MerchantRepository interface {
 	Update(ctx context.Context, merchant Merchant) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	GetAll(ctx context.Context) ([]*MerchantDTO, error)
+	GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -189,8 +189,13 @@ WHERE m.id = $1 AND m.is_deleted = FALSE;
 	return nil
 }
 
-func (r *merchantRepository) GetAll(ctx context.Context) ([]*MerchantDTO, error) {
+func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
+
+	filters := map[string]any{}
+	if filter.Search != "" {
+		filters["name"] = common.ILike(filter.Search)
+	}
 
 	var baseQuery string
 	if role == string(users.RoleAdmin) {
@@ -200,9 +205,9 @@ func (r *merchantRepository) GetAll(ctx context.Context) ([]*MerchantDTO, error)
 		// Others only see non-deleted merchants, branches, and users
 		baseQuery = merchantWithRelationsActive
 	}
-	query := baseQuery + " ORDER BY m.created_at DESC"
+	query := baseQuery + " ORDER BY m.created_at DESC LIMIT $1 OFFSET $2"
 
-	results, err := common.QueryRows(r.joinDAL, ctx, query, nil, func(rows *sql.Rows) (*MerchantDTO, error) {
+	results, err := common.QueryRows(r.joinDAL, ctx, query, []any{filter.Limit, filter.Page}, func(rows *sql.Rows) (*MerchantDTO, error) {
 		var dto MerchantDTO
 		if err := r.scanMerchantWithRelationsFromRows(rows, &dto); err != nil {
 			return nil, err

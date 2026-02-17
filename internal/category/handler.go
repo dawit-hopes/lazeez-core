@@ -179,7 +179,8 @@ func (h *categoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
-	categories, err := h.categoryService.List(r.Context())
+	filter := common.ParseFilter(r)
+	categories, err := h.categoryService.List(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to list categories", "error", err)
 		common.WriteErrorResponse(w, err)

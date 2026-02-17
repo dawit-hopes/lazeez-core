@@ -163,7 +163,8 @@ func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	merchants, err := h.merchantService.GetAll(r.Context())
+	filter := common.ParseFilter(r)
+	merchants, err := h.merchantService.GetAll(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to get all merchants", "error", err)
 		common.WriteErrorResponse(w, err)

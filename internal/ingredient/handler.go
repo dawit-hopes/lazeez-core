@@ -12,6 +12,8 @@ type IngredientHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	List(w http.ResponseWriter, r *http.Request)
+	Delete(w http.ResponseWriter, r *http.Request)
+	UnDelete(w http.ResponseWriter, r *http.Request)
 }
 
 type ingredientHandler struct {
@@ -103,4 +105,30 @@ func (h *ingredientHandler) List(w http.ResponseWriter, r *http.Request) {
 		Message:    "Ingredients fetched successfully",
 		StatusCode: http.StatusOK,
 	})
+}
+
+
+func (h *ingredientHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.ingredientService.Delete(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to delete ingredient", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{
+		Message:    "Ingredient deleted successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *ingredientHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	err := h.ingredientService.UnDelete(r.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to undelete ingredient", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Message: "Ingredient undeleted successfully", StatusCode: http.StatusOK})
 }

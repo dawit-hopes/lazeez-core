@@ -118,7 +118,8 @@ func (h *userHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *userHandler) GetAllUser(w http.ResponseWriter, r *http.Request) {
-	users, err := h.userService.GetAllUsers(r.Context())
+	filter := common.ParseFilter(r)
+	users, err := h.userService.GetAllUsers(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to get all users", "error", err)
 		common.WriteErrorResponse(w, err)

@@ -15,7 +15,7 @@ type CategoryService interface {
 	Update(ctx context.Context, id string, req CategoryRequest) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	List(ctx context.Context) ([]*CategoryDTO, error)
+	List(ctx context.Context, filter common.Filter) ([]*CategoryDTO, error)
 }
 
 type categoryService struct {
@@ -114,8 +114,8 @@ func (s *categoryService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *categoryService) List(ctx context.Context) ([]*CategoryDTO, error) {
-	categories, err := s.categoryRepository.List(ctx)
+func (s *categoryService) List(ctx context.Context, filter common.Filter) ([]*CategoryDTO, error) {
+	categories, err := s.categoryRepository.List(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to list categories", "error", err)
 		return nil, err

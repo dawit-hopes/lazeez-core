@@ -92,7 +92,7 @@ func ParseFilter(r *http.Request) Filter {
 	}
 
 	if query.Get("search") != "" {
-		filter.Search = query.Get("search")
+		filter.Search = strings.ToLower(query.Get("search"))
 	}
 	return filter
 }

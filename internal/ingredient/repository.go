@@ -14,6 +14,8 @@ type IngredientRepository interface {
 	Update(ctx context.Context, ingredient Ingredient) error
 	List(ctx context.Context, filter common.Filter) ([]*Ingredient, error)
 	CheckExists(ctx context.Context, name string) error
+	Delete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
 }
 
 type ingredientRepository struct {
@@ -92,4 +94,31 @@ func (r *ingredientRepository) CheckExists(ctx context.Context, name string) err
 		return common.ErrInternalServerError
 	}
 	return common.ErrIngredientAlreadyExists
+}
+
+
+func (r *ingredientRepository) Delete(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{
+		"is_deleted": true,
+	}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to delete ingredient", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
+
+func (r *ingredientRepository) UnDelete(ctx context.Context, id string) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{
+		"is_deleted": false,
+	}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		r.logger.Error("failed to undelete ingredient", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
 }

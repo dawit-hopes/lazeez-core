@@ -16,7 +16,7 @@ type UserRepository interface {
 	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
 	DeleteUser(ctx context.Context, id string) error
 	CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error
-	GetAllUsers(ctx context.Context) ([]*User, error)
+	GetAllUsers(ctx context.Context, filter common.Filter) ([]*User, error)
 	GetUserByBranchID(ctx context.Context, branchID string) (User, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
@@ -145,18 +145,20 @@ func (r *userRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phone
 	return common.ErrUserWithInformationAlreadyExists
 }
 
-func (r *userRepository) GetAllUsers(ctx context.Context) ([]*User, error) {
+func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) ([]*User, error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
 
 	var results []*User
 	var err error
+	filters := map[string]any{}
+	if filter.Search != "" {
+		filters["full_name"] = common.ILike(filter.Search)
+	}
 	// Super admin can see deleted + non-deleted; others see only non-deleted
 	if role != "" && role == string(RoleAdmin) {
-		results, err = r.dal.ListIncludeDeleted(ctx, map[string]any{}, 0, 0)
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, filter.Page)
 	} else {
-		results, err = r.dal.List(ctx, map[string]any{
-			"is_deleted": false,
-		}, 0, 0)
+		results, err = r.dal.List(ctx, filters, filter.Limit, filter.Page)
 	}
 	if err != nil {
 		r.logger.Error("failed to get all users", "error", err)

@@ -34,6 +34,18 @@ func NewIngredientRoutes(router chi.Router, handler IngredientHandler, mw middle
 			Handler:     handler.List,
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
+		{
+			Method:      http.MethodDelete,
+			Path:        "/ingredients/{id}",
+			Handler:     handler.Delete,
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
+		},
+		{
+			Method:      http.MethodPut,
+			Path:        "/ingredients/{id}/undelete",
+			Handler:     handler.UnDelete,
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }

@@ -16,7 +16,7 @@ type CategoryRepository interface {
 	Update(ctx context.Context, category Category) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	List(ctx context.Context) ([]*Category, error)
+	List(ctx context.Context, filter common.Filter) ([]*Category, error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -89,15 +89,20 @@ func (r *categoryRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *categoryRepository) List(ctx context.Context) ([]*Category, error) {
+func (r *categoryRepository) List(ctx context.Context, filter common.Filter) ([]*Category, error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
+
+	filters := map[string]any{}
+	if filter.Search != "" {
+		filters["name"] = common.ILike(filter.Search)
+	}
 
 	var results []*Category
 	var err error
 	if role == "super_admin" {
-		results, err = r.dal.ListIncludeDeleted(ctx, map[string]any{}, 0, 0)
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, filter.Page)
 	} else {
-		results, err = r.dal.List(ctx, map[string]any{}, 0, 0)
+		results, err = r.dal.List(ctx, filters, filter.Limit, filter.Page)
 	}
 	if err != nil {
 		r.logger.Error("failed to list categories", "error", err)
