@@ -9,6 +9,7 @@ import (
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
 
+	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -146,7 +147,7 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 			return err
 		}
 
-		existingMenu.CategoryID = req.CategoryID
+		existingMenu.CategoryID = common.ParseStringToUUID(req.CategoryID)
 	}
 
 	if req.BranchID != "" {
@@ -155,7 +156,7 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 			s.logger.Error("Failed to get branch", "error", err)
 			return err
 		}
-		existingMenu.BranchID = req.BranchID
+		existingMenu.BranchID = common.ParseStringToUUID(req.BranchID)
 	}
 
 	if len(req.Ingredients) > 0 {
@@ -168,7 +169,9 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 
 		}
 
-		existingMenu.Ingredients = req.Ingredients
+		ingredients := make(pq.StringArray, len(req.Ingredients))
+		copy(ingredients, req.Ingredients)
+		existingMenu.Ingredients = ingredients
 	}
 
 	if req.Image != nil {
@@ -180,12 +183,12 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 		existingMenu.Image = imageURL
 	}
 
-	if req.IsFasting != existingMenu.IsFasting {
-		existingMenu.IsFasting = req.IsFasting
+	if req.IsFasting != nil && *req.IsFasting != existingMenu.IsFasting {
+		existingMenu.IsFasting = *req.IsFasting
 	}
 
-	if req.IsAvailable != existingMenu.IsAvailable {
-		existingMenu.IsAvailable = req.IsAvailable
+	if req.IsAvailable != nil && *req.IsAvailable != existingMenu.IsAvailable {
+		existingMenu.IsAvailable = *req.IsAvailable
 	}
 
 	if req.Description != existingMenu.Description {
@@ -205,6 +208,24 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 	return nil
 }
 
+func (s *menuService) enrichMenuDTO(ctx context.Context, dto *MenuDTO, categoryID string, ingredientIDs []string) {
+	if categoryID != "" {
+		if cat, err := s.categoryService.Get(ctx, categoryID); err == nil {
+			dto.Category = cat
+		}
+	}
+	ingredients := make([]*ingredient.IngredientDTO, 0, len(ingredientIDs))
+	for _, id := range ingredientIDs {
+		if id == "" {
+			continue
+		}
+		if ing, err := s.ingredientService.Get(ctx, id); err == nil {
+			ingredients = append(ingredients, ing)
+		}
+	}
+	dto.Ingredients = ingredients
+}
+
 func (s *menuService) Get(ctx context.Context, id string, branchID string) (*MenuDTO, error) {
 	menu, err := s.menuRepository.Get(ctx, id, branchID)
 	if err != nil {
@@ -212,6 +233,7 @@ func (s *menuService) Get(ctx context.Context, id string, branchID string) (*Men
 		return nil, err
 	}
 	menuDTO := menu.ToDTO()
+	s.enrichMenuDTO(ctx, &menuDTO, menuDTO.CategoryID, menu.Ingredients)
 	return &menuDTO, nil
 }
 
@@ -240,10 +262,41 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID s
 		s.logger.Error("Failed to list menus", "error", err)
 		return nil, err
 	}
+	// Collect unique category and ingredient IDs for batch lookup
+	uniqueCategoryIDs := make(map[string]struct{})
+	uniqueIngredientIDs := make(map[string]struct{})
+	for _, menu := range menus {
+		uniqueCategoryIDs[common.ParseUUIDToString(menu.CategoryID)] = struct{}{}
+		for _, id := range menu.Ingredients {
+			if id != "" {
+				uniqueIngredientIDs[id] = struct{}{}
+			}
+		}
+	}
+	categoryMap := make(map[string]*category.CategoryDTO)
+	for id := range uniqueCategoryIDs {
+		if cat, err := s.categoryService.Get(ctx, id); err == nil {
+			categoryMap[id] = cat
+		}
+	}
+	ingredientMap := make(map[string]*ingredient.IngredientDTO)
+	for id := range uniqueIngredientIDs {
+		if ing, err := s.ingredientService.Get(ctx, id); err == nil {
+			ingredientMap[id] = ing
+		}
+	}
 	menuDTOs := make([]*MenuDTO, len(menus))
 	for i, menu := range menus {
-		menuDTO := menu.ToDTO()
-		menuDTOs[i] = &menuDTO
+		dto := menu.ToDTO()
+		dto.Category = categoryMap[dto.CategoryID]
+		ingredients := make([]*ingredient.IngredientDTO, 0, len(menu.Ingredients))
+		for _, id := range menu.Ingredients {
+			if ing := ingredientMap[id]; ing != nil {
+				ingredients = append(ingredients, ing)
+			}
+		}
+		dto.Ingredients = ingredients
+		menuDTOs[i] = &dto
 	}
 	return menuDTOs, nil
 }

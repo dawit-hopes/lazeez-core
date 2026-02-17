@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
@@ -138,6 +139,10 @@ func (m *middleware) decodeToken(token string) (map[string]any, error) {
 	if !ok {
 		return nil, common.ErrUnAuthorized
 	}
+
+	fmt.Println("branchID", branchID)
+	fmt.Println("roleStr", roleStr)
+	fmt.Println("uid", uid)
 
 	return map[string]any{
 		"uid": uid,

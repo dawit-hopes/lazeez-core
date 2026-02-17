@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func ToNUllString(s string) sql.NullString {
@@ -71,7 +73,6 @@ func ValidatePhoneNumber(phoneNumber string) (string, error) {
 }
 
 func ParseFilter(r *http.Request) Filter {
-
 	filter := Filter{
 		Page:   1,
 		Limit:  10,
@@ -95,4 +96,26 @@ func ParseFilter(r *http.Request) Filter {
 		filter.Search = strings.ToLower(query.Get("search"))
 	}
 	return filter
+}
+
+func FormatText(text string) string {
+	if text == "" {
+		return text
+	}
+
+	r := []rune(strings.ToLower(text))
+	r[0] = unicode.ToUpper(r[0])
+
+	return string(r)
+}
+
+func ParseStringToUUID(text string) uuid.UUID {
+	return uuid.MustParse(text)
+}
+
+
+
+
+func ParseUUIDToString(uuid uuid.UUID) string {
+	return uuid.String()
 }

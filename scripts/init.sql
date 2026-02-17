@@ -79,10 +79,19 @@ CREATE TABLE IF NOT EXISTS menus (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
     image TEXT,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    ingredients TEXT[],
+    category_id UUID NOT NULL,
+    branch_id UUID NOT NULL,
+    is_fasting BOOLEAN DEFAULT FALSE,
+    is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_menus_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT chk_menus_ingredients CHECK (array_length(ingredients, 1) > 0)
 );
 
 -- Create index on name for faster lookups

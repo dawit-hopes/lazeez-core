@@ -235,7 +235,17 @@ func (s *authService) validateSession(ctx context.Context, userID string, refres
 }
 
 func (s *authService) generatePayload(user users.UserDTO) map[string]any {
-	return map[string]any{"id": user.ID, "role": user.Role, "bid": user.BranchID}
+	// This payload is later consumed by generateTokens, which expects:
+	//   - "id"        → user ID
+	//   - "role"      → user role
+	//   - "branch_id" → branch ID (used to populate the "bid" claim in the JWT)
+	// Previously we stored "bid" here, which meant generateTokens could not
+	// find "branch_id" and was writing an empty "bid" claim into the token.
+	return map[string]any{
+		"id":   user.ID,
+		"role": user.Role,
+		"bid":  user.BranchID,
+	}
 }
 
 func (s *authService) validateExistingUser(ctx context.Context, normalizedPhoneNumber string, requireFirstLogin bool) (*users.User, error) {

@@ -53,10 +53,17 @@ func (r *menuRepository) Get(ctx context.Context, id string, branchID string) (M
 func (r *menuRepository) Update(ctx context.Context, menu Menu) error {
 	filter := map[string]any{"id": menu.ID}
 	updates := map[string]any{
-		"name":       menu.Name,
-		"image":      menu.Image,
-		"deleted_at": menu.DeletedAt,
-		"is_deleted": menu.IsDeleted,
+		"name":         menu.Name,
+		"image":        menu.Image,
+		"description":  menu.Description,
+		"price":        menu.Price,
+		"ingredients":  menu.Ingredients,
+		"category_id":  menu.CategoryID,
+		"branch_id":    menu.BranchID,
+		"is_fasting":   menu.IsFasting,
+		"is_available": menu.IsAvailable,
+		"deleted_at":   menu.DeletedAt,
+		"is_deleted":   menu.IsDeleted,
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {

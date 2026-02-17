@@ -22,7 +22,7 @@ func (r *MenuRequest) Validate() error {
 		),
 		validation.Field(&r.Price,
 			validation.Required.Error("price is required"),
-			validation.Min(0).Error("price must be greater than 0"),
+			validation.Min(0.0).Error("price must be greater than 0"),
 		),
 		validation.Field(&r.Ingredients,
 			validation.Required.Error("ingredients are required"),

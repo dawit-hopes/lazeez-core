@@ -49,7 +49,14 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 				h.logger.Error("Image file is required", "error", err)
 				return req, nil, common.ErrMissingFile
 			}
-			req.Name = r.FormValue("name")
+			// No image; still parse all other form fields for update
+			h.parseFormFields(r, &req)
+			branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+			if !ok {
+				h.logger.Error("Failed to get branch ID from context", "error", common.ErrUnAuthorized)
+				return req, nil, common.ErrUnAuthorized
+			}
+			req.BranchID = branchID
 			return req, nil, nil
 		}
 		h.logger.Error("Failed to get image file", "error", err)
@@ -58,17 +65,7 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 
 	req.ImageHeader = *fileHeader
 	req.Image = file
-	req.Name = r.FormValue("name")
-	req.Description = r.FormValue("description")
-	req.Price, err = strconv.ParseFloat(r.FormValue("price"), 64)
-	if err != nil {
-		h.logger.Error("Failed to parse price", "error", err)
-		return req, nil, err
-	}
-	req.Ingredients = strings.Split(r.FormValue("ingredients"), ",")
-	req.CategoryID = r.FormValue("category_id")
-	req.IsFasting = r.FormValue("is_fasting") == "true"
-	req.IsAvailable = r.FormValue("is_available") == "true"
+	h.parseFormFields(r, &req)
 
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
 	if !ok {
@@ -78,6 +75,25 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 	req.BranchID = branchID
 
 	return req, file, nil
+}
+
+// parseFormFields fills MenuRequest from form values (name, description, price, ingredients, category_id, is_fasting, is_available).
+func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) {
+	req.Name = r.FormValue("name")
+	req.Description = r.FormValue("description")
+	if p := r.FormValue("price"); p != "" {
+		if v, err := strconv.ParseFloat(p, 64); err == nil {
+			req.Price = v
+		}
+	}
+	if ing := r.FormValue("ingredients"); ing != "" {
+		req.Ingredients = strings.Split(ing, ",")
+	}
+	req.CategoryID = r.FormValue("category_id")
+	isFasting := r.FormValue("is_fasting") == "true"
+	isAvailable := r.FormValue("is_available") == "true"
+	req.IsFasting = &isFasting
+	req.IsAvailable = &isAvailable
 }
 
 func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {

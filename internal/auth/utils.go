@@ -38,7 +38,7 @@ func (s *authService) validatePassword(password string) error {
 
 func (s *authService) generateTokens(user map[string]any) (string, string, error) {
 	branchID := ""
-	if bid := user["branch_id"]; bid != nil {
+	if bid := user["bid"]; bid != nil {
 		switch v := bid.(type) {
 		case string:
 			branchID = v
