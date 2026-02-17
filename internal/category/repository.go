@@ -97,12 +97,13 @@ func (r *categoryRepository) List(ctx context.Context, filter common.Filter) ([]
 		filters["name"] = common.ILike(filter.Search)
 	}
 
+	offset := (filter.Page - 1) * filter.Limit
 	var results []*Category
 	var err error
 	if role == "super_admin" {
-		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, filter.Page)
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, offset)
 	} else {
-		results, err = r.dal.List(ctx, filters, filter.Limit, filter.Page)
+		results, err = r.dal.List(ctx, filters, filter.Page, filter.Limit)
 	}
 	if err != nil {
 		r.logger.Error("failed to list categories", "error", err)

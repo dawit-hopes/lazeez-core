@@ -192,11 +192,6 @@ WHERE m.id = $1 AND m.is_deleted = FALSE;
 func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
 
-	filters := map[string]any{}
-	if filter.Search != "" {
-		filters["name"] = common.ILike(filter.Search)
-	}
-
 	var baseQuery string
 	if role == string(users.RoleAdmin) {
 		// Super admin sees deleted and non-deleted merchants, branches, and users
@@ -205,9 +200,34 @@ func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) (
 		// Others only see non-deleted merchants, branches, and users
 		baseQuery = merchantWithRelationsActive
 	}
-	query := baseQuery + " ORDER BY m.created_at DESC LIMIT $1 OFFSET $2"
 
-	results, err := common.QueryRows(r.joinDAL, ctx, query, []any{filter.Limit, filter.Page}, func(rows *sql.Rows) (*MerchantDTO, error) {
+	offset := (filter.Page - 1) * filter.Limit
+	var query string
+	var args []any
+
+	if filter.Search != "" {
+		searchPattern := common.ILikePattern(filter.Search)
+		// Search merchant name, branch (name, address, phone), and user (full_name, phone_number). Pattern is pre-escaped in Go so no ESCAPE clause needed.
+		searchByBranch := "EXISTS (SELECT 1 FROM branches b WHERE b.merchant_id = m.id AND (b.branch_name ILIKE $1 OR b.address ILIKE $1 OR b.phone_number ILIKE $1))"
+		searchByUser := "EXISTS (SELECT 1 FROM users u INNER JOIN branches b ON u.branch_id = b.id WHERE b.merchant_id = m.id AND (u.full_name ILIKE $1 OR u.phone_number ILIKE $1))"
+		searchCond := "(m.name ILIKE $1 OR " + searchByBranch + " OR " + searchByUser + ")"
+		if role == string(users.RoleAdmin) {
+			// merchantWithRelationsAll has no WHERE yet; no is_deleted filter in subqueries
+			query = baseQuery + " WHERE " + searchCond + " ORDER BY m.created_at DESC LIMIT $2 OFFSET $3"
+		} else {
+			// merchantWithRelationsActive already has WHERE m.is_deleted = FALSE; restrict branch/user to non-deleted
+			searchByBranchActive := "EXISTS (SELECT 1 FROM branches b WHERE b.merchant_id = m.id AND b.is_deleted = FALSE AND (b.branch_name ILIKE $1 OR b.address ILIKE $1 OR b.phone_number ILIKE $1))"
+			searchByUserActive := "EXISTS (SELECT 1 FROM users u INNER JOIN branches b ON u.branch_id = b.id WHERE b.merchant_id = m.id AND u.is_deleted = FALSE AND b.is_deleted = FALSE AND (u.full_name ILIKE $1 OR u.phone_number ILIKE $1))"
+			searchCondActive := "(m.name ILIKE $1 OR " + searchByBranchActive + " OR " + searchByUserActive + ")"
+			query = baseQuery + " AND " + searchCondActive + " ORDER BY m.created_at DESC LIMIT $2 OFFSET $3"
+		}
+		args = []any{searchPattern, filter.Limit, offset}
+	} else {
+		query = baseQuery + " ORDER BY m.created_at DESC LIMIT $1 OFFSET $2"
+		args = []any{filter.Limit, offset}
+	}
+
+	results, err := common.QueryRows(r.joinDAL, ctx, query, args, func(rows *sql.Rows) (*MerchantDTO, error) {
 		var dto MerchantDTO
 		if err := r.scanMerchantWithRelationsFromRows(rows, &dto); err != nil {
 			return nil, err

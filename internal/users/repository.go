@@ -153,6 +153,7 @@ func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) 
 	filters := map[string]any{}
 	if filter.Search != "" {
 		filters["full_name"] = common.ILike(filter.Search)
+		filters["phone_number"] = common.ILike(filter.Search)
 	}
 	// Super admin can see deleted + non-deleted; others see only non-deleted
 	if role != "" && role == string(RoleAdmin) {

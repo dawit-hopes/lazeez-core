@@ -12,7 +12,6 @@ func initCloudinary(logger config.Logger) (*cloudinary.Cloudinary, error) {
 	cloudName := getEnv("CLOUDINARY_CLOUD_NAME", "")
 	apiKey := getEnv("CLOUDINARY_API_KEY", "")
 	apiSecret := getEnv("CLOUDINARY_API_SECRET", "")
-	fmt.Println("Cloudinary Configuration", cloudName, apiKey, apiSecret)
 
 	url := fmt.Sprintf("cloudinary://%s:%s@%s", apiKey, apiSecret, cloudName)
 

@@ -291,6 +291,12 @@ func escapeLike(s string) string {
 	return s
 }
 
+// ILikePattern returns a pattern suitable for ILIKE $n ESCAPE '\' (contains search).
+// Use this when building raw SQL that uses ILIKE for search.
+func ILikePattern(s string) string {
+	return "%" + escapeLike(s) + "%"
+}
+
 func (r *DAL[T]) buildWhereClause(filters map[string]any, startAt int) (string, []any) {
 	if len(filters) == 0 {
 		return "", nil
