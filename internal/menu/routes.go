@@ -33,11 +33,17 @@ func NewMenuRoutes(router chi.Router, handler MenuHandler, middleware middleware
 			Path:        "/menus/{id}",
 			Handler:     handler.Delete,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
-		},	
+		},
 		{
 			Method:      http.MethodPost,
 			Path:        "/menus/{id}/undelete",
 			Handler:     handler.UnDelete,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/menus",
+			Handler:     handler.List,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 	}

@@ -16,6 +16,7 @@ type CategoryService interface {
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 	List(ctx context.Context, filter common.Filter) ([]*CategoryDTO, error)
+	CheckExists(ctx context.Context, name string) error	
 }
 
 type categoryService struct {
@@ -133,6 +134,15 @@ func (s *categoryService) UnDelete(ctx context.Context, id string) error {
 	err := s.categoryRepository.UnDelete(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to undelete category", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (s *categoryService) CheckExists(ctx context.Context, name string) error {
+	err := s.categoryRepository.CheckExists(ctx, name)
+	if err != nil {
+		s.logger.Error("Failed to check if category exists", "error", err)
 		return err
 	}
 	return nil

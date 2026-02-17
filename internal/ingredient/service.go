@@ -13,6 +13,7 @@ type IngredientService interface {
 	List(ctx context.Context, filter common.Filter) ([]*IngredientDTO, error)
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
+	CheckExists(ctx context.Context, name string) error
 }
 
 type ingredientService struct {
@@ -105,6 +106,15 @@ func (s *ingredientService) UnDelete(ctx context.Context, id string) error {
 	err := s.ingredientRepository.UnDelete(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to undelete ingredient", "error", err)
+		return err
+	}
+	return nil
+}
+
+func (s *ingredientService) CheckExists(ctx context.Context, name string) error {
+	err := s.ingredientRepository.CheckExists(ctx, name)
+	if err != nil {
+		s.logger.Error("Failed to check if ingredient exists", "error", err)
 		return err
 	}
 	return nil

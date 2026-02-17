@@ -25,28 +25,28 @@ type Dependencies struct {
 	KeyService key.KeyService
 
 	// Repositories
-	UserRepo     users.UserRepository
-	BranchRepo   branch.BranchRepository
-	MerchantRepo merchant.MerchantRepository
+	UserRepo       users.UserRepository
+	BranchRepo     branch.BranchRepository
+	MerchantRepo   merchant.MerchantRepository
 	MenuRepo       menu.MenuRepository
-	CategoryRepo     category.CategoryRepository
-	IngredientRepo   ingredient.IngredientRepository
+	CategoryRepo   category.CategoryRepository
+	IngredientRepo ingredient.IngredientRepository
 
 	// Services
-	AuthService     auth.AuthService
-	UserService     users.UserService
-	BranchService   branch.BranchService
-	MerchantService merchant.MerchantService
-	MenuService     menu.MenuService
+	AuthService       auth.AuthService
+	UserService       users.UserService
+	BranchService     branch.BranchService
+	MerchantService   merchant.MerchantService
+	MenuService       menu.MenuService
 	CategoryService   category.CategoryService
 	IngredientService ingredient.IngredientService
 
 	// Handlers
-	AuthHandler     auth.AuthHandler
-	UserHandler     users.UserHandler
-	BranchHandler   branch.BranchHandler
-	MerchantHandler merchant.MerchantHandler
-	MenuHandler     menu.MenuHandler
+	AuthHandler       auth.AuthHandler
+	UserHandler       users.UserHandler
+	BranchHandler     branch.BranchHandler
+	MerchantHandler   merchant.MerchantHandler
+	MenuHandler       menu.MenuHandler
 	CategoryHandler   category.CategoryHandler
 	IngredientHandler ingredient.IngredientHandler
 
@@ -93,9 +93,9 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	userService := users.NewUserService(userRepo, branchService, logger)
 	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
-	menuService := menu.NewMenuService(menuRepo, fileService, logger)
 	categoryService := category.NewCategoryService(categoryRepo, fileService, logger)
 	ingredientService := ingredient.NewIngredientService(ingredientRepo, logger)
+	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -111,26 +111,26 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	return &Dependencies{
 		KeyService: keyService,
 
-		UserRepo:     userRepo,
-		BranchRepo:   branchRepo,
-		MerchantRepo: merchantRepo,
+		UserRepo:       userRepo,
+		BranchRepo:     branchRepo,
+		MerchantRepo:   merchantRepo,
 		MenuRepo:       menuRepo,
-		CategoryRepo:     categoryRepo,
-		IngredientRepo:   ingredientRepo,
+		CategoryRepo:   categoryRepo,
+		IngredientRepo: ingredientRepo,
 
-		AuthService:     authService,
-		UserService:     userService,
-		BranchService:   branchService,
-		MerchantService: merchantService,
-		MenuService:     menuService,
+		AuthService:       authService,
+		UserService:       userService,
+		BranchService:     branchService,
+		MerchantService:   merchantService,
+		MenuService:       menuService,
 		CategoryService:   categoryService,
 		IngredientService: ingredientService,
 
-		AuthHandler:     authHandler,
-		UserHandler:     userHandler,
-		BranchHandler:   branchHandler,
-		MerchantHandler: merchantHandler,
-		MenuHandler:     menuHandler,
+		AuthHandler:       authHandler,
+		UserHandler:       userHandler,
+		BranchHandler:     branchHandler,
+		MerchantHandler:   merchantHandler,
+		MenuHandler:       menuHandler,
 		CategoryHandler:   categoryHandler,
 		IngredientHandler: ingredientHandler,
 

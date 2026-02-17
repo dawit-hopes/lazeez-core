@@ -235,7 +235,7 @@ func (s *authService) validateSession(ctx context.Context, userID string, refres
 }
 
 func (s *authService) generatePayload(user users.UserDTO) map[string]any {
-	return map[string]any{"id": user.ID, "role": user.Role, "branch_id": user.BranchID}
+	return map[string]any{"id": user.ID, "role": user.Role, "bid": user.BranchID}
 }
 
 func (s *authService) validateExistingUser(ctx context.Context, normalizedPhoneNumber string, requireFirstLogin bool) (*users.User, error) {

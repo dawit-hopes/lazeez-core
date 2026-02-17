@@ -51,4 +51,6 @@ var (
 	ErrRefreshTokenNotFound             = &Errors{Code: BadRequest, Message: "refresh token not found"}
 	ErrCategoryAlreadyExists            = &Errors{Code: BadRequest, Message: "category with this information already exists"}
 	ErrIngredientAlreadyExists          = &Errors{Code: BadRequest, Message: "ingredient with this information already exists"}
+	ErrNoDataToUpdate                   = &Errors{Code: BadRequest, Message: "no data to update"}
+	ErrMenuAlreadyExists                = &Errors{Code: BadRequest, Message: "menu with this information already exists"}
 )

@@ -179,3 +179,12 @@ func GetRoleFromContext(ctx context.Context) (string, bool) {
 	role, ok := claims["rol"].(string)
 	return role, ok
 }
+
+func GetBranchIDFromContext(ctx context.Context) (string, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(map[string]any)
+	if !ok || claims == nil {
+		return "", false
+	}
+	branchID, ok := claims["bid"].(string)
+	return branchID, ok
+}
