@@ -14,6 +14,8 @@ import (
 	"lazeez-core/internal/menu"
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/middleware"
+	modgroup "lazeez-core/internal/modifiers/group"
+	modoption "lazeez-core/internal/modifiers/option"
 	"lazeez-core/internal/session"
 	"lazeez-core/internal/users"
 
@@ -25,21 +27,25 @@ type Dependencies struct {
 	KeyService key.KeyService
 
 	// Repositories
-	UserRepo       users.UserRepository
-	BranchRepo     branch.BranchRepository
-	MerchantRepo   merchant.MerchantRepository
-	MenuRepo       menu.MenuRepository
-	CategoryRepo   category.CategoryRepository
-	IngredientRepo ingredient.IngredientRepository
+	UserRepo           users.UserRepository
+	BranchRepo         branch.BranchRepository
+	MerchantRepo       merchant.MerchantRepository
+	MenuRepo           menu.MenuRepository
+	CategoryRepo       category.CategoryRepository
+	IngredientRepo     ingredient.IngredientRepository
+	ModifierGroupRepo  modgroup.ModifierGroupRepository
+	ModifierOptionRepo modoption.ModifierOptionRepository
 
 	// Services
-	AuthService       auth.AuthService
-	UserService       users.UserService
-	BranchService     branch.BranchService
-	MerchantService   merchant.MerchantService
-	MenuService       menu.MenuService
-	CategoryService   category.CategoryService
-	IngredientService ingredient.IngredientService
+	AuthService           auth.AuthService
+	UserService           users.UserService
+	BranchService         branch.BranchService
+	MerchantService       merchant.MerchantService
+	MenuService           menu.MenuService
+	CategoryService       category.CategoryService
+	IngredientService     ingredient.IngredientService
+	ModifierGroupService  modgroup.ModifierGroupService
+	ModifierOptionService modoption.ModifierOptionService
 
 	// Handlers
 	AuthHandler       auth.AuthHandler
@@ -70,6 +76,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	categoryDAL := common.NewDAL(db, func() *category.Category { return &category.Category{} })
 	ingredientDAL := common.NewDAL(db, func() *ingredient.Ingredient { return &ingredient.Ingredient{} })
 	sessionDAL := common.NewDAL(db, func() *session.Session { return &session.Session{} })
+	modifierGroupDAL := common.NewDAL(db, func() *modgroup.ModifierGroup { return &modgroup.ModifierGroup{} })
+	modifierOptionDAL := common.NewDAL(db, func() *modoption.ModifierOption { return &modoption.ModifierOption{} })
 
 	joinDAL := common.NewJoinDAL(db)
 	cld, err := initCloudinary(logger)
@@ -86,6 +94,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	categoryRepo := category.NewCategoryRepository(categoryDAL, logger)
 	ingredientRepo := ingredient.NewIngredientRepository(ingredientDAL, logger)
 	sessionRepo := session.NewSessionRepository(sessionDAL, logger)
+	modifierGroupRepo := modgroup.NewModifierGroupRepository(modifierGroupDAL, logger)
+	modifierOptionRepo := modoption.NewModifierOptionRepository(modifierOptionDAL, logger)
 
 	// Initialize services
 	branchService := branch.NewBranchService(branchRepo, logger)
@@ -95,7 +105,9 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	ingredientService := ingredient.NewIngredientService(ingredientRepo, logger)
-	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, logger)
+	modifierGroupService := modgroup.NewModifierGroupService(modifierGroupRepo, logger)
+	modifierOptionService := modoption.NewModifierOptionService(modifierOptionRepo, logger)
+	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -111,20 +123,24 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	return &Dependencies{
 		KeyService: keyService,
 
-		UserRepo:       userRepo,
-		BranchRepo:     branchRepo,
-		MerchantRepo:   merchantRepo,
-		MenuRepo:       menuRepo,
-		CategoryRepo:   categoryRepo,
-		IngredientRepo: ingredientRepo,
+		UserRepo:           userRepo,
+		BranchRepo:         branchRepo,
+		MerchantRepo:       merchantRepo,
+		MenuRepo:           menuRepo,
+		CategoryRepo:       categoryRepo,
+		IngredientRepo:     ingredientRepo,
+		ModifierGroupRepo:  modifierGroupRepo,
+		ModifierOptionRepo: modifierOptionRepo,
 
-		AuthService:       authService,
-		UserService:       userService,
-		BranchService:     branchService,
-		MerchantService:   merchantService,
-		MenuService:       menuService,
-		CategoryService:   categoryService,
-		IngredientService: ingredientService,
+		AuthService:           authService,
+		UserService:           userService,
+		BranchService:         branchService,
+		MerchantService:       merchantService,
+		MenuService:           menuService,
+		CategoryService:       categoryService,
+		IngredientService:     ingredientService,
+		ModifierGroupService:  modifierGroupService,
+		ModifierOptionService: modifierOptionService,
 
 		AuthHandler:       authHandler,
 		UserHandler:       userHandler,
@@ -152,3 +168,4 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	category.NewCategoryRoutes(router, deps.CategoryHandler, deps.Middleware)
 	ingredient.NewIngredientRoutes(router, deps.IngredientHandler, deps.Middleware)
 }
+
