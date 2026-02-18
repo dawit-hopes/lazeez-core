@@ -40,6 +40,13 @@ func (h *userHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	req.PhoneNumber = normalized
 	err = h.userService.CreateUser(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to create user", "error", err)
@@ -75,6 +82,15 @@ func (h *userHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	if req.PhoneNumber != "" {
+		normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+		if err != nil {
+			h.logger.Error("Invalid phone number", "error", err)
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		req.PhoneNumber = normalized
+	}
 	err = h.userService.UpdateUser(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update user", "error", err)
@@ -108,7 +124,13 @@ func (h *userHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	user, err := h.userService.UserLookUp(r.Context(), req.PhoneNumber)
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	user, err := h.userService.UserLookUp(r.Context(), normalized)
 	if err != nil {
 		h.logger.Error("Failed to look up user by phone number", "error", err)
 		common.WriteErrorResponse(w, err)

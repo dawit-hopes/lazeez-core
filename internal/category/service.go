@@ -30,17 +30,14 @@ func NewCategoryService(categoryRepository CategoryRepository, logger config.Log
 
 func (s *categoryService) Create(ctx context.Context, req CategoryRequest) error {
 	category := Category{
-		Name: req.Name,
+		Name: common.FormatText(req.Name),
+		Icon: req.Icon,
 	}
 
 	err := s.categoryRepository.CheckExists(ctx, req.Name)
 	if err != nil {
 		s.logger.Error("Failed to check if category exists", "error", err)
 		return err
-	}
-
-	if req.Icon != "" {
-		category.Icon = req.Icon
 	}
 
 	category.ID = common.GenerateUUID()
@@ -72,12 +69,12 @@ func (s *categoryService) Update(ctx context.Context, id string, req CategoryReq
 	}
 
 	if req.Name != "" {
-		existingCategory.Name = req.Name
 		err = s.categoryRepository.CheckExists(ctx, req.Name)
 		if err != nil {
 			s.logger.Error("Failed to check if category exists", "error", err)
 			return err
 		}
+		existingCategory.Name = common.FormatText(req.Name)
 	}
 	if req.Icon != "" {
 		existingCategory.Icon = req.Icon

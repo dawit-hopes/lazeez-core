@@ -89,13 +89,8 @@ func (s *authService) validateUser(ctx context.Context, user *users.User, req Lo
 
 func (s *authService) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
 	s.logger.Info("Logging in", "phone number", req.PhoneNumber)
-	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
-		return nil, err
-	}
-
-	existingUser, err := s.userService.GetUserByPhoneNumber(ctx, normalizedPhoneNumber)
+	// req.PhoneNumber is already validated and normalized by the handler
+	existingUser, err := s.userService.GetUserByPhoneNumber(ctx, req.PhoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to get user by phone number", "error", err)
 		return nil, err
@@ -137,30 +132,22 @@ func (s *authService) ResetPassword(ctx context.Context, req SetPasswordRequest)
 }
 
 func (s *authService) setPasswordAndLogin(ctx context.Context, req SetPasswordRequest, requireFirstLogin bool) (*LoginResponse, error) {
-	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
-		return nil, err
-	}
-
-	existingUser, err := s.validateExistingUser(ctx, normalizedPhoneNumber, requireFirstLogin)
+	// req.PhoneNumber is already validated and normalized by the handler
+	existingUser, err := s.validateExistingUser(ctx, req.PhoneNumber, requireFirstLogin)
 	if err != nil {
 		s.logger.Error("Failed to validate existing user", "error", err)
 		return nil, err
 	}
-
 	if err := s.validatePassword(req.Password); err != nil {
 		s.logger.Error("Failed to validate password", "error", err)
 		return nil, err
 	}
-
 	encryptedPassword, err := s.keyService.HashPassword(req.Password)
 	if err != nil {
 		s.logger.Error("Failed to hash password", "error", err)
 		return nil, err
 	}
-
-	if err := s.userService.SetPassword(ctx, normalizedPhoneNumber, existingUser.ID, encryptedPassword, existingUser.IsFirstLogin); err != nil {
+	if err := s.userService.SetPassword(ctx, req.PhoneNumber, existingUser.ID, encryptedPassword, existingUser.IsFirstLogin); err != nil {
 		s.logger.Error("Failed to set password", "error", err)
 		return nil, err
 	}

@@ -32,7 +32,7 @@ func NewMerchantService(merchantRepository MerchantRepository, fileService files
 
 func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error) {
 	merchant := Merchant{
-		Name: req.Name,
+		Name: common.FormatText(req.Name),
 	}
 	merchant.ID = common.GenerateUUID()
 	err := s.merchantRepository.CheckExists(ctx, merchant.Name)
@@ -87,7 +87,7 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 			s.logger.Error("Failed to check if merchant exists", "error", err)
 			return err
 		}
-		existingMerchant.Name = req.Name
+		existingMerchant.Name = common.FormatText(req.Name)
 	}
 
 	if req.Logo != nil {
@@ -109,16 +109,8 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 }
 
 func (s *merchantService) Delete(ctx context.Context, id string) error {
-	s.logger.Info("Deleting merchant", "id", id)
-	existingMerchant, err := s.Get(ctx, id)
-	if err != nil {
-		s.logger.Error("Failed to get merchant by ID", "error", err)
-		return err
-	}
-	if existingMerchant.IsDeleted {
 
-	}
-	err = s.merchantRepository.Delete(ctx, existingMerchant.ID)
+	err := s.merchantRepository.Delete(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to delete merchant", "error", err)
 		return err

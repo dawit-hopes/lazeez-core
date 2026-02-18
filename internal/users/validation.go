@@ -6,11 +6,11 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
+// Validate checks UserRequest. Phone format is validated and normalized in the handler once; here we only check required/length/etc.
 func (u *UserRequest) Validate(isUpdate bool) error {
 	return validation.ValidateStruct(u,
 		validation.Field(&u.PhoneNumber,
 			validation.When(!isUpdate, validation.Required.Error("phone number is required")),
-			validation.Match(regexp.MustCompile(`^(\+?251[79]\d{8}|0[79]\d{8})$`)).Error("phone number must be a valid Ethiopian phone number"),
 		),
 		validation.Field(&u.FullName,
 			validation.When(!isUpdate, validation.Required.Error("full name is required")),
@@ -26,7 +26,6 @@ func (u *UserRequest) Validate(isUpdate bool) error {
 
 func (u *UserLookUpRequest) Validate() error {
 	return validation.ValidateStruct(u,
-		validation.Field(&u.PhoneNumber, validation.Required.Error("phone number is required"),
-			validation.Match(regexp.MustCompile(`^(\+?251[79]\d{8}|0[79]\d{8})$`)).Error("phone number must be a valid Ethiopian phone number")),
+		validation.Field(&u.PhoneNumber, validation.Required.Error("phone number is required")),
 	)
 }

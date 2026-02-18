@@ -126,7 +126,7 @@ func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       result,
+		Data:       result.Data,
 		Meta:       &result.Meta,
 		Message:    "Categories fetched successfully",
 		StatusCode: http.StatusOK,

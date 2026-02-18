@@ -53,4 +53,5 @@ var (
 	ErrIngredientAlreadyExists          = &Errors{Code: BadRequest, Message: "ingredient with this information already exists"}
 	ErrNoDataToUpdate                   = &Errors{Code: BadRequest, Message: "no data to update"}
 	ErrMenuAlreadyExists                = &Errors{Code: BadRequest, Message: "menu with this information already exists"}
+	ErrMerchentAlreadyDeleted           = &Errors{Code: BadRequest, Message: "merchant is already deleted"}
 )

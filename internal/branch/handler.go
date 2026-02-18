@@ -42,8 +42,14 @@ func (h *branchHandler) Create(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-
-	err := h.branchService.Create(r.Context(), req)
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	req.PhoneNumber = normalized
+	err = h.branchService.Create(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to create branch", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -87,7 +93,15 @@ func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-
+	if req.PhoneNumber != "" {
+		normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+		if err != nil {
+			h.logger.Error("Invalid phone number", "error", err)
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		req.PhoneNumber = normalized
+	}
 	err := h.branchService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update branch", "error", err)

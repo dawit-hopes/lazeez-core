@@ -35,22 +35,14 @@ func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) err
 		return err
 	}
 
+	// req.PhoneNumber is already validated and normalized by the handler
 	branch := Branch{
 		MerchantID:  req.MerchantID,
 		BranchName:  req.BranchName,
 		Address:     req.Address,
 		PhoneNumber: req.PhoneNumber,
 	}
-
 	branch.ID = common.GenerateUUID()
-
-	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
-		return err
-	}
-	branch.PhoneNumber = normalizedPhoneNumber
-
 	s.logger.Info("Creating branch", "branch", branch)
 
 	err = s.branchRepository.Create(ctx, branch)
@@ -84,12 +76,17 @@ func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchR
 	}
 
 	if req.BranchName != "" {
-		existingBranch.BranchName = req.BranchName
+		if err := s.branchRepository.CheckExists(ctx, existingBranch.MerchantID, req.BranchName, existingBranch.PhoneNumber); err != nil {
+			s.logger.Error("Failed to check if branch exists", "error", err)
+			return err
+		}
+			existingBranch.BranchName = common.FormatText(req.BranchName)
 	}
 	if req.Address != "" {
 		existingBranch.Address = req.Address
 	}
 	if req.PhoneNumber != "" {
+		// req.PhoneNumber is already validated and normalized by the handler
 		existingBranch.PhoneNumber = req.PhoneNumber
 	}
 

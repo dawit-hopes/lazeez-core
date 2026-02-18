@@ -6,6 +6,7 @@ import (
 	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 )
 
 type MenuRepository interface {
@@ -112,7 +113,14 @@ func (r *menuRepository) UnDelete(ctx context.Context, id string, branchID strin
 }
 
 func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*Menu], error) {
-	filters := map[string]any{"branch_id": branchID}
+	role, _ := middleware.GetRoleFromContext(ctx)
+
+	filters := map[string]any{}
+	// If branchID is empty and role is super_admin, return full menu list (no branch filter).
+	// Otherwise, scope results to the given branch.
+	if !(branchID == "" && role == "super_admin") {
+		filters["branch_id"] = branchID
+	}
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)
 	}

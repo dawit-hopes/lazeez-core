@@ -30,7 +30,7 @@ func NewIngredientService(ingredientRepository IngredientRepository, logger conf
 
 func (s *ingredientService) Create(ctx context.Context, req IngredientRequest) error {
 	ingredient := Ingredient{
-		Name: req.Name,
+		Name: common.FormatText(req.Name),
 		Icon: req.Icon,
 	}
 	ingredient.ID = common.GenerateUUID()
@@ -66,12 +66,12 @@ func (s *ingredientService) Update(ctx context.Context, id string, req Ingredien
 		return err
 	}
 	if req.Name != "" {
-		existing.Name = req.Name
 		err = s.ingredientRepository.CheckExists(ctx, req.Name)
 		if err != nil {
 			s.logger.Error("Failed to check if ingredient exists", "error", err)
 			return err
 		}
+		existing.Name = common.FormatText(req.Name)
 	}
 
 	if req.Icon != "" {
