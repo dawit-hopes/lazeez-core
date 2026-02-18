@@ -35,7 +35,7 @@ func (h *ingredientHandler) Create(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	if err := req.Validate(true); err != nil {
+	if err := req.Validate(true, true); err != nil {
 		h.logger.Error("Failed to validate request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
@@ -75,11 +75,12 @@ func (h *ingredientHandler) Update(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	if err := req.Validate(false); err != nil {
-		h.logger.Error("Failed to validate request", "error", err)
-		common.WriteErrorResponse(w, err)
+	if req.IsEmpty() {
+		h.logger.Error("Name and icon are required")
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
+
 	err := h.ingredientService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update ingredient", "error", err)
@@ -106,7 +107,6 @@ func (h *ingredientHandler) List(w http.ResponseWriter, r *http.Request) {
 		StatusCode: http.StatusOK,
 	})
 }
-
 
 func (h *ingredientHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")

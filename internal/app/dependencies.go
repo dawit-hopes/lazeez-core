@@ -63,13 +63,13 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	keyService := key.NewKeyService(logger, secretKey)
 
 	// Initialize DAL instances
-	userDAL := common.NewDAL[*users.User](db, func() *users.User { return &users.User{} })
-	branchDAL := common.NewDAL[*branch.Branch](db, func() *branch.Branch { return &branch.Branch{} })
-	merchantDAL := common.NewDAL[*merchant.Merchant](db, func() *merchant.Merchant { return &merchant.Merchant{} })
-	menuDAL := common.NewDAL[*menu.Menu](db, func() *menu.Menu { return &menu.Menu{} })
-	categoryDAL := common.NewDAL[*category.Category](db, func() *category.Category { return &category.Category{} })
-	ingredientDAL := common.NewDAL[*ingredient.Ingredient](db, func() *ingredient.Ingredient { return &ingredient.Ingredient{} })
-	sessionDAL := common.NewDAL[*session.Session](db, func() *session.Session { return &session.Session{} })
+	userDAL := common.NewDAL(db, func() *users.User { return &users.User{} })
+	branchDAL := common.NewDAL(db, func() *branch.Branch { return &branch.Branch{} })
+	merchantDAL := common.NewDAL(db, func() *merchant.Merchant { return &merchant.Merchant{} })
+	menuDAL := common.NewDAL(db, func() *menu.Menu { return &menu.Menu{} })
+	categoryDAL := common.NewDAL(db, func() *category.Category { return &category.Category{} })
+	ingredientDAL := common.NewDAL(db, func() *ingredient.Ingredient { return &ingredient.Ingredient{} })
+	sessionDAL := common.NewDAL(db, func() *session.Session { return &session.Session{} })
 
 	joinDAL := common.NewJoinDAL(db)
 	cld, err := initCloudinary(logger)
@@ -93,7 +93,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	userService := users.NewUserService(userRepo, branchService, logger)
 	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
-	categoryService := category.NewCategoryService(categoryRepo, fileService, logger)
+	categoryService := category.NewCategoryService(categoryRepo, logger)
 	ingredientService := ingredient.NewIngredientService(ingredientRepo, logger)
 	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, logger)
 

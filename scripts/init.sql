@@ -121,6 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_categories_created_at ON categories(created_at) W
 CREATE TABLE IF NOT EXISTS ingredients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
+    icon TEXT,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -181,7 +182,7 @@ COMMENT ON TABLE branches IS 'Stores branch locations for merchants';
 COMMENT ON TABLE users IS 'Stores user accounts with authentication information';
 COMMENT ON TABLE menus IS 'Stores menu information';
 COMMENT ON TABLE categories IS 'Stores category information with name and icon';
-COMMENT ON TABLE ingredients IS 'Stores ingredient names';
+COMMENT ON TABLE ingredients IS 'Stores ingredient names and icon';
 
 COMMENT ON COLUMN users.role IS 'User role: super admin or branch_manager';
 COMMENT ON COLUMN users.is_locked IS 'Indicates if user account is locked';

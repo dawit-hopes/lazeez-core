@@ -4,10 +4,7 @@ import (
 	"context"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
-	"lazeez-core/internal/files"
 )
-
-const categoryIconFolder = "lazeez_category"
 
 type CategoryService interface {
 	Create(ctx context.Context, req CategoryRequest) error
@@ -16,20 +13,18 @@ type CategoryService interface {
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 	List(ctx context.Context, filter common.Filter) ([]*CategoryDTO, error)
-	CheckExists(ctx context.Context, name string) error	
+	CheckExists(ctx context.Context, name string) error
 }
 
 type categoryService struct {
 	categoryRepository CategoryRepository
-	fileService       files.FileService
-	logger            config.Logger
+	logger             config.Logger
 }
 
-func NewCategoryService(categoryRepository CategoryRepository, fileService files.FileService, logger config.Logger) CategoryService {
+func NewCategoryService(categoryRepository CategoryRepository, logger config.Logger) CategoryService {
 	return &categoryService{
 		categoryRepository: categoryRepository,
-		fileService:       fileService,
-		logger:            logger,
+		logger:             logger,
 	}
 }
 
@@ -44,13 +39,8 @@ func (s *categoryService) Create(ctx context.Context, req CategoryRequest) error
 		return err
 	}
 
-	if req.Icon != nil {
-		iconURL, err := s.fileService.UploadFileToFolder(ctx, &req.IconHeader, categoryIconFolder)
-		if err != nil {
-			s.logger.Error("Failed to upload icon", "error", err)
-			return err
-		}
-		category.Icon = iconURL
+	if req.Icon != "" {
+		category.Icon = req.Icon
 	}
 
 	category.ID = common.GenerateUUID()
@@ -73,7 +63,7 @@ func (s *categoryService) Get(ctx context.Context, id string) (*CategoryDTO, err
 	categoryDTO := category.ToDTO()
 	return &categoryDTO, nil
 }
-	
+
 func (s *categoryService) Update(ctx context.Context, id string, req CategoryRequest) error {
 	existingCategory, err := s.categoryRepository.Get(ctx, id)
 	if err != nil {
@@ -89,13 +79,8 @@ func (s *categoryService) Update(ctx context.Context, id string, req CategoryReq
 			return err
 		}
 	}
-	if req.Icon != nil {
-		iconURL, err := s.fileService.UploadFileToFolder(ctx, &req.IconHeader, categoryIconFolder)
-		if err != nil {
-			s.logger.Error("Failed to upload icon", "error", err)
-			return err
-		}
-		existingCategory.Icon = iconURL
+	if req.Icon != "" {
+		existingCategory.Icon = req.Icon
 	}
 
 	err = s.categoryRepository.Update(ctx, existingCategory)
@@ -128,7 +113,6 @@ func (s *categoryService) List(ctx context.Context, filter common.Filter) ([]*Ca
 	}
 	return categoryDTOs, nil
 }
-
 
 func (s *categoryService) UnDelete(ctx context.Context, id string) error {
 	err := s.categoryRepository.UnDelete(ctx, id)
