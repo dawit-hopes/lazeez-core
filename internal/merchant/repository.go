@@ -19,7 +19,7 @@ type MerchantRepository interface {
 	Update(ctx context.Context, merchant Merchant) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error)
+	GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -189,7 +189,7 @@ WHERE m.id = $1 AND m.is_deleted = FALSE;
 	return nil
 }
 
-func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error) {
+func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
 
 	var baseQuery string
@@ -238,7 +238,10 @@ func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) (
 		r.logger.Error("failed to get all merchants", "error", err)
 		return nil, err
 	}
-	return results, nil
+	return &common.PaginatedResponse[[]*MerchantDTO]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil
 }
 
 // scanMerchantWithRelations scans a merchant row with JSON branches and users into MerchantDTO.

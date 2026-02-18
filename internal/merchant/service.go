@@ -11,7 +11,7 @@ type MerchantService interface {
 	Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error)
 	Get(ctx context.Context, id string) (*MerchantDTO, error)
 	Update(ctx context.Context, id string, req MerchantRequest) error
-	GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error)
+	GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error)
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 }
@@ -32,7 +32,7 @@ func NewMerchantService(merchantRepository MerchantRepository, fileService files
 
 func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error) {
 	merchant := Merchant{
-		Name: req.Name,
+		Name: common.FormatText(req.Name),
 	}
 	merchant.ID = common.GenerateUUID()
 	err := s.merchantRepository.CheckExists(ctx, merchant.Name)
@@ -87,7 +87,7 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 			s.logger.Error("Failed to check if merchant exists", "error", err)
 			return err
 		}
-		existingMerchant.Name = req.Name
+		existingMerchant.Name = common.FormatText(req.Name)
 	}
 
 	if req.Logo != nil {
@@ -109,16 +109,8 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 }
 
 func (s *merchantService) Delete(ctx context.Context, id string) error {
-	s.logger.Info("Deleting merchant", "id", id)
-	existingMerchant, err := s.Get(ctx, id)
-	if err != nil {
-		s.logger.Error("Failed to get merchant by ID", "error", err)
-		return err
-	}
-	if existingMerchant.IsDeleted {
 
-	}
-	err = s.merchantRepository.Delete(ctx, existingMerchant.ID)
+	err := s.merchantRepository.Delete(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to delete merchant", "error", err)
 		return err
@@ -126,19 +118,9 @@ func (s *merchantService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *merchantService) GetAll(ctx context.Context, filter common.Filter) ([]*MerchantDTO, error) {
+func (s *merchantService) GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error) {
 	s.logger.Info("Getting all merchants")
-	merchants, err := s.merchantRepository.GetAll(ctx, filter)
-	if err != nil {
-		s.logger.Error("Failed to get all merchants", "error", err)
-		return nil, err
-	}
-	merchantDTOs := make([]*MerchantDTO, len(merchants))
-	for i, merchant := range merchants {
-		result := merchant
-		merchantDTOs[i] = result
-	}
-	return merchantDTOs, nil
+	return s.merchantRepository.GetAll(ctx, filter)
 }
 
 func (s *merchantService) UnDelete(ctx context.Context, id string) error {

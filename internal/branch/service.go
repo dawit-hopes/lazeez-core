@@ -12,8 +12,8 @@ type BranchService interface {
 	Update(ctx context.Context, id string, req UpdateBranchRequest) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	GetAll(ctx context.Context) ([]*BranchResponse, error)
-	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*BranchResponse, error)
+	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*BranchResponse], error)
+	ListByMerchantID(ctx context.Context, merchantID string, filter common.Filter) (*common.PaginatedResponse[[]*BranchResponse], error)
 }
 
 type branchService struct {
@@ -35,22 +35,14 @@ func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) err
 		return err
 	}
 
+	// req.PhoneNumber is already validated and normalized by the handler
 	branch := Branch{
 		MerchantID:  req.MerchantID,
 		BranchName:  req.BranchName,
 		Address:     req.Address,
 		PhoneNumber: req.PhoneNumber,
 	}
-
 	branch.ID = common.GenerateUUID()
-
-	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
-		return err
-	}
-	branch.PhoneNumber = normalizedPhoneNumber
-
 	s.logger.Info("Creating branch", "branch", branch)
 
 	err = s.branchRepository.Create(ctx, branch)
@@ -84,12 +76,17 @@ func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchR
 	}
 
 	if req.BranchName != "" {
-		existingBranch.BranchName = req.BranchName
+		if err := s.branchRepository.CheckExists(ctx, existingBranch.MerchantID, req.BranchName, existingBranch.PhoneNumber); err != nil {
+			s.logger.Error("Failed to check if branch exists", "error", err)
+			return err
+		}
+			existingBranch.BranchName = common.FormatText(req.BranchName)
 	}
 	if req.Address != "" {
 		existingBranch.Address = req.Address
 	}
 	if req.PhoneNumber != "" {
+		// req.PhoneNumber is already validated and normalized by the handler
 		existingBranch.PhoneNumber = req.PhoneNumber
 	}
 
@@ -114,34 +111,40 @@ func (s *branchService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *branchService) GetAll(ctx context.Context) ([]*BranchResponse, error) {
-	s.logger.Info("Getting all branches")
-	branches, err := s.branchRepository.GetAll(ctx)
+func (s *branchService) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*BranchResponse], error) {
+	s.logger.Info("Listing branches")
+	result, err := s.branchRepository.List(ctx, filter)
 	if err != nil {
-		s.logger.Error("Failed to get all branches", "error", err)
+		s.logger.Error("Failed to list branches", "error", err)
 		return nil, err
 	}
-	branchDTOs := make([]*BranchResponse, len(branches))
-	for i, branch := range branches {
-		result := branch.ToDTO()
-		branchDTOs[i] = &result
+	branchDTOs := make([]*BranchResponse, len(result.Data))
+	for i, branch := range result.Data {
+		dto := branch.ToDTO()
+		branchDTOs[i] = &dto
 	}
-	return branchDTOs, nil
+	return &common.PaginatedResponse[[]*BranchResponse]{
+		Data: branchDTOs,
+		Meta: result.Meta,
+	}, nil
 }
 
-func (s *branchService) GetAllByMerchantID(ctx context.Context, merchantID string) ([]*BranchResponse, error) {
-	s.logger.Info("Getting all branches by merchant ID", "merchantID", merchantID)
-	branches, err := s.branchRepository.GetAllByMerchantID(ctx, merchantID)
+func (s *branchService) ListByMerchantID(ctx context.Context, merchantID string, filter common.Filter) (*common.PaginatedResponse[[]*BranchResponse], error) {
+	s.logger.Info("Listing branches by merchant ID", "merchantID", merchantID)
+	result, err := s.branchRepository.ListByMerchantID(ctx, merchantID, filter)
 	if err != nil {
-		s.logger.Error("Failed to get all branches by merchant ID", "error", err)
+		s.logger.Error("Failed to list branches by merchant ID", "error", err)
 		return nil, err
 	}
-	branchDTOs := make([]*BranchResponse, len(branches))
-	for i, branch := range branches {
-		result := branch.ToDTO()
-		branchDTOs[i] = &result
+	branchDTOs := make([]*BranchResponse, len(result.Data))
+	for i, branch := range result.Data {
+		dto := branch.ToDTO()
+		branchDTOs[i] = &dto
 	}
-	return branchDTOs, nil
+	return &common.PaginatedResponse[[]*BranchResponse]{
+		Data: branchDTOs,
+		Meta: result.Meta,
+	}, nil
 }
 
 func (s *branchService) UnDelete(ctx context.Context, id string) error {

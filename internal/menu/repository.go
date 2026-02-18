@@ -6,6 +6,7 @@ import (
 	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 )
 
 type MenuRepository interface {
@@ -14,7 +15,7 @@ type MenuRepository interface {
 	Update(ctx context.Context, menu Menu) error
 	Delete(ctx context.Context, id string, branchID string) error
 	UnDelete(ctx context.Context, id string, branchID string) error
-	List(ctx context.Context, filter common.Filter, branchID string) ([]*Menu, error)
+	List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*Menu], error)
 	CheckExists(ctx context.Context, name, branchID string) error
 }
 
@@ -111,8 +112,15 @@ func (r *menuRepository) UnDelete(ctx context.Context, id string, branchID strin
 	return nil
 }
 
-func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchID string) ([]*Menu, error) {
-	filters := map[string]any{"branch_id": branchID}
+func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*Menu], error) {
+	role, _ := middleware.GetRoleFromContext(ctx)
+
+	filters := map[string]any{}
+	// If branchID is empty and role is super_admin, return full menu list (no branch filter).
+	// Otherwise, scope results to the given branch.
+	if !(branchID == "" && role == "super_admin") {
+		filters["branch_id"] = branchID
+	}
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)
 	}
@@ -121,7 +129,10 @@ func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchI
 		r.logger.Error("failed to list menus", "error", err)
 		return nil, common.ErrInternalServerError
 	}
-	return menus, nil
+	return &common.PaginatedResponse[[]*Menu]{
+		Data: menus,
+		Meta: common.BuildPaginationMeta(int64(len(menus)), filter.Page, filter.Limit),
+	}, nil
 }
 
 func (r *menuRepository) CheckExists(ctx context.Context, name, branchID string) error {

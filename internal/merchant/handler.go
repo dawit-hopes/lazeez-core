@@ -164,13 +164,18 @@ func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *merchantHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
-	merchants, err := h.merchantService.GetAll(r.Context(), filter)
+	result, err := h.merchantService.GetAll(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to get all merchants", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: merchants, Message: "Merchants fetched successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Merchants fetched successfully",
+		StatusCode: http.StatusOK,
+	})
 }
 
 func (h *merchantHandler) UnDelete(w http.ResponseWriter, r *http.Request) {

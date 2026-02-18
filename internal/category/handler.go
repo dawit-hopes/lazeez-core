@@ -1,10 +1,9 @@
 package category
 
 import (
-	"errors"
+	"encoding/json"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
-	"mime/multipart"
 	"net/http"
 )
 
@@ -29,54 +28,11 @@ func NewCategoryHandler(categoryService CategoryService, logger config.Logger) C
 	}
 }
 
-func (h *categoryHandler) parseMultipart(r *http.Request, limit int64) error {
-	if err := r.ParseMultipartForm(limit); err != nil {
-		h.logger.Error("Failed to parse multipart form", "error", err)
-		return common.ErrInvalidMultipartForm
-	}
-	return nil
-}
-
-func (h *categoryHandler) parseRequest(r *http.Request, iconRequired bool) (CategoryRequest, multipart.File, error) {
-	var req CategoryRequest
-	file, fileHeader, err := r.FormFile("icon")
-	if err != nil {
-		if errors.Is(err, http.ErrMissingFile) {
-			if iconRequired {
-				h.logger.Error("Icon file is required", "error", err)
-				return req, nil, common.ErrMissingFile
-			}
-			req.Name = r.FormValue("name")
-			return req, nil, nil
-		}
-		h.logger.Error("Failed to get icon file", "error", err)
-		return req, nil, err
-	}
-
-	req.IconHeader = *fileHeader
-	req.Icon = file
-	req.Name = r.FormValue("name")
-
-	return req, file, nil
-}
-
 func (h *categoryHandler) Create(w http.ResponseWriter, r *http.Request) {
-	if err := h.parseMultipart(r, 32<<20); err != nil {
-		h.logger.Error("Failed to parse multipart form", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
 
-	req, file, err := h.parseRequest(r, true)
-	if err != nil {
-		h.logger.Error("Failed to parse request", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-	defer file.Close()
-
-	if err := common.ValidateImage(req.IconHeader); err != nil {
-		h.logger.Error("Failed to validate icon", "error", err)
+	var req CategoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
@@ -87,7 +43,7 @@ func (h *categoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.categoryService.Create(r.Context(), req)
+	err := h.categoryService.Create(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to create category", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -119,29 +75,11 @@ func (h *categoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *categoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")
-	if err := h.parseMultipart(r, 32<<20); err != nil {
-		h.logger.Error("Failed to parse multipart form", "error", err)
+	var req CategoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
-	}
-
-	req, file, err := h.parseRequest(r, false)
-	if err != nil {
-		h.logger.Error("Failed to parse request", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
-	if file != nil {
-		defer file.Close()
-	}
-
-	if req.Icon != nil {
-		if err := common.ValidateImage(req.IconHeader); err != nil {
-			h.logger.Error("Failed to validate icon", "error", err)
-			common.WriteErrorResponse(w, err)
-			return
-		}
 	}
 
 	if err := req.Validate(false); err != nil {
@@ -150,7 +88,7 @@ func (h *categoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.categoryService.Update(r.Context(), id, req)
+	err := h.categoryService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update category", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -180,7 +118,7 @@ func (h *categoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
-	categories, err := h.categoryService.List(r.Context(), filter)
+	result, err := h.categoryService.List(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to list categories", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -188,7 +126,8 @@ func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       categories,
+		Data:       result.Data,
+		Meta:       &result.Meta,
 		Message:    "Categories fetched successfully",
 		StatusCode: http.StatusOK,
 	})

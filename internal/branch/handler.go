@@ -13,8 +13,8 @@ type BranchHandler interface {
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
 	UnDelete(w http.ResponseWriter, r *http.Request)
-	GetAll(w http.ResponseWriter, r *http.Request)
-	GetAllByMerchantID(w http.ResponseWriter, r *http.Request)
+	List(w http.ResponseWriter, r *http.Request)
+	ListByMerchantID(w http.ResponseWriter, r *http.Request)
 }
 
 type branchHandler struct {
@@ -42,8 +42,14 @@ func (h *branchHandler) Create(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-
-	err := h.branchService.Create(r.Context(), req)
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	req.PhoneNumber = normalized
+	err = h.branchService.Create(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to create branch", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -87,7 +93,15 @@ func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-
+	if req.PhoneNumber != "" {
+		normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+		if err != nil {
+			h.logger.Error("Invalid phone number", "error", err)
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		req.PhoneNumber = normalized
+	}
 	err := h.branchService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update branch", "error", err)
@@ -131,32 +145,36 @@ func (h *branchHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *branchHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	branchesDTO, err := h.branchService.GetAll(r.Context())
+func (h *branchHandler) List(w http.ResponseWriter, r *http.Request) {
+	filter := common.ParseFilter(r)
+	result, err := h.branchService.List(r.Context(), filter)
 	if err != nil {
-		h.logger.Error("Failed to get all branches", "error", err)
+		h.logger.Error("Failed to list branches", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       branchesDTO,
-		Message:    "All branches fetched successfully",
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Branches fetched successfully",
 		StatusCode: http.StatusOK,
 	})
 }
 
-func (h *branchHandler) GetAllByMerchantID(w http.ResponseWriter, r *http.Request) {
+func (h *branchHandler) ListByMerchantID(w http.ResponseWriter, r *http.Request) {
 	merchantID := common.ParseID(r, "merchantID")
-	h.logger.Info("Getting all branches by merchant ID handler", "merchantID", merchantID)
-	branchesDTO, err := h.branchService.GetAllByMerchantID(r.Context(), merchantID)
+	filter := common.ParseFilter(r)
+	h.logger.Info("Listing branches by merchant ID", "merchantID", merchantID)
+	result, err := h.branchService.ListByMerchantID(r.Context(), merchantID, filter)
 	if err != nil {
-		h.logger.Error("Failed to get all branches by merchant ID", "error", err)
+		h.logger.Error("Failed to list branches by merchant ID", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       branchesDTO,
-		Message:    "All branches fetched successfully",
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Branches fetched successfully",
 		StatusCode: http.StatusOK,
 	})
 }

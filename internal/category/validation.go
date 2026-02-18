@@ -13,11 +13,8 @@ func (r *CategoryRequest) Validate(requireIcon bool) error {
 	}
 	if requireIcon {
 		rules = append(rules,
-			validation.Field(&r.IconHeader,
-				validation.Required.Error("icon is required"),
-			),
 			validation.Field(&r.Icon,
-				validation.Required.Error("icon file is required"),
+				validation.Required.Error("icon is required"),
 			),
 		)
 	}

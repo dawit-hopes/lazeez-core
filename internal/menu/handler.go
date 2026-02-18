@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"encoding/json"
 	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
@@ -94,6 +95,13 @@ func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) {
 	isAvailable := r.FormValue("is_available") == "true"
 	req.IsFasting = &isFasting
 	req.IsAvailable = &isAvailable
+
+	// modifier_groups comes as a JSON string form field; decode into the request.
+	if mg := r.FormValue("modifier_groups"); mg != "" {
+		if err := json.Unmarshal([]byte(mg), &req.Modifiers); err != nil {
+			h.logger.Error("Failed to parse modifier_groups", "error", err)
+		}
+	}
 }
 
 func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +132,7 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.menuService.Create(r.Context(), req)
+	createdMenu, err := h.menuService.Create(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to create menu", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -132,6 +140,7 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
+		Data:       createdMenu,
 		Message:    "Menu created successfully",
 		StatusCode: http.StatusOK,
 	})
@@ -252,14 +261,15 @@ func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
 		return
 	}
-	menus, err := h.menuService.List(r.Context(), filter, branchID)
+	result, err := h.menuService.List(r.Context(), filter, branchID)
 	if err != nil {
 		h.logger.Error("Failed to list menus", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       menus,
+		Data:       result.Data,
+		Meta:       &result.Meta,
 		Message:    "Menus fetched successfully",
 		StatusCode: http.StatusOK,
 	})

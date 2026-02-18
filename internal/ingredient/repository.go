@@ -12,7 +12,7 @@ type IngredientRepository interface {
 	Create(ctx context.Context, ingredient Ingredient) error
 	Get(ctx context.Context, id string) (Ingredient, error)
 	Update(ctx context.Context, ingredient Ingredient) error
-	List(ctx context.Context, filter common.Filter) ([]*Ingredient, error)
+	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Ingredient], error)
 	CheckExists(ctx context.Context, name string) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
@@ -69,18 +69,20 @@ func (r *ingredientRepository) Update(ctx context.Context, ingredient Ingredient
 	return nil
 }
 
-func (r *ingredientRepository) List(ctx context.Context, filter common.Filter) ([]*Ingredient, error) {
+func (r *ingredientRepository) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Ingredient], error) {
 	filters := map[string]any{}
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)
 	}
 	results, err := r.dal.List(ctx, filters, filter.Page, filter.Limit)
-
 	if err != nil {
 		r.logger.Error("failed to list ingredients", "error", err)
 		return nil, common.ErrInternalServerError
 	}
-	return results, nil
+	return &common.PaginatedResponse[[]*Ingredient]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil
 }
 
 func (r *ingredientRepository) CheckExists(ctx context.Context, name string) error {

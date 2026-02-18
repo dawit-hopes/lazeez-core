@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS menus (
     is_fasting BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
+    modifiers TEXT[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
@@ -121,6 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_categories_created_at ON categories(created_at) W
 CREATE TABLE IF NOT EXISTS ingredients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
+    icon TEXT,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -181,7 +183,7 @@ COMMENT ON TABLE branches IS 'Stores branch locations for merchants';
 COMMENT ON TABLE users IS 'Stores user accounts with authentication information';
 COMMENT ON TABLE menus IS 'Stores menu information';
 COMMENT ON TABLE categories IS 'Stores category information with name and icon';
-COMMENT ON TABLE ingredients IS 'Stores ingredient names';
+COMMENT ON TABLE ingredients IS 'Stores ingredient names and icon';
 
 COMMENT ON COLUMN users.role IS 'User role: super admin or branch_manager';
 COMMENT ON COLUMN users.is_locked IS 'Indicates if user account is locked';
@@ -210,4 +212,41 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id) WHERE is_de
 CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at) WHERE is_deleted = FALSE;
 
 
+-- ============================================
+-- MODIFIER OPTIONS TABLE (options for modifier groups; IDs stored in modifier_groups.options)
+-- ============================================
+CREATE TABLE IF NOT EXISTS modifier_options (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    price_adjustment DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    is_default BOOLEAN DEFAULT FALSE,
+    is_available BOOLEAN DEFAULT TRUE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
 
+CREATE INDEX IF NOT EXISTS idx_modifier_options_name ON modifier_options(name) WHERE is_deleted = FALSE;
+
+-- ============================================
+-- MODIFIER GROUPS TABLE (option IDs stored in options TEXT[]; group IDs stored in menus.modifiers)
+-- ============================================
+CREATE TABLE IF NOT EXISTS modifier_groups (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    selection_type VARCHAR(50) NOT NULL,
+    is_required BOOLEAN DEFAULT FALSE,
+    min_selections INTEGER DEFAULT 0,
+    max_selections INTEGER DEFAULT 0,
+    options TEXT[] DEFAULT '{}',
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_modifier_groups_name ON modifier_groups(name) WHERE is_deleted = FALSE;
+
+COMMENT ON TABLE modifier_options IS 'Selectable options for modifier groups (e.g. size, extras)';
+COMMENT ON TABLE modifier_groups IS 'Modifier groups for menus (e.g. Size, Extras); option IDs in options array';

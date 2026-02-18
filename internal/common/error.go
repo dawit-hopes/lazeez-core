@@ -21,6 +21,8 @@ var (
 	ErrMenuNotFound                     = &Errors{Code: NotFound, Message: "menu not found"}
 	ErrCategoryNotFound                 = &Errors{Code: NotFound, Message: "category not found"}
 	ErrIngredientNotFound                = &Errors{Code: NotFound, Message: "ingredient not found"}
+	ErrModifierGroupNotFound             = &Errors{Code: NotFound, Message: "modifier group not found"}
+	ErrModifierOptionNotFound            = &Errors{Code: NotFound, Message: "modifier option not found"}
 	ErrUnAuthorized                     = &Errors{Code: Unauthorized, Message: "unauthorized"}
 	ErrPasswordRequired                 = &Errors{Code: BadRequest, Message: "password is required and cannot be empty"}
 	ErrInvalidPassword                  = &Errors{Code: BadRequest, Message: "password is invalid"}
@@ -53,4 +55,5 @@ var (
 	ErrIngredientAlreadyExists          = &Errors{Code: BadRequest, Message: "ingredient with this information already exists"}
 	ErrNoDataToUpdate                   = &Errors{Code: BadRequest, Message: "no data to update"}
 	ErrMenuAlreadyExists                = &Errors{Code: BadRequest, Message: "menu with this information already exists"}
+	ErrMerchentAlreadyDeleted           = &Errors{Code: BadRequest, Message: "merchant is already deleted"}
 )

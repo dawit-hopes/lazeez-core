@@ -39,6 +39,13 @@ func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	req.PhoneNumber = normalized
 	loginResponse, err := h.authService.Login(r.Context(), req)
 	if err != nil {
 		h.logger.Error("Failed to login", "error", err)
@@ -84,6 +91,13 @@ func (h *authHandler) handleSetPassword(w http.ResponseWriter, r *http.Request, 
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	req.PhoneNumber = normalized
 	loginResponse, err := fn(r.Context(), req)
 	if err != nil {
 		h.logger.Error(errorMsg, "error", err)

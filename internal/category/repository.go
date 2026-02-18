@@ -16,7 +16,7 @@ type CategoryRepository interface {
 	Update(ctx context.Context, category Category) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	List(ctx context.Context, filter common.Filter) ([]*Category, error)
+	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Category], error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -89,7 +89,7 @@ func (r *categoryRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *categoryRepository) List(ctx context.Context, filter common.Filter) ([]*Category, error) {
+func (r *categoryRepository) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Category], error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
 
 	filters := map[string]any{}
@@ -110,7 +110,10 @@ func (r *categoryRepository) List(ctx context.Context, filter common.Filter) ([]
 		return nil, common.ErrInternalServerError
 	}
 
-	return results, nil
+	return &common.PaginatedResponse[[]*Category]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil	
 }
 
 func (r *categoryRepository) UnDelete(ctx context.Context, id string) error {

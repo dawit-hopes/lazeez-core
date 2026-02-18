@@ -8,27 +8,31 @@ import (
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
+	modgroup "lazeez-core/internal/modifiers/group"
+	modoption "lazeez-core/internal/modifiers/option"
 
 	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 )
 
 type MenuService interface {
-	Create(ctx context.Context, req MenuRequest) error
+	Create(ctx context.Context, req MenuRequest) (*MenuDTO, error)
 	Get(ctx context.Context, id string, branchID string) (*MenuDTO, error)
-	List(ctx context.Context, filter common.Filter, branchID string) ([]*MenuDTO, error)
+	List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*MenuDTO], error)
 	Update(ctx context.Context, id string, req MenuRequest) error
 	Delete(ctx context.Context, id string, branchID string) error
 	UnDelete(ctx context.Context, id string, branchID string) error
 }
 
 type menuService struct {
-	menuRepository    MenuRepository
-	categoryService   category.CategoryService
-	branchService     branch.BranchService
-	ingredientService ingredient.IngredientService
-	fileService       files.FileService
-	logger            config.Logger
+	menuRepository        MenuRepository
+	categoryService       category.CategoryService
+	branchService         branch.BranchService
+	ingredientService     ingredient.IngredientService
+	modifierGroupService  modgroup.ModifierGroupService
+	modifierOptionService modoption.ModifierOptionService
+	fileService           files.FileService
+	logger                config.Logger
 }
 
 func NewMenuService(menuRepository MenuRepository,
@@ -36,14 +40,18 @@ func NewMenuService(menuRepository MenuRepository,
 	categoryService category.CategoryService,
 	branchService branch.BranchService,
 	ingredientService ingredient.IngredientService,
+	modifierGroupService modgroup.ModifierGroupService,
+	modifierOptionService modoption.ModifierOptionService,
 	logger config.Logger) MenuService {
 	return &menuService{
-		menuRepository:    menuRepository,
-		logger:            logger,
-		fileService:       fileService,
-		categoryService:   categoryService,
-		branchService:     branchService,
-		ingredientService: ingredientService,
+		menuRepository:        menuRepository,
+		logger:                logger,
+		fileService:           fileService,
+		categoryService:       categoryService,
+		branchService:         branchService,
+		ingredientService:     ingredientService,
+		modifierGroupService:  modifierGroupService,
+		modifierOptionService: modifierOptionService,
 	}
 }
 
@@ -99,10 +107,71 @@ func (s *menuService) validateMenu(ctx context.Context, req MenuRequest) error {
 	return g.Wait()
 }
 
-func (s *menuService) Create(ctx context.Context, req MenuRequest) error {
+func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, error) {
 	if err := s.validateMenu(ctx, req); err != nil {
 		s.logger.Error("Failed to validate menu", "error", err)
-		return err
+		return nil, err
+	}
+
+	// Create modifier groups and options (if any) and collect their IDs.
+	modifierGroupIDs := make(pq.StringArray, 0, len(req.Modifiers))
+	modifierGroupDTOs := make([]modgroup.ModifierGroupDTO, 0, len(req.Modifiers))
+
+	for _, mgReq := range req.Modifiers {
+		// Validate group and options using their own validators
+		if err := mgReq.Validate(); err != nil {
+			s.logger.Error("Failed to validate modifier group", "error", err)
+			return nil, err
+		}
+
+		optionIDs := make(pq.StringArray, 0, len(mgReq.Options))
+		optionDTOs := make([]modoption.ModifierOptionDTO, 0, len(mgReq.Options))
+		for _, optReq := range mgReq.Options {
+			if err := optReq.Validate(); err != nil {
+				s.logger.Error("Failed to validate modifier option", "error", err)
+				return nil, err
+			}
+
+			optionModel := modoption.ModifierOption{
+				Base: common.Base{
+					ID:        common.GenerateUUID(),
+					IsDeleted: false,
+				},
+				Name:            common.FormatText(optReq.Name),
+				PriceAdjustment: optReq.PriceAdjustment,
+				IsDefault:       optReq.IsDefault,
+				IsAvailable:     optReq.IsAvailable,
+			}
+
+			if err := s.modifierOptionService.Create(ctx, optionModel); err != nil {
+				s.logger.Error("Failed to create modifier option", "error", err)
+				return nil, err
+			}
+
+			optionIDs = append(optionIDs, optionModel.ID)
+			optionDTOs = append(optionDTOs, optionModel.ToDTO())
+		}
+
+		groupModel := modgroup.ModifierGroup{
+			Base: common.Base{
+				ID:        common.GenerateUUID(),
+				IsDeleted: false,
+			},
+			Name:          common.FormatText(mgReq.Name),
+			SelectionType: string(mgReq.SelectionType),
+			IsRequired:    mgReq.IsRequired,
+			MinSelections: mgReq.MinSelections,
+			MaxSelections: mgReq.MaxSelections,
+			Options:       optionIDs,
+		}
+
+		if err := s.modifierGroupService.Create(ctx, groupModel); err != nil {
+			s.logger.Error("Failed to create modifier group", "error", err)
+			return nil, err
+		}
+
+		modifierGroupIDs = append(modifierGroupIDs, groupModel.ID)
+		modifierGroupDTOs = append(modifierGroupDTOs, groupModel.ToDTO(optionDTOs))
 	}
 
 	menu := req.ToModel()
@@ -110,19 +179,26 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) error {
 		imageURL, err := s.fileService.UploadFile(ctx, &req.ImageHeader)
 		if err != nil {
 			s.logger.Error("Failed to upload image", "error", err)
-			return err
+			return nil, err
 		}
 		menu.Image = imageURL
 	}
 	menu.ID = common.GenerateUUID()
+	menu.Modifiers = modifierGroupIDs
 
-	err := s.menuRepository.Create(ctx, menu)
-	if err != nil {
+	if err := s.menuRepository.Create(ctx, menu); err != nil {
 		s.logger.Error("Failed to create menu", "error", err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	// Build response DTO, including category, ingredients, and modifier groups/options.
+	menuDTO := menu.ToDTO()
+
+	// Enrich category and ingredients as in List/Get
+	s.enrichMenuDTO(ctx, &menuDTO, menuDTO.CategoryID, menu.Ingredients)
+	menuDTO.Modifiers = modifierGroupDTOs
+
+	return &menuDTO, nil
 }
 
 func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) error {
@@ -226,6 +302,38 @@ func (s *menuService) enrichMenuDTO(ctx context.Context, dto *MenuDTO, categoryI
 	dto.Ingredients = ingredients
 }
 
+func (s *menuService) buildModifierGroups(ctx context.Context, modifierGroupIDs []string) ([]modgroup.ModifierGroupDTO, error) {
+	groups := make([]modgroup.ModifierGroupDTO, 0, len(modifierGroupIDs))
+	for _, groupID := range modifierGroupIDs {
+		if groupID == "" {
+			continue
+		}
+
+		groupModel, err := s.modifierGroupService.Get(ctx, groupID)
+		if err != nil {
+			s.logger.Error("Failed to get modifier group", "id", groupID, "error", err)
+			return nil, err
+		}
+
+		options := make([]modoption.ModifierOptionDTO, 0, len(groupModel.Options))
+		for _, optionID := range groupModel.Options {
+			if optionID == "" {
+				continue
+			}
+			optionModel, err := s.modifierOptionService.Get(ctx, optionID)
+			if err != nil {
+				s.logger.Error("Failed to get modifier option", "id", optionID, "error", err)
+				return nil, err
+			}
+			options = append(options, optionModel.ToDTO())
+		}
+
+		groups = append(groups, groupModel.ToDTO(options))
+	}
+
+	return groups, nil
+}
+
 func (s *menuService) Get(ctx context.Context, id string, branchID string) (*MenuDTO, error) {
 	menu, err := s.menuRepository.Get(ctx, id, branchID)
 	if err != nil {
@@ -234,6 +342,15 @@ func (s *menuService) Get(ctx context.Context, id string, branchID string) (*Men
 	}
 	menuDTO := menu.ToDTO()
 	s.enrichMenuDTO(ctx, &menuDTO, menuDTO.CategoryID, menu.Ingredients)
+
+	if len(menu.Modifiers) > 0 {
+		modifiers, err := s.buildModifierGroups(ctx, menu.Modifiers)
+		if err != nil {
+			return nil, err
+		}
+		menuDTO.Modifiers = modifiers
+	}
+
 	return &menuDTO, nil
 }
 
@@ -256,12 +373,13 @@ func (s *menuService) UnDelete(ctx context.Context, id string, branchID string) 
 	return nil
 }
 
-func (s *menuService) List(ctx context.Context, filter common.Filter, branchID string) ([]*MenuDTO, error) {
-	menus, err := s.menuRepository.List(ctx, filter, branchID)
+func (s *menuService) List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*MenuDTO], error) {
+	result, err := s.menuRepository.List(ctx, filter, branchID)
 	if err != nil {
 		s.logger.Error("Failed to list menus", "error", err)
 		return nil, err
 	}
+	menus := result.Data
 	// Collect unique category and ingredient IDs for batch lookup
 	uniqueCategoryIDs := make(map[string]struct{})
 	uniqueIngredientIDs := make(map[string]struct{})
@@ -296,7 +414,20 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID s
 			}
 		}
 		dto.Ingredients = ingredients
+
+		if len(menu.Modifiers) > 0 {
+			if modifiers, err := s.buildModifierGroups(ctx, menu.Modifiers); err == nil {
+				dto.Modifiers = modifiers
+			} else {
+				// If we fail to build modifiers for a specific menu, log and continue
+				s.logger.Error("Failed to build modifiers for menu", "menu_id", menu.ID, "error", err)
+			}
+		}
+
 		menuDTOs[i] = &dto
 	}
-	return menuDTOs, nil
+	return &common.PaginatedResponse[[]*MenuDTO]{
+		Data: menuDTOs,
+		Meta: result.Meta,
+	}, nil
 }

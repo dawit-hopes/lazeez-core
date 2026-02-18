@@ -13,7 +13,7 @@ type UserService interface {
 	UpdateUser(ctx context.Context, id string, req UserRequest) error
 	DeleteUser(ctx context.Context, id string) error
 	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
-	GetAllUsers(ctx context.Context, filter common.Filter) ([]*UserDTO, error)
+	GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*UserDTO], error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
 	UnDeleteUser(ctx context.Context, id string) error
 	// Internal methods for auth module
@@ -39,27 +39,17 @@ func NewUserService(userRepository UserRepository, branchService branch.BranchSe
 }
 
 func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
-	normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
-		return err
-	}
-
-	// check if user already exists
-	if err := s.userRepository.CheckUserExistsByPhoneNumber(ctx, normalizedPhoneNumber); err != nil {
+	// req.PhoneNumber is already validated and normalized by the handler
+	if err := s.userRepository.CheckUserExistsByPhoneNumber(ctx, req.PhoneNumber); err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return err
 	}
-
-	err = s.validateBranch(ctx, req.BranchID, req.MerchantID)
-	if err != nil {
+	if err := s.validateBranch(ctx, req.BranchID, req.MerchantID); err != nil {
 		s.logger.Error("Failed to validate branch", "error", err)
 		return err
 	}
-
-	req.PhoneNumber = normalizedPhoneNumber
 	newUser := s.createUserDefaultData(&req)
-	err = s.userRepository.CreateUser(ctx, *newUser)
+	err := s.userRepository.CreateUser(ctx, *newUser)
 	if err != nil {
 		s.logger.Error("Failed to create user", "error", err)
 		return err
@@ -85,15 +75,7 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req UserRequest
 		return err
 	}
 
-	if req.PhoneNumber != "" {
-		normalizedPhoneNumber, err := common.ValidatePhoneNumber(req.PhoneNumber)
-		if err != nil {
-			s.logger.Error("Failed to validate phone number", "error", err)
-			return err
-		}
-		req.PhoneNumber = normalizedPhoneNumber
-	}
-
+	// req.PhoneNumber, when set, is already validated and normalized by the handler
 	user := s.updateUserDefaultData(&req, &existingUser)
 	return s.userRepository.UpdateUser(ctx, *user)
 }
@@ -104,13 +86,9 @@ func (s *userService) DeleteUser(ctx context.Context, id string) error {
 }
 
 func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error) {
-	normalizedPhoneNumber, err := common.ValidatePhoneNumber(phoneNumber)
-	if err != nil {
-		s.logger.Error("Failed to validate phone number", "error", err)
-		return UserDTO{}, err
-	}
+	// phoneNumber is already validated and normalized by the handler
 	s.logger.Info("Looking up user by phone number", "phone number", phoneNumber)
-	user, err := s.userRepository.GetUserByPhoneNumber(ctx, normalizedPhoneNumber)
+	user, err := s.userRepository.GetUserByPhoneNumber(ctx, phoneNumber)
 	if err != nil {
 		s.logger.Error("Failed to get user by phone number", "error", err)
 		return UserDTO{}, err
@@ -118,19 +96,22 @@ func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserD
 	return user.ToDTO(), nil
 }
 
-func (s *userService) GetAllUsers(ctx context.Context, filter common.Filter) ([]*UserDTO, error) {
+func (s *userService) GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*UserDTO], error) {
 	s.logger.Info("Getting all users")
-	users, err := s.userRepository.GetAllUsers(ctx, filter)
+	result, err := s.userRepository.GetAllUsers(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to get all users", "error", err)
 		return nil, err
 	}
-	userDTOs := make([]*UserDTO, len(users))
-	for i, user := range users {
-		result := user.ToDTO()
-		userDTOs[i] = &result
+	userDTOs := make([]*UserDTO, len(result.Data))
+	for i, user := range result.Data {
+		dto := user.ToDTO()
+		userDTOs[i] = &dto
 	}
-	return userDTOs, nil
+	return &common.PaginatedResponse[[]*UserDTO]{
+		Data: userDTOs,
+		Meta: result.Meta,
+	}, nil
 }
 
 func (s *userService) GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error) {

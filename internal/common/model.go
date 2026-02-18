@@ -34,6 +34,7 @@ func (e *Errors) Error() string {
 
 type Response struct {
 	Data       any                `json:"data"`
+	Meta       *PaginationMeta    `json:"meta,omitempty"`
 	Message    string             `json:"message"`
 	StatusCode int                `json:"status_code"`
 	Errors     map[string][]string `json:"errors,omitempty"`

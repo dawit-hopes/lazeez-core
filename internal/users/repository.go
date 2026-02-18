@@ -16,7 +16,7 @@ type UserRepository interface {
 	SetPassword(ctx context.Context, phoneNumber, id, password string, isFirstLogin bool) error
 	DeleteUser(ctx context.Context, id string) error
 	CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error
-	GetAllUsers(ctx context.Context, filter common.Filter) ([]*User, error)
+	GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*User], error)
 	GetUserByBranchID(ctx context.Context, branchID string) (User, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
@@ -145,27 +145,28 @@ func (r *userRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phone
 	return common.ErrUserWithInformationAlreadyExists
 }
 
-func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) ([]*User, error) {
+func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*User], error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
-
-	var results []*User
-	var err error
 	filters := map[string]any{}
 	if filter.Search != "" {
 		filters["full_name"] = common.ILike(filter.Search)
-		filters["phone_number"] = common.ILike(filter.Search)
 	}
-	// Super admin can see deleted + non-deleted; others see only non-deleted
+	offset := (filter.Page - 1) * filter.Limit
+	var results []*User
+	var err error
 	if role != "" && role == string(RoleAdmin) {
-		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, filter.Page)
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, offset)
 	} else {
-		results, err = r.dal.List(ctx, filters, filter.Limit, filter.Page)
+		results, err = r.dal.List(ctx, filters, filter.Page, filter.Limit)
 	}
 	if err != nil {
 		r.logger.Error("failed to get all users", "error", err)
 		return nil, err
 	}
-	return results, nil
+	return &common.PaginatedResponse[[]*User]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil
 }
 
 func (r *userRepository) GetUserByBranchID(ctx context.Context, branchID string) (User, error) {

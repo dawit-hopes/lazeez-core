@@ -18,6 +18,7 @@ type Menu struct {
 	BranchID    uuid.UUID      `json:"branch_id" db:"branch_id"`
 	IsFasting   bool           `json:"is_fasting" db:"is_fasting"`
 	IsAvailable bool           `json:"is_available" db:"is_available"`
+	Modifiers   pq.StringArray `json:"modifiers" db:"modifiers"`
 }
 
 func (m *Menu) Table() string {
@@ -25,19 +26,17 @@ func (m *Menu) Table() string {
 }
 
 func (m *Menu) Columns() []string {
-	return []string{"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "is_fasting", "is_available", "description", "price", "ingredients", "category_id"}
+	return []string{"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "is_fasting", "is_available", "description", "price", "ingredients", "category_id", "modifiers"}
 }
 
 func (m *Menu) Values() []any {
-	return []any{m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.IsFasting, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID}
+	return []any{m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.IsFasting, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers}
 }
 
 func (m *Menu) Addr() []any {
-	return []any{&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.IsFasting, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.CreatedAt, &m.UpdatedAt}
+	return []any{&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.IsFasting, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.CreatedAt, &m.UpdatedAt}
 }
 
-// ToDTO returns a MenuDTO with base menu fields. Category and Ingredients
-// are left nil; the service layer fills them for the API response.
 func (m *Menu) ToDTO() MenuDTO {
 	return MenuDTO{
 		BaseDTO: common.BaseDTO{
@@ -47,15 +46,15 @@ func (m *Menu) ToDTO() MenuDTO {
 			UpdatedAt: m.UpdatedAt,
 			DeletedAt: common.ToNullTimePtr(m.DeletedAt),
 		},
-		Name:         m.Name,
-		Image:        m.Image,
-		Description:  m.Description,
-		Price:        m.Price,
-		CategoryID:   common.ParseUUIDToString(m.CategoryID),
-		Category:     nil, // filled by service
-		Ingredients:  nil, // filled by service from m.Ingredients (IDs)
-		BranchID:     common.ParseUUIDToString(m.BranchID),
-		IsFasting:    m.IsFasting,
-		IsAvailable:  m.IsAvailable,
+		Name:        m.Name,
+		Image:       m.Image,
+		Description: m.Description,
+		Price:       m.Price,
+		CategoryID:  common.ParseUUIDToString(m.CategoryID),
+		Category:    nil, // filled by service
+		Ingredients: nil, // filled by service from m.Ingredients (IDs)
+		BranchID:    common.ParseUUIDToString(m.BranchID),
+		IsFasting:   m.IsFasting,
+		IsAvailable: m.IsAvailable,
 	}
 }
