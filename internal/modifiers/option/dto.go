@@ -1,7 +1,9 @@
 package option
 
+import "lazeez-core/internal/common"
+
 type ModifierOptionDTO struct {
-	ID              string  `json:"id"`
+	common.BaseDTO
 	Name            string  `json:"name"`
 	PriceAdjustment float64 `json:"price_adjustment"`
 	IsDefault       bool    `json:"is_default"`

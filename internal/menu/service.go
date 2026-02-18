@@ -11,7 +11,6 @@ import (
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
 
-	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 )
@@ -134,7 +133,10 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, er
 			}
 
 			optionModel := modoption.ModifierOption{
-				ID:              uuid.New(),
+				Base: common.Base{
+					ID:        common.GenerateUUID(),
+					IsDeleted: false,
+				},
 				Name:            common.FormatText(optReq.Name),
 				PriceAdjustment: optReq.PriceAdjustment,
 				IsDefault:       optReq.IsDefault,
@@ -146,12 +148,15 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, er
 				return nil, err
 			}
 
-			optionIDs = append(optionIDs, optionModel.ID.String())
+			optionIDs = append(optionIDs, optionModel.ID)
 			optionDTOs = append(optionDTOs, optionModel.ToDTO())
 		}
 
 		groupModel := modgroup.ModifierGroup{
-			ID:            uuid.New(),
+			Base: common.Base{
+				ID:        common.GenerateUUID(),
+				IsDeleted: false,
+			},
 			Name:          common.FormatText(mgReq.Name),
 			SelectionType: string(mgReq.SelectionType),
 			IsRequired:    mgReq.IsRequired,
@@ -165,16 +170,8 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, er
 			return nil, err
 		}
 
-		modifierGroupIDs = append(modifierGroupIDs, groupModel.ID.String())
-		modifierGroupDTOs = append(modifierGroupDTOs, modgroup.ModifierGroupDTO{
-			ID:            groupModel.ID.String(),
-			Name:          groupModel.Name,
-			SelectionType: modgroup.SelectionType(groupModel.SelectionType),
-			IsRequired:    groupModel.IsRequired,
-			MinSelections: groupModel.MinSelections,
-			MaxSelections: groupModel.MaxSelections,
-			Options:       optionDTOs,
-		})
+		modifierGroupIDs = append(modifierGroupIDs, groupModel.ID)
+		modifierGroupDTOs = append(modifierGroupDTOs, groupModel.ToDTO(optionDTOs))
 	}
 
 	menu := req.ToModel()
@@ -331,15 +328,7 @@ func (s *menuService) buildModifierGroups(ctx context.Context, modifierGroupIDs 
 			options = append(options, optionModel.ToDTO())
 		}
 
-		groups = append(groups, modgroup.ModifierGroupDTO{
-			ID:            groupModel.ID.String(),
-			Name:          groupModel.Name,
-			SelectionType: modgroup.SelectionType(groupModel.SelectionType),
-			IsRequired:    groupModel.IsRequired,
-			MinSelections: groupModel.MinSelections,
-			MaxSelections: groupModel.MaxSelections,
-			Options:       options,
-		})
+		groups = append(groups, groupModel.ToDTO(options))
 	}
 
 	return groups, nil

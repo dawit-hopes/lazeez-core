@@ -221,11 +221,13 @@ CREATE TABLE IF NOT EXISTS modifier_options (
     price_adjustment DECIMAL(10, 2) NOT NULL DEFAULT 0,
     is_default BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
+    is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX IF NOT EXISTS idx_modifier_options_name ON modifier_options(name);
+CREATE INDEX IF NOT EXISTS idx_modifier_options_name ON modifier_options(name) WHERE is_deleted = FALSE;
 
 -- ============================================
 -- MODIFIER GROUPS TABLE (option IDs stored in options TEXT[]; group IDs stored in menus.modifiers)
@@ -238,11 +240,13 @@ CREATE TABLE IF NOT EXISTS modifier_groups (
     min_selections INTEGER DEFAULT 0,
     max_selections INTEGER DEFAULT 0,
     options TEXT[] DEFAULT '{}',
+    is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX IF NOT EXISTS idx_modifier_groups_name ON modifier_groups(name);
+CREATE INDEX IF NOT EXISTS idx_modifier_groups_name ON modifier_groups(name) WHERE is_deleted = FALSE;
 
 COMMENT ON TABLE modifier_options IS 'Selectable options for modifier groups (e.g. size, extras)';
 COMMENT ON TABLE modifier_groups IS 'Modifier groups for menus (e.g. Size, Extras); option IDs in options array';

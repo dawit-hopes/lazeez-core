@@ -2,6 +2,8 @@ package option
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 )
@@ -33,9 +35,12 @@ func (r *modifierOptionRepository) Create(ctx context.Context, modifierOption Mo
 }
 
 func (r *modifierOptionRepository) Get(ctx context.Context, id string) (ModifierOption, error) {
-	filter := map[string]any{"id": id}
+	filter := map[string]any{"id": id, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ModifierOption{}, common.ErrModifierOptionNotFound
+		}
 		r.logger.Error("failed to get modifier option", "error", err)
 		return ModifierOption{}, common.ErrInternalServerError
 	}

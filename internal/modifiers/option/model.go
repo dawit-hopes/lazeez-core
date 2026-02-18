@@ -1,20 +1,13 @@
 package option
 
-import (
-	"lazeez-core/internal/common"
-	"time"
-
-	"github.com/google/uuid"
-)
+import "lazeez-core/internal/common"
 
 type ModifierOption struct {
-	ID              uuid.UUID `db:"id"`
-	Name            string    `db:"name"`
-	PriceAdjustment float64   `db:"price_adjustment"`
-	IsDefault       bool      `db:"is_default"`
-	IsAvailable     bool      `db:"is_available"`
-	CreatedAt       time.Time `db:"created_at"`
-	UpdatedAt       time.Time `db:"updated_at"`
+	common.Base
+	Name            string  `json:"name" db:"name"`
+	PriceAdjustment float64 `json:"price_adjustment" db:"price_adjustment"`
+	IsDefault       bool    `json:"is_default" db:"is_default"`
+	IsAvailable     bool    `json:"is_available" db:"is_available"`
 }
 
 func (s *ModifierOption) Table() string {
@@ -22,20 +15,26 @@ func (s *ModifierOption) Table() string {
 }
 
 func (s *ModifierOption) Columns() []string {
-	return []string{"id", "name", "price_adjustment", "is_default", "is_available"}
+	return []string{"id", "name", "price_adjustment", "is_default", "is_available", "deleted_at", "is_deleted"}
 }
 
 func (s *ModifierOption) Values() []any {
-	return []any{s.ID, s.Name, s.PriceAdjustment, s.IsDefault, s.IsAvailable}
+	return []any{s.ID, s.Name, s.PriceAdjustment, s.IsDefault, s.IsAvailable, s.DeletedAt, s.IsDeleted}
 }
 
 func (s *ModifierOption) Addr() []any {
-	return []any{&s.ID, &s.Name, &s.PriceAdjustment, &s.IsDefault, &s.IsAvailable, &s.CreatedAt, &s.UpdatedAt}
+	return []any{&s.ID, &s.Name, &s.PriceAdjustment, &s.IsDefault, &s.IsAvailable, &s.DeletedAt, &s.IsDeleted, &s.CreatedAt, &s.UpdatedAt}
 }
 
 func (s *ModifierOption) ToDTO() ModifierOptionDTO {
 	return ModifierOptionDTO{
-		ID:              common.ParseUUIDToString(s.ID),
+		BaseDTO: common.BaseDTO{
+			ID:        s.ID,
+			IsDeleted: s.IsDeleted,
+			CreatedAt: s.CreatedAt,
+			UpdatedAt: s.UpdatedAt,
+			DeletedAt: common.ToNullTimePtr(s.DeletedAt),
+		},
 		Name:            s.Name,
 		PriceAdjustment: s.PriceAdjustment,
 		IsDefault:       s.IsDefault,

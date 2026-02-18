@@ -2,6 +2,8 @@ package group
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 )
@@ -33,9 +35,12 @@ func (r *modifierRepository) Create(ctx context.Context, modifier ModifierGroup)
 }
 
 func (r *modifierRepository) Get(ctx context.Context, id string) (ModifierGroup, error) {
-	filter := map[string]any{"id": id}
+	filter := map[string]any{"id": id, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ModifierGroup{}, common.ErrModifierGroupNotFound
+		}
 		r.logger.Error("failed to get modifier group", "error", err)
 		return ModifierGroup{}, common.ErrInternalServerError
 	}

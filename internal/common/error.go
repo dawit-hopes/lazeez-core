@@ -21,6 +21,8 @@ var (
 	ErrMenuNotFound                     = &Errors{Code: NotFound, Message: "menu not found"}
 	ErrCategoryNotFound                 = &Errors{Code: NotFound, Message: "category not found"}
 	ErrIngredientNotFound                = &Errors{Code: NotFound, Message: "ingredient not found"}
+	ErrModifierGroupNotFound             = &Errors{Code: NotFound, Message: "modifier group not found"}
+	ErrModifierOptionNotFound            = &Errors{Code: NotFound, Message: "modifier option not found"}
 	ErrUnAuthorized                     = &Errors{Code: Unauthorized, Message: "unauthorized"}
 	ErrPasswordRequired                 = &Errors{Code: BadRequest, Message: "password is required and cannot be empty"}
 	ErrInvalidPassword                  = &Errors{Code: BadRequest, Message: "password is invalid"}
