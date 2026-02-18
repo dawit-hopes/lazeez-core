@@ -119,13 +119,18 @@ func (h *userHandler) UserLookUp(w http.ResponseWriter, r *http.Request) {
 
 func (h *userHandler) GetAllUser(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
-	users, err := h.userService.GetAllUsers(r.Context(), filter)
+	result, err := h.userService.GetAllUsers(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to get all users", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	common.WriteSuccessResponse(w, common.Response{Data: users, Message: "All users fetched successfully", StatusCode: http.StatusOK})
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Users fetched successfully",
+		StatusCode: http.StatusOK,
+	})
 }
 
 func (h *userHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) {

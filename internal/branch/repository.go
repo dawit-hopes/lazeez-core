@@ -15,8 +15,8 @@ type BranchRepository interface {
 	Update(ctx context.Context, branch Branch) error
 	Delete(ctx context.Context, id string) error
 	CheckExists(ctx context.Context, merchantID string, branchName, phoneNumber string) error
-	GetAll(ctx context.Context) ([]*Branch, error)
-	GetAllByMerchantID(ctx context.Context, merchantID string) ([]*Branch, error)
+	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error)
+	ListByMerchantID(ctx context.Context, merchantID string, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error)
 	UnDelete(ctx context.Context, id string) error
 }
 
@@ -131,41 +131,53 @@ func (r *branchRepository) CheckExists(ctx context.Context, merchantID string, b
 	return common.ErrBranchAlreadyExists
 }
 
-func (r *branchRepository) GetAll(ctx context.Context) ([]*Branch, error) {
+func (r *branchRepository) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error) {
 	role, _ := middleware.GetRoleFromContext(ctx)
-
+	filters := map[string]any{}
+	if filter.Search != "" {
+		filters["branch_name"] = common.ILike(filter.Search)
+	}
+	offset := (filter.Page - 1) * filter.Limit
 	var results []*Branch
 	var err error
 	if role == "super_admin" {
-		results, err = r.dal.ListIncludeDeleted(ctx, map[string]any{}, 0, 0)
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, offset)
 	} else {
-		results, err = r.dal.List(ctx, map[string]any{}, 0, 0)
+		results, err = r.dal.List(ctx, filters, filter.Page, filter.Limit)
 	}
 	if err != nil {
-		r.logger.Error("failed to get all branches", "error", err)
-		return nil, err
+		r.logger.Error("failed to list branches", "error", err)
+		return nil, common.ErrInternalServerError
 	}
-	return results, nil
+	return &common.PaginatedResponse[[]*Branch]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil
 }
 
-func (r *branchRepository) GetAllByMerchantID(ctx context.Context, merchantID string) ([]*Branch, error) {
-	r.logger.Info("getting all branches by merchant ID", "merchantID", merchantID)
-	filter := map[string]any{"merchant_id": merchantID}
-
+func (r *branchRepository) ListByMerchantID(ctx context.Context, merchantID string, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error) {
+	r.logger.Info("listing branches by merchant ID", "merchantID", merchantID)
+	filters := map[string]any{"merchant_id": merchantID}
+	if filter.Search != "" {
+		filters["branch_name"] = common.ILike(filter.Search)
+	}
 	role, _ := middleware.GetRoleFromContext(ctx)
-
+	offset := (filter.Page - 1) * filter.Limit
 	var results []*Branch
 	var err error
 	if role == "super_admin" {
-		results, err = r.dal.ListIncludeDeleted(ctx, filter, 0, 0)
+		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, offset)
 	} else {
-		results, err = r.dal.List(ctx, filter, 0, 0)
+		results, err = r.dal.List(ctx, filters, filter.Page, filter.Limit)
 	}
 	if err != nil {
-		r.logger.Error("failed to get all branches by merchant ID", "error", err)
-		return nil, err
+		r.logger.Error("failed to list branches by merchant ID", "error", err)
+		return nil, common.ErrInternalServerError
 	}
-	return results, nil
+	return &common.PaginatedResponse[[]*Branch]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil
 }
 
 func (r *branchRepository) UnDelete(ctx context.Context, id string) error {

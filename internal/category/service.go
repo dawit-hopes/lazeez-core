@@ -12,7 +12,7 @@ type CategoryService interface {
 	Update(ctx context.Context, id string, req CategoryRequest) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
-	List(ctx context.Context, filter common.Filter) ([]*CategoryDTO, error)
+	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*CategoryDTO], error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -100,18 +100,22 @@ func (s *categoryService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *categoryService) List(ctx context.Context, filter common.Filter) ([]*CategoryDTO, error) {
-	categories, err := s.categoryRepository.List(ctx, filter)
+func (s *categoryService) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*CategoryDTO], error) {
+	result, err := s.categoryRepository.List(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to list categories", "error", err)
 		return nil, err
 	}
-	categoryDTOs := make([]*CategoryDTO, len(categories))
-	for i, category := range categories {
+	categoryDTOs := make([]*CategoryDTO, len(result.Data))
+	for i, category := range result.Data {
 		categoryDTO := category.ToDTO()
 		categoryDTOs[i] = &categoryDTO
 	}
-	return categoryDTOs, nil
+
+	return &common.PaginatedResponse[[]*CategoryDTO]{
+		Data: categoryDTOs,
+		Meta: result.Meta,
+	}, nil
 }
 
 func (s *categoryService) UnDelete(ctx context.Context, id string) error {

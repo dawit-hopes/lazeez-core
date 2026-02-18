@@ -37,13 +37,13 @@ func NewBranchRoutes(router chi.Router, handler BranchHandler, middleware middle
 		{
 			Method:      http.MethodGet,
 			Path:        "/branches",
-			Handler:     handler.GetAll,
+			Handler:     handler.List,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 		{
 			Method:      http.MethodGet,
 			Path:        "/branches/merchant/{merchantID}",
-			Handler:     handler.GetAllByMerchantID,
+			Handler:     handler.ListByMerchantID,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
 		{

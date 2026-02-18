@@ -13,7 +13,7 @@ type UserService interface {
 	UpdateUser(ctx context.Context, id string, req UserRequest) error
 	DeleteUser(ctx context.Context, id string) error
 	UserLookUp(ctx context.Context, phoneNumber string) (UserDTO, error)
-	GetAllUsers(ctx context.Context, filter common.Filter) ([]*UserDTO, error)
+	GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*UserDTO], error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
 	UnDeleteUser(ctx context.Context, id string) error
 	// Internal methods for auth module
@@ -118,19 +118,22 @@ func (s *userService) UserLookUp(ctx context.Context, phoneNumber string) (UserD
 	return user.ToDTO(), nil
 }
 
-func (s *userService) GetAllUsers(ctx context.Context, filter common.Filter) ([]*UserDTO, error) {
+func (s *userService) GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*UserDTO], error) {
 	s.logger.Info("Getting all users")
-	users, err := s.userRepository.GetAllUsers(ctx, filter)
+	result, err := s.userRepository.GetAllUsers(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to get all users", "error", err)
 		return nil, err
 	}
-	userDTOs := make([]*UserDTO, len(users))
-	for i, user := range users {
-		result := user.ToDTO()
-		userDTOs[i] = &result
+	userDTOs := make([]*UserDTO, len(result.Data))
+	for i, user := range result.Data {
+		dto := user.ToDTO()
+		userDTOs[i] = &dto
 	}
-	return userDTOs, nil
+	return &common.PaginatedResponse[[]*UserDTO]{
+		Data: userDTOs,
+		Meta: result.Meta,
+	}, nil
 }
 
 func (s *userService) GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error) {

@@ -95,14 +95,15 @@ func (h *ingredientHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *ingredientHandler) List(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
-	ingredients, err := h.ingredientService.List(r.Context(), filter)
+	result, err := h.ingredientService.List(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to list ingredients", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       ingredients,
+		Data:       result.Data,
+		Meta:       &result.Meta,
 		Message:    "Ingredients fetched successfully",
 		StatusCode: http.StatusOK,
 	})

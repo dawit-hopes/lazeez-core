@@ -118,7 +118,7 @@ func (h *categoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
-	categories, err := h.categoryService.List(r.Context(), filter)
+	result, err := h.categoryService.List(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to list categories", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -126,7 +126,8 @@ func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       categories,
+		Data:       result,
+		Meta:       &result.Meta,
 		Message:    "Categories fetched successfully",
 		StatusCode: http.StatusOK,
 	})

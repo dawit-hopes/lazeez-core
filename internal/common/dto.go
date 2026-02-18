@@ -15,12 +15,3 @@ type Filter struct {
 	Limit  int    `json:"limit"`
 	Search string `json:"search"`
 }
-
-type PaginationResponse struct {
-	Data        []*any  `json:"data"`
-	HasNext     bool `json:"has_next"`
-	HasPrevious bool `json:"has_previous"`
-	Total       int  `json:"total"`
-	Page        int  `json:"page"`
-	Limit       int  `json:"limit"`
-}

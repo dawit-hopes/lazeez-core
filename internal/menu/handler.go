@@ -252,14 +252,15 @@ func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
 		return
 	}
-	menus, err := h.menuService.List(r.Context(), filter, branchID)
+	result, err := h.menuService.List(r.Context(), filter, branchID)
 	if err != nil {
 		h.logger.Error("Failed to list menus", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       menus,
+		Data:       result.Data,
+		Meta:       &result.Meta,
 		Message:    "Menus fetched successfully",
 		StatusCode: http.StatusOK,
 	})

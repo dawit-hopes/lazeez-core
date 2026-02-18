@@ -10,7 +10,7 @@ type IngredientService interface {
 	Create(ctx context.Context, req IngredientRequest) error
 	Get(ctx context.Context, id string) (*IngredientDTO, error)
 	Update(ctx context.Context, id string, req IngredientRequest) error
-	List(ctx context.Context, filter common.Filter) ([]*IngredientDTO, error)
+	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*IngredientDTO], error)
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 	CheckExists(ctx context.Context, name string) error
@@ -86,18 +86,21 @@ func (s *ingredientService) Update(ctx context.Context, id string, req Ingredien
 	return nil
 }
 
-func (s *ingredientService) List(ctx context.Context, filter common.Filter) ([]*IngredientDTO, error) {
-	ingredients, err := s.ingredientRepository.List(ctx, filter)
+func (s *ingredientService) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*IngredientDTO], error) {
+	result, err := s.ingredientRepository.List(ctx, filter)
 	if err != nil {
 		s.logger.Error("Failed to list ingredients", "error", err)
 		return nil, err
 	}
-	ingredientDTOs := make([]*IngredientDTO, len(ingredients))
-	for i, ingredient := range ingredients {
-		ingredientDTO := ingredient.ToDTO()
-		ingredientDTOs[i] = &ingredientDTO
+	ingredientDTOs := make([]*IngredientDTO, len(result.Data))
+	for i, ing := range result.Data {
+		dto := ing.ToDTO()
+		ingredientDTOs[i] = &dto
 	}
-	return ingredientDTOs, nil
+	return &common.PaginatedResponse[[]*IngredientDTO]{
+		Data: ingredientDTOs,
+		Meta: result.Meta,
+	}, nil
 }
 
 func (s *ingredientService) Delete(ctx context.Context, id string) error {

@@ -14,7 +14,7 @@ type MenuRepository interface {
 	Update(ctx context.Context, menu Menu) error
 	Delete(ctx context.Context, id string, branchID string) error
 	UnDelete(ctx context.Context, id string, branchID string) error
-	List(ctx context.Context, filter common.Filter, branchID string) ([]*Menu, error)
+	List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*Menu], error)
 	CheckExists(ctx context.Context, name, branchID string) error
 }
 
@@ -111,7 +111,7 @@ func (r *menuRepository) UnDelete(ctx context.Context, id string, branchID strin
 	return nil
 }
 
-func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchID string) ([]*Menu, error) {
+func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*Menu], error) {
 	filters := map[string]any{"branch_id": branchID}
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)
@@ -121,7 +121,10 @@ func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchI
 		r.logger.Error("failed to list menus", "error", err)
 		return nil, common.ErrInternalServerError
 	}
-	return menus, nil
+	return &common.PaginatedResponse[[]*Menu]{
+		Data: menus,
+		Meta: common.BuildPaginationMeta(int64(len(menus)), filter.Page, filter.Limit),
+	}, nil
 }
 
 func (r *menuRepository) CheckExists(ctx context.Context, name, branchID string) error {

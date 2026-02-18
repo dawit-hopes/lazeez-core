@@ -16,7 +16,7 @@ import (
 type MenuService interface {
 	Create(ctx context.Context, req MenuRequest) error
 	Get(ctx context.Context, id string, branchID string) (*MenuDTO, error)
-	List(ctx context.Context, filter common.Filter, branchID string) ([]*MenuDTO, error)
+	List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*MenuDTO], error)
 	Update(ctx context.Context, id string, req MenuRequest) error
 	Delete(ctx context.Context, id string, branchID string) error
 	UnDelete(ctx context.Context, id string, branchID string) error
@@ -256,12 +256,13 @@ func (s *menuService) UnDelete(ctx context.Context, id string, branchID string) 
 	return nil
 }
 
-func (s *menuService) List(ctx context.Context, filter common.Filter, branchID string) ([]*MenuDTO, error) {
-	menus, err := s.menuRepository.List(ctx, filter, branchID)
+func (s *menuService) List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*MenuDTO], error) {
+	result, err := s.menuRepository.List(ctx, filter, branchID)
 	if err != nil {
 		s.logger.Error("Failed to list menus", "error", err)
 		return nil, err
 	}
+	menus := result.Data
 	// Collect unique category and ingredient IDs for batch lookup
 	uniqueCategoryIDs := make(map[string]struct{})
 	uniqueIngredientIDs := make(map[string]struct{})
@@ -298,5 +299,8 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID s
 		dto.Ingredients = ingredients
 		menuDTOs[i] = &dto
 	}
-	return menuDTOs, nil
+	return &common.PaginatedResponse[[]*MenuDTO]{
+		Data: menuDTOs,
+		Meta: result.Meta,
+	}, nil
 }
