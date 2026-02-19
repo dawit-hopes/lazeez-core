@@ -151,7 +151,8 @@ func (m *middleware) decodeToken(token string) (map[string]any, error) {
 	}, nil
 }
 
-var localURLs = []string{
+// Default CORS origins when CORS_ALLOWED_ORIGINS is not set (local dev).
+var defaultCORSOrigins = []string{
 	"http://localhost:8081",
 	"http://10.121.241.209:8081",
 	"http://172.21.0.1:8081",
@@ -160,9 +161,27 @@ var localURLs = []string{
 	"http://172.24.0.1:8081",
 }
 
+func getAllowedOrigins() []string {
+	raw := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if raw == "" {
+		return defaultCORSOrigins
+	}
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if o := strings.TrimSpace(p); o != "" {
+			origins = append(origins, o)
+		}
+	}
+	if len(origins) == 0 {
+		return defaultCORSOrigins
+	}
+	return origins
+}
+
 func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 	return cors.Handler(cors.Options{
-		AllowedOrigins: localURLs,
+		AllowedOrigins: getAllowedOrigins(),
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders: []string{
 			"Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token",

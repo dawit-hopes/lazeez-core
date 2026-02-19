@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"net/http"
 
 	"lazeez-core/config"
 	"lazeez-core/internal/auth"
@@ -159,6 +160,13 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	router.Use(deps.Middleware.CORSHandler)
 	router.MethodNotAllowed(deps.Middleware.MethodNotAllowedHandler)
 	router.NotFound(deps.Middleware.NotFoundHandler)
+
+	// Health check for cloud/orchestrators (no auth)
+	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
 
 	auth.NewAuthRoutes(router, deps.AuthHandler, deps.Middleware)
 	users.NewUserRoutes(router, deps.UserHandler, deps.Middleware)

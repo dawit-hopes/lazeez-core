@@ -19,9 +19,10 @@ func getDatabaseDSN() string {
 	user := getEnv("DB_USER", "postgres")
 	password := getEnv("DB_PASSWORD", "")
 	dbname := getEnv("DB_NAME", "lazeez")
+	sslmode := getEnv("DB_SSLMODE", "disable") // use "require" or "verify-full" in cloud
 
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
 }
 
 // getSecretKey returns the JWT secret key from environment
