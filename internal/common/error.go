@@ -56,4 +56,11 @@ var (
 	ErrNoDataToUpdate                   = &Errors{Code: BadRequest, Message: "no data to update"}
 	ErrMenuAlreadyExists                = &Errors{Code: BadRequest, Message: "menu with this information already exists"}
 	ErrMerchentAlreadyDeleted           = &Errors{Code: BadRequest, Message: "merchant is already deleted"}
+	ErrOrderItemNotFound                = &Errors{Code: NotFound, Message: "order item not found"}
+	ErrOrderNotFound                    = &Errors{Code: NotFound, Message: "order not found"}
+	ErrOrderAlreadyExists               = &Errors{Code: BadRequest, Message: "order with this information already exists"}
+	ErrOrderItemAlreadyExists           = &Errors{Code: BadRequest, Message: "order item with this information already exists"}
+	ErrMenuPriceMismatch                = &Errors{Code: BadRequest, Message: "menu item price does not match order item price"}
+	ErrOrderTotalMismatch                = &Errors{Code: BadRequest, Message: "order total does not match sum of order items"}
+	ErrOrderItemsRequired                = &Errors{Code: BadRequest, Message: "at least one order item is required"}
 )

@@ -16,6 +16,9 @@ import (
 
 type Middleware interface {
 	ValidateToken(next http.Handler) http.Handler
+	RequireSessionKey(next http.Handler) http.Handler
+	RequireBranch(next http.Handler) http.Handler
+	RequireSuperAdmin(next http.Handler) http.Handler
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
 	MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request)
 	CORSHandler(next http.Handler) http.Handler
@@ -65,6 +68,45 @@ func (m *middleware) ValidateToken(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), claimsContextKey, claim)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// RequireSessionKey ensures X-Session-Key header or session_key query param is present.
+func (m *middleware) RequireSessionKey(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := r.Header.Get("X-Session-Key")
+		if key == "" {
+			key = r.URL.Query().Get("session_key")
+		}
+		if strings.TrimSpace(key) == "" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireBranch ensures user has branch_id (branch_manager). Use after ValidateToken.
+func (m *middleware) RequireBranch(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		branchID, ok := GetBranchIDFromContext(r.Context())
+		if !ok || branchID == "" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireSuperAdmin ensures user has super_admin role. Use after ValidateToken.
+func (m *middleware) RequireSuperAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok || role != "super_admin" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 
