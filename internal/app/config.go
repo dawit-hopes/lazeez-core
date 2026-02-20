@@ -2,22 +2,23 @@ package app
 
 import (
 	"fmt"
-	"lazeez-core/internal/common"
 	"os"
+
+	"lazeez-core/internal/common"
 )
 
 // getDatabaseDSN returns the database connection string from environment.
 // Prefers individual DB_* vars over DATABASE_URL because the key=value format
 // correctly handles special characters in passwords (=, +, ?, @, etc.).
 func getDatabaseDSN() string {
-	// Use individual vars when DB_HOST is set - avoids URL parsing issues with
+	host := getEnv("DB_HOST", defaultDBHost())
+	// Use individual vars when we have a host - avoids URL parsing issues with
 	// special characters in passwords (e.g. =, +, ? break postgres:// URL format)
-	if os.Getenv("DB_HOST") != "" {
-		host := getEnv("DB_HOST", "localhost")
+	if host != "" {
 		port := getEnv("DB_PORT", "5432")
-		user := getEnv("DB_USER", "postgres")
-		password := getEnv("DB_PASSWORD", "")
-		dbname := getEnv("DB_NAME", "lazeez")
+		user := getEnv("DB_USER", getEnv("POSTGRES_USER", "postgres"))
+		password := getEnv("DB_PASSWORD", os.Getenv("POSTGRES_PASSWORD"))
+		dbname := getEnv("DB_NAME", getEnv("POSTGRES_DB", "lazeez"))
 		sslmode := getEnv("DB_SSLMODE", "disable")
 		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 			host, port, user, password, dbname, sslmode)
@@ -25,6 +26,14 @@ func getDatabaseDSN() string {
 
 	// Fallback to DATABASE_URL (password must be URL-encoded if it contains =, +, ?, @)
 	return os.Getenv("DATABASE_URL")
+}
+
+// defaultDBHost returns "db" when running in Docker (for docker-compose), "localhost" otherwise.
+func defaultDBHost() string {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return "db"
+	}
+	return "localhost"
 }
 
 // getSecretKey returns the JWT secret key from environment
