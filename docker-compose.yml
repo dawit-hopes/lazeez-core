@@ -1,4 +1,9 @@
+version: "3.9"
+
 services:
+  # -------------------
+  # PostgreSQL Service
+  # -------------------
   db:
     image: postgres:15
     restart: always
@@ -15,6 +20,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # -------------------
+  # Go Backend Service
+  # -------------------
+  app:
+    build: .
+    restart: always
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    # Optional: run migrations before server start
+    # Replace with your actual migration command
+    command: sh -c "echo Waiting for DB... && ./main"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:${PORT:-8080}/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
 volumes:
   db-data:
