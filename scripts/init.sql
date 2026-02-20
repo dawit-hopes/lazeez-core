@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS menus (
     ingredients TEXT[],
     category_id UUID NOT NULL,
     branch_id UUID NOT NULL,
+    preparation_time DECIMAL(10,2) NOT NULL DEFAULT 0,
     is_fasting BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
