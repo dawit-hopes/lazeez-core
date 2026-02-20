@@ -275,6 +275,10 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 		existingMenu.Price = req.Price
 	}
 
+	if req.PreparationTime != existingMenu.PreparationTime {
+		existingMenu.PreparationTime = req.PreparationTime
+	}
+
 	err = s.menuRepository.Update(ctx, existingMenu)
 	if err != nil {
 		s.logger.Error("Failed to update menu", "error", err)

@@ -9,16 +9,17 @@ import (
 
 type Menu struct {
 	common.Base
-	Name        string         `json:"name" db:"name"`
-	Image       string         `json:"image" db:"image"`
-	Description string         `json:"description" db:"description"`
-	Price       float64        `json:"price" db:"price"`
-	Ingredients pq.StringArray `json:"ingredients" db:"ingredients"`
-	CategoryID  uuid.UUID      `json:"category_id" db:"category_id"`
-	BranchID    uuid.UUID      `json:"branch_id" db:"branch_id"`
-	IsFasting   bool           `json:"is_fasting" db:"is_fasting"`
-	IsAvailable bool           `json:"is_available" db:"is_available"`
-	Modifiers   pq.StringArray `json:"modifiers" db:"modifiers"`
+	Name            string         `json:"name" db:"name"`
+	Image           string         `json:"image" db:"image"`
+	Description     string         `json:"description" db:"description"`
+	Price           float64        `json:"price" db:"price"`
+	Ingredients     pq.StringArray `json:"ingredients" db:"ingredients"`
+	CategoryID      uuid.UUID      `json:"category_id" db:"category_id"`
+	BranchID        uuid.UUID      `json:"branch_id" db:"branch_id"`
+	IsFasting       bool           `json:"is_fasting" db:"is_fasting"`
+	IsAvailable     bool           `json:"is_available" db:"is_available"`
+	PreparationTime float64        `json:"preparation_time" db:"preparation_time"`
+	Modifiers       pq.StringArray `json:"modifiers" db:"modifiers"`
 }
 
 func (m *Menu) Table() string {
@@ -26,15 +27,15 @@ func (m *Menu) Table() string {
 }
 
 func (m *Menu) Columns() []string {
-	return []string{"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "is_fasting", "is_available", "description", "price", "ingredients", "category_id", "modifiers"}
+	return []string{"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "is_fasting", "is_available", "description", "price", "ingredients", "category_id", "modifiers", "preparation_time"}
 }
 
 func (m *Menu) Values() []any {
-	return []any{m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.IsFasting, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers}
+	return []any{m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.IsFasting, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers, m.PreparationTime}
 }
 
 func (m *Menu) Addr() []any {
-	return []any{&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.IsFasting, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.CreatedAt, &m.UpdatedAt}
+	return []any{&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.IsFasting, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.PreparationTime, &m.CreatedAt, &m.UpdatedAt}
 }
 
 func (m *Menu) ToDTO() MenuDTO {
