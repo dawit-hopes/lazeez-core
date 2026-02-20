@@ -28,6 +28,13 @@ services:
     build: .
     restart: always
     env_file: .env
+    environment:
+      # Use individual DB_* vars (not DATABASE_URL) so special chars in password work
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-lazeez}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB:-lazeez}
     depends_on:
       db:
         condition: service_healthy

@@ -6,23 +6,25 @@ import (
 	"os"
 )
 
-// getDatabaseDSN returns the database connection string from environment
+// getDatabaseDSN returns the database connection string from environment.
+// Prefers individual DB_* vars over DATABASE_URL because the key=value format
+// correctly handles special characters in passwords (=, +, ?, @, etc.).
 func getDatabaseDSN() string {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn != "" {
-		return dsn
+	// Use individual vars when DB_HOST is set - avoids URL parsing issues with
+	// special characters in passwords (e.g. =, +, ? break postgres:// URL format)
+	if os.Getenv("DB_HOST") != "" {
+		host := getEnv("DB_HOST", "localhost")
+		port := getEnv("DB_PORT", "5432")
+		user := getEnv("DB_USER", "postgres")
+		password := getEnv("DB_PASSWORD", "")
+		dbname := getEnv("DB_NAME", "lazeez")
+		sslmode := getEnv("DB_SSLMODE", "disable")
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+			host, port, user, password, dbname, sslmode)
 	}
 
-	// Fallback to individual environment variables
-	host := getEnv("DB_HOST", "localhost")
-	port := getEnv("DB_PORT", "5432")
-	user := getEnv("DB_USER", "postgres")
-	password := getEnv("DB_PASSWORD", "")
-	dbname := getEnv("DB_NAME", "lazeez")
-	sslmode := getEnv("DB_SSLMODE", "disable") // use "require" or "verify-full" in cloud
-
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, dbname, sslmode)
+	// Fallback to DATABASE_URL (password must be URL-encoded if it contains =, +, ?, @)
+	return os.Getenv("DATABASE_URL")
 }
 
 // getSecretKey returns the JWT secret key from environment
