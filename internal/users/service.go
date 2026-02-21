@@ -9,6 +9,7 @@ import (
 
 type UserService interface {
 	CreateUser(ctx context.Context, req UserRequest) error
+	CreateSuperAdminUser(ctx context.Context, req SuperAdminUserRequest) error
 	GetUserByID(ctx context.Context, id string) (UserDTO, error)
 	UpdateUser(ctx context.Context, id string, req UserRequest) error
 	DeleteUser(ctx context.Context, id string) error
@@ -18,6 +19,8 @@ type UserService interface {
 	UnDeleteUser(ctx context.Context, id string) error
 	// Internal methods for auth module
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error)
+	GetUserDTOWithMerchant(ctx context.Context, user *User) (UserDTO, error)
+	GetUserByIDForLogin(ctx context.Context, userID string) (UserDTO, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
@@ -56,6 +59,22 @@ func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
 	}
 	return nil
 }
+
+func (s *userService) CreateSuperAdminUser(ctx context.Context, req SuperAdminUserRequest) error {
+	// req.PhoneNumber is already validated and normalized by the handler
+	if err := s.userRepository.CheckUserExistsByPhoneNumber(ctx, req.PhoneNumber); err != nil {
+		s.logger.Error("Failed to check user exists by phone number", "error", err)
+		return err
+	}
+	newUser := s.createSuperAdminUserDefaultData(&req)
+	err := s.userRepository.CreateUser(ctx, *newUser)
+	if err != nil {
+		s.logger.Error("Failed to create user", "error", err)
+		return err
+	}
+	return nil
+}
+
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (UserDTO, error) {
 	s.logger.Info("Getting user by ID", "id", id)
@@ -132,6 +151,28 @@ func (s *userService) GetUserByPhoneNumber(ctx context.Context, phoneNumber stri
 		return nil, err
 	}
 	return &user, nil
+}
+
+// GetUserDTOWithMerchant returns UserDTO with MerchantID populated from branch (for branch_manager and super_branch_admin).
+func (s *userService) GetUserDTOWithMerchant(ctx context.Context, user *User) (UserDTO, error) {
+	dto := user.ToDTO()
+	if user.BranchID.Valid && user.BranchID.String != "" {
+		branch, err := s.branchService.Get(ctx, user.BranchID.String)
+		if err == nil {
+			dto.MerchantID = branch.MerchantID
+		}
+	}
+	return dto, nil
+}
+
+// GetUserByIDForLogin returns UserDTO with MerchantID for login/refresh response.
+func (s *userService) GetUserByIDForLogin(ctx context.Context, userID string) (UserDTO, error) {
+	user, err := s.userRepository.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user by ID for login", "error", err)
+		return UserDTO{}, err
+	}
+	return s.GetUserDTOWithMerchant(ctx, &user)
 }
 
 func (s *userService) UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error {

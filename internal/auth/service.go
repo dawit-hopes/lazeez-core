@@ -101,7 +101,12 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 		return nil, err
 	}
 
-	response, err := s.createLoginResponse(existingUser.ToDTO())
+	userDTO, err := s.userService.GetUserDTOWithMerchant(ctx, existingUser)
+	if err != nil {
+		s.logger.Error("Failed to get user DTO with merchant", "error", err)
+		return nil, err
+	}
+	response, err := s.createLoginResponse(userDTO)
 	if err != nil {
 		s.logger.Error("Failed to create login response", "error", err)
 		return nil, err
@@ -152,7 +157,12 @@ func (s *authService) setPasswordAndLogin(ctx context.Context, req SetPasswordRe
 		return nil, err
 	}
 
-	return s.createLoginResponse(existingUser.ToDTO())
+	userDTO, err := s.userService.GetUserDTOWithMerchant(ctx, existingUser)
+	if err != nil {
+		s.logger.Error("Failed to get user DTO with merchant", "error", err)
+		return nil, err
+	}
+	return s.createLoginResponse(userDTO)
 }
 
 func (s *authService) Logout(ctx context.Context, userID string) error {
@@ -185,9 +195,9 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*L
 	})
 
 	g.Go(func() error {
-		result, err := s.userService.GetUserByID(ctx, userID)
+		result, err := s.userService.GetUserByIDForLogin(ctx, userID)
 		if err != nil {
-			s.logger.Error("Failed to get user by ID", "error", err)
+			s.logger.Error("Failed to get user by ID for login", "error", err)
 			return err
 		}
 		user = result

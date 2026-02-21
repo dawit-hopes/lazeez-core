@@ -11,6 +11,7 @@ func ParseFilter(r *http.Request) Filter {
 		Page:   1,
 		Limit:  10,
 		Search: "",
+		Filter: make(map[string]any),
 	}
 
 	query := r.URL.Query()
@@ -28,6 +29,12 @@ func ParseFilter(r *http.Request) Filter {
 
 	if query.Get("search") != "" {
 		filter.Search = strings.ToLower(query.Get("search"))
+	}
+	for key, values := range query {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey != "" && trimmedKey != "page" && trimmedKey != "limit" && trimmedKey != "search" && trimmedKey != "cursor" && trimmedKey != "sort" && trimmedKey != "order" {
+			filter.Filter[trimmedKey] = strings.TrimSpace(values[0])
+		}
 	}
 	return filter
 }

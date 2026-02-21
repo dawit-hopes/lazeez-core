@@ -11,7 +11,10 @@ type BaseDTO struct {
 }
 
 type Filter struct {
-	Page   int    `json:"page"`
-	Limit  int    `json:"limit"`
-	Search string `json:"search"`
+	Page   int            `json:"page"`
+	Limit  int            `json:"limit"`
+	Search string         `json:"search"`
+	Filter map[string]any `json:"filter"`
+	Sort   string         `json:"sort"`
+	Order  string         `json:"order"`
 }

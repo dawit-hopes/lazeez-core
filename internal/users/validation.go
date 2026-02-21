@@ -24,6 +24,20 @@ func (u *UserRequest) Validate(isUpdate bool) error {
 	)
 }
 
+func (u *SuperAdminUserRequest) Validate(isUpdate bool) error {
+	return validation.ValidateStruct(u,
+		validation.Field(&u.PhoneNumber,
+			validation.When(!isUpdate, validation.Required.Error("phone number is required")),
+		),
+		validation.Field(&u.FullName,
+			validation.When(!isUpdate, validation.Required.Error("full name is required")),
+			validation.Length(3, 100).Error("full name must be between 3 and 100 characters")),
+		validation.Field(&u.MerchantID,
+			validation.When(!isUpdate, validation.Required.Error("merchant id is required")),
+		),
+	)
+}
+
 func (u *UserLookUpRequest) Validate() error {
 	return validation.ValidateStruct(u,
 		validation.Field(&u.PhoneNumber, validation.Required.Error("phone number is required")),

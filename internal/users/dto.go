@@ -9,6 +9,12 @@ type UserRequest struct {
 	MerchantID  string `json:"merchant_id"`
 }
 
+type SuperAdminUserRequest struct {
+	PhoneNumber string `json:"phone_number"`
+	FullName    string `json:"full_name"`
+	MerchantID  string `json:"merchant_id"`
+}
+
 type CreateUserResponse struct {
 	ID          string `json:"id"`
 	PhoneNumber string `json:"phone_number"`
@@ -38,6 +44,7 @@ type UserDTO struct {
 	Password        string `json:"-"`
 	Role            Role   `json:"role"`
 	BranchID        string `json:"branch_id"`
+	MerchantID      string `json:"merchant_id"` // Populated for branch_manager and super_branch_admin from branch
 	IsLocked        bool   `json:"is_locked"`
 	IsFirstLogin    bool   `json:"is_first_login"`
 	LoggingAttempts int    `json:"logging_attempts"`

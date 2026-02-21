@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
-    CONSTRAINT chk_users_role CHECK (role IN ('super_admin', 'branch_manager'))
+    CONSTRAINT chk_users_role CHECK (role IN ('super_admin', 'branch_manager', 'super_branch_admin'))
 );
 
 -- Create indexes for faster lookups

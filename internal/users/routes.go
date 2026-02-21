@@ -17,6 +17,12 @@ func NewUserRoutes(router chi.Router, handler UserHandler, mw middleware.Middlew
 			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
 		},
 		{
+			Method:      http.MethodPost,
+			Path:        "/users/super-branch-manager",
+			Handler:     handler.CreateSuperAdminUser,
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
+		},
+		{
 			Method:      http.MethodGet,
 			Path:        "/users/{id}",
 			Handler:     handler.GetUserByID,

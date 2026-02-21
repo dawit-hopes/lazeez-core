@@ -9,6 +9,7 @@ import (
 
 type UserHandler interface {
 	CreateUser(w http.ResponseWriter, r *http.Request)
+	CreateSuperAdminUser(w http.ResponseWriter, r *http.Request)
 	GetUserByID(w http.ResponseWriter, r *http.Request)
 	UpdateUser(w http.ResponseWriter, r *http.Request)
 	DeleteUser(w http.ResponseWriter, r *http.Request)
@@ -56,6 +57,34 @@ func (h *userHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "User created successfully", StatusCode: http.StatusOK})
 }
 
+func (h *userHandler) CreateSuperAdminUser(w http.ResponseWriter, r *http.Request) {
+	var req SuperAdminUserRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		h.logger.Error("Failed to decode request body", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	if err := req.Validate(false); err != nil {
+		h.logger.Error("Failed to validate request body", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	normalized, err := common.ValidatePhoneNumber(req.PhoneNumber)
+	if err != nil {
+		h.logger.Error("Invalid phone number", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	req.PhoneNumber = normalized
+	err = h.userService.CreateSuperAdminUser(r.Context(), req)
+	if err != nil {
+		h.logger.Error("Failed to create super admin user", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "Super admin user created successfully", StatusCode: http.StatusOK})
+}
 func (h *userHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")
 	user, err := h.userService.GetUserByID(r.Context(), id)

@@ -95,7 +95,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	fileService := files.NewFileService(logger, cld)
 
 	// Initialize repositories
-	userRepo := users.NewUserRepository(userDAL, logger)
+	userRepo := users.NewUserRepository(userDAL, joinDAL, logger)
 	branchRepo := branch.NewBranchRepository(branchDAL, joinDAL, logger)
 	merchantRepo := merchant.NewMerchantRepository(merchantDAL, joinDAL, logger)
 	menuRepo := menu.NewMenuRepository(menuDAL, logger)

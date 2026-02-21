@@ -3,6 +3,9 @@ package users
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
+
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/middleware"
@@ -25,12 +28,13 @@ type UserRepository interface {
 }
 
 type userRepository struct {
-	dal    *common.DAL[*User]
-	logger config.Logger
+	dal     *common.DAL[*User]
+	joinDAL *common.JoinDAL
+	logger  config.Logger
 }
 
-func NewUserRepository(dal *common.DAL[*User], logger config.Logger) UserRepository {
-	return &userRepository{dal: dal, logger: logger}
+func NewUserRepository(dal *common.DAL[*User], joinDAL *common.JoinDAL, logger config.Logger) UserRepository {
+	return &userRepository{dal: dal, joinDAL: joinDAL, logger: logger}
 }
 
 func (r *userRepository) CreateUser(ctx context.Context, user User) error {
@@ -151,16 +155,81 @@ func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) 
 	if filter.Search != "" {
 		filters["full_name"] = common.ILike(filter.Search)
 	}
+
+	merchantID, hasMerchantID := filter.Filter["merchant_id"].(string)
+	if hasMerchantID && merchantID != "" {
+		// Users don't have merchant_id; filter via join: user -> branch -> merchant
+		return r.listUsersByMerchant(ctx, filter, merchantID, role)
+	}
+
+	if len(filter.Filter) > 0 {
+		if roleVal, ok := filter.Filter["role"].(string); ok && roleVal != "" {
+			filters["role"] = roleVal
+		}
+		if branchID, ok := filter.Filter["branch_id"].(string); ok && branchID != "" {
+			filters["branch_id"] = branchID
+		}
+	}
+
 	offset := (filter.Page - 1) * filter.Limit
 	var results []*User
 	var err error
-	if role != "" && role == string(RoleAdmin) {
+	if role == string(RoleAdmin) {
 		results, err = r.dal.ListIncludeDeleted(ctx, filters, filter.Limit, offset)
 	} else {
 		results, err = r.dal.List(ctx, filters, filter.Page, filter.Limit)
 	}
 	if err != nil {
 		r.logger.Error("failed to get all users", "error", err)
+		return nil, err
+	}
+	return &common.PaginatedResponse[[]*User]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+	}, nil
+}
+
+// listUsersByMerchant returns users whose branch belongs to the given merchant.
+func (r *userRepository) listUsersByMerchant(ctx context.Context, filter common.Filter, merchantID string, role string) (*common.PaginatedResponse[[]*User], error) {
+	offset := (filter.Page - 1) * filter.Limit
+
+	// JOIN users with branches to filter by merchant_id
+	// Include users with branch_id IN (branches of merchant) OR super_admin (branch_id may be null)
+	baseQuery := `
+		SELECT u.id, u.full_name, u.phone_number, u.password, u.role, u.branch_id, u.is_locked, u.is_first_login, u.logging_attempts, u.deleted_at, u.is_deleted, u.created_at, u.updated_at
+		FROM users u
+		INNER JOIN branches b ON u.branch_id = b.id AND b.merchant_id = $1
+		WHERE 1=1`
+	args := []any{merchantID}
+	argNum := 2
+
+	var conditions []string
+	if filter.Search != "" {
+		conditions = append(conditions, fmt.Sprintf(" AND u.full_name ILIKE $%d", argNum))
+		args = append(args, common.ILikePattern(filter.Search))
+		argNum++
+	}
+	if roleVal, ok := filter.Filter["role"].(string); ok && roleVal != "" {
+		conditions = append(conditions, fmt.Sprintf(" AND u.role = $%d", argNum))
+		args = append(args, roleVal)
+		argNum++
+	}
+	if role != string(RoleAdmin) {
+		conditions = append(conditions, " AND u.is_deleted = FALSE")
+	}
+
+	query := baseQuery + strings.Join(conditions, "") + " ORDER BY u.created_at DESC LIMIT $" + fmt.Sprint(argNum) + " OFFSET $" + fmt.Sprint(argNum+1)
+	args = append(args, filter.Limit, offset)
+
+	results, err := common.QueryRows(r.joinDAL, ctx, query, args, func(rows *sql.Rows) (*User, error) {
+		item := &User{}
+		if err := rows.Scan(item.Addr()...); err != nil {
+			return nil, err
+		}
+		return item, nil
+	})
+	if err != nil {
+		r.logger.Error("failed to list users by merchant", "error", err)
 		return nil, err
 	}
 	return &common.PaginatedResponse[[]*User]{

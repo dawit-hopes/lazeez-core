@@ -40,6 +40,21 @@ func (s *userService) createUserDefaultData(req *UserRequest) *User {
 	return &user
 }
 
+func (s *userService) createSuperAdminUserDefaultData(req *SuperAdminUserRequest) *User {
+	var user User
+	now := time.Now()
+	user.ID = uuid.New().String()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+	user.IsFirstLogin = true
+	user.IsLocked = false
+	user.LoggingAttempts = 0
+	user.Role = RoleSuperBranchManager
+	user.FullName = common.FormatText(req.FullName)
+	user.PhoneNumber = req.PhoneNumber
+	return &user
+}
+
 func (s *userService) updateUserDefaultData(req *UserRequest, existingUser *User) *User {
 	user := existingUser
 	now := time.Now()
