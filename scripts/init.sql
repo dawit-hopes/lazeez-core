@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255),
     role VARCHAR(50) NOT NULL DEFAULT 'branch_manager',
     branch_id UUID,
+    merchant_id UUID,
     is_locked BOOLEAN DEFAULT FALSE,
     is_first_login BOOLEAN DEFAULT TRUE,
     logging_attempts INTEGER DEFAULT 0,
@@ -60,6 +61,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+    CONSTRAINT fk_users_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE SET NULL,
     CONSTRAINT chk_users_role CHECK (role IN ('super_admin', 'branch_manager', 'super_branch_admin'))
 );
 

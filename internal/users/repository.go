@@ -196,7 +196,7 @@ func (r *userRepository) listUsersByMerchant(ctx context.Context, filter common.
 	// JOIN users with branches to filter by merchant_id
 	// Include users with branch_id IN (branches of merchant) OR super_admin (branch_id may be null)
 	baseQuery := `
-		SELECT u.id, u.full_name, u.phone_number, u.password, u.role, u.branch_id, u.is_locked, u.is_first_login, u.logging_attempts, u.deleted_at, u.is_deleted, u.created_at, u.updated_at
+		SELECT u.id, u.full_name, u.phone_number, u.password, u.role, u.branch_id, u.merchant_id, u.is_locked, u.is_first_login, u.logging_attempts, u.deleted_at, u.is_deleted, u.created_at, u.updated_at
 		FROM users u
 		INNER JOIN branches b ON u.branch_id = b.id AND b.merchant_id = $1
 		WHERE 1=1`

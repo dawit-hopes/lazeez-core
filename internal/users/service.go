@@ -153,7 +153,8 @@ func (s *userService) GetUserByPhoneNumber(ctx context.Context, phoneNumber stri
 	return &user, nil
 }
 
-// GetUserDTOWithMerchant returns UserDTO with MerchantID populated from branch (for branch_manager and super_branch_admin).
+// GetUserDTOWithMerchant returns UserDTO with MerchantID populated from branch or from user's stored merchant_id.
+// For super_branch_admin and branch_manager, merchant_id is required; returns ErrBranchAdminMissingMerchant if missing.
 func (s *userService) GetUserDTOWithMerchant(ctx context.Context, user *User) (UserDTO, error) {
 	dto := user.ToDTO()
 	if user.BranchID.Valid && user.BranchID.String != "" {
@@ -161,6 +162,13 @@ func (s *userService) GetUserDTOWithMerchant(ctx context.Context, user *User) (U
 		if err == nil {
 			dto.MerchantID = branch.MerchantID
 		}
+	}
+	if dto.MerchantID == "" && user.MerchantID.Valid && user.MerchantID.String != "" {
+		dto.MerchantID = user.MerchantID.String
+	}
+	// super_branch_admin and branch_manager must have a merchant (via branch or stored); block login if not set
+	if (user.Role == RoleBranchManager || user.Role == RoleSuperBranchManager) && dto.MerchantID == "" {
+		return UserDTO{}, common.ErrBranchAdminMissingMerchant
 	}
 	return dto, nil
 }

@@ -37,6 +37,7 @@ func (s *userService) createUserDefaultData(req *UserRequest) *User {
 	user.FullName = common.FormatText(req.FullName)
 	user.PhoneNumber = req.PhoneNumber
 	user.BranchID = common.ToNUllString(req.BranchID)
+	user.MerchantID = common.ToNUllString(req.MerchantID)
 	return &user
 }
 
@@ -52,6 +53,7 @@ func (s *userService) createSuperAdminUserDefaultData(req *SuperAdminUserRequest
 	user.Role = RoleSuperBranchManager
 	user.FullName = common.FormatText(req.FullName)
 	user.PhoneNumber = req.PhoneNumber
+	user.MerchantID = common.ToNUllString(req.MerchantID)
 	return &user
 }
 
