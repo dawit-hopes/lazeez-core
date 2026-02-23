@@ -20,9 +20,9 @@ var (
 	ErrBranchNotFound                   = &Errors{Code: NotFound, Message: "branch not found"}
 	ErrMenuNotFound                     = &Errors{Code: NotFound, Message: "menu not found"}
 	ErrCategoryNotFound                 = &Errors{Code: NotFound, Message: "category not found"}
-	ErrIngredientNotFound                = &Errors{Code: NotFound, Message: "ingredient not found"}
-	ErrModifierGroupNotFound             = &Errors{Code: NotFound, Message: "modifier group not found"}
-	ErrModifierOptionNotFound            = &Errors{Code: NotFound, Message: "modifier option not found"}
+	ErrIngredientNotFound               = &Errors{Code: NotFound, Message: "ingredient not found"}
+	ErrModifierGroupNotFound            = &Errors{Code: NotFound, Message: "modifier group not found"}
+	ErrModifierOptionNotFound           = &Errors{Code: NotFound, Message: "modifier option not found"}
 	ErrUnAuthorized                     = &Errors{Code: Unauthorized, Message: "unauthorized"}
 	ErrPasswordRequired                 = &Errors{Code: BadRequest, Message: "password is required and cannot be empty"}
 	ErrInvalidPassword                  = &Errors{Code: BadRequest, Message: "password is invalid"}
@@ -61,7 +61,9 @@ var (
 	ErrOrderAlreadyExists               = &Errors{Code: BadRequest, Message: "order with this information already exists"}
 	ErrOrderItemAlreadyExists           = &Errors{Code: BadRequest, Message: "order item with this information already exists"}
 	ErrMenuPriceMismatch                = &Errors{Code: BadRequest, Message: "menu item price does not match order item price"}
-	ErrOrderTotalMismatch                = &Errors{Code: BadRequest, Message: "order total does not match sum of order items"}
-	ErrOrderItemsRequired                = &Errors{Code: BadRequest, Message: "at least one order item is required"}
+	ErrOrderTotalMismatch               = &Errors{Code: BadRequest, Message: "order total does not match sum of order items"}
+	ErrOrderItemsRequired               = &Errors{Code: BadRequest, Message: "at least one order item is required"}
 	ErrBranchAdminMissingMerchant       = &Errors{Code: BadRequest, Message: "branch admin account must be linked to a branch and merchant"}
+	ErrTableNotFound                    = &Errors{Code: NotFound, Message: "table not found"}
+	ErrTableAlreadyExists               = &Errors{Code: BadRequest, Message: "table with this information already exists"}
 )
