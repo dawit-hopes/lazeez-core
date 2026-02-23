@@ -317,3 +317,28 @@ CREATE TRIGGER update_order_items_updated_at
     BEFORE UPDATE ON order_items
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================
+-- TABLES TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS tables (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    table_name VARCHAR(100) NOT NULL,
+    branch_id UUID NOT NULL,
+    reference VARCHAR(255) NOT NULL,
+    qr_code TEXT NOT NULL,
+    qr_version INTEGER NOT NULL DEFAULT 1,
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
+    active_order_id UUID,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_tables_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_tables_branch_id ON tables(branch_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_tables_created_at ON tables(created_at) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_tables_reference ON tables(reference) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_tables_status ON tables(status) WHERE is_deleted = FALSE;
