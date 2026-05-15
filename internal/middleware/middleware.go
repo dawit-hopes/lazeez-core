@@ -254,3 +254,29 @@ func GetBranchIDFromContext(ctx context.Context) (string, bool) {
 	branchID, ok := claims["bid"].(string)
 	return branchID, ok
 }
+
+// GetUserIDFromContext extracts the user ID ("uid") claim from the request context.
+func GetUserIDFromContext(ctx context.Context) (string, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(map[string]any)
+	if !ok || claims == nil {
+		return "", false
+	}
+	uid, ok := claims["uid"].(string)
+	if !ok || uid == "" {
+		return "", false
+	}
+	return uid, true
+}
+
+// GetMerchantIDFromContext extracts the merchant ID ("mid") claim from the request context.
+func GetMerchantIDFromContext(ctx context.Context) (string, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(map[string]any)
+	if !ok || claims == nil {
+		return "", false
+	}
+	mid, ok := claims["mid"].(string)
+	if !ok || mid == "" {
+		return "", false
+	}
+	return mid, true
+}

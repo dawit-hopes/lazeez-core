@@ -48,7 +48,18 @@ func (s *authService) generateTokens(user map[string]any) (string, string, error
 			}
 		}
 	}
-	payload := map[string]any{"uid": user["id"], "bid": branchID, "rol": user["role"]}
+	merchantID := ""
+	if mid := user["mid"]; mid != nil {
+		switch v := mid.(type) {
+		case string:
+			merchantID = v
+		case sql.NullString:
+			if v.Valid {
+				merchantID = v.String
+			}
+		}
+	}
+	payload := map[string]any{"uid": user["id"], "bid": branchID, "mid": merchantID, "rol": user["role"]}
 
 	accessToken, err := s.keyService.GenerateJWTToken(payload, accessTokenExpirationMinutes)
 	if err != nil {

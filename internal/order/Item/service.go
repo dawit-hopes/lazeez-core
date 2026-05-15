@@ -38,7 +38,7 @@ func (s *orderItemService) validateOrderItem(ctx context.Context, orderItem Orde
 
 	// menu item
 	g.Go(func() error {
-		menuItem, err := s.menuService.Get(ctx, orderItem.MenuItemID, orderItem.BranchID)
+		menuItem, err := s.menuService.Get(ctx, orderItem.MenuItemID, orderItem.BranchID, "")
 		if err != nil {
 			s.logger.Error("failed to get menu item", "error", err)
 			return err

@@ -63,7 +63,7 @@ var (
 	ErrMenuPriceMismatch                = &Errors{Code: BadRequest, Message: "menu item price does not match order item price"}
 	ErrOrderTotalMismatch               = &Errors{Code: BadRequest, Message: "order total does not match sum of order items"}
 	ErrOrderItemsRequired               = &Errors{Code: BadRequest, Message: "at least one order item is required"}
-	ErrBranchAdminMissingMerchant       = &Errors{Code: BadRequest, Message: "branch admin account must be linked to a branch and merchant"}
+	ErrBranchAdminMissingMerchant       = &Errors{Code: BadRequest, Message: "account must be linked to a restaurant (merchant). Sign out and sign in again, or contact support."}
 	ErrTableNotFound                    = &Errors{Code: NotFound, Message: "table not found"}
 	ErrTableAlreadyExists               = &Errors{Code: BadRequest, Message: "table with this information already exists"}
 )

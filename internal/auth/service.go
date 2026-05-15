@@ -242,6 +242,7 @@ func (s *authService) generatePayload(user users.UserDTO) map[string]any {
 		"id":   user.ID,
 		"role": user.Role,
 		"bid":  user.BranchID,
+		"mid":  user.MerchantID,
 	}
 }
 

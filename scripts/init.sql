@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS menus (
     price DECIMAL(10, 2) NOT NULL,
     ingredients TEXT[],
     category_id UUID NOT NULL,
-    branch_id UUID NOT NULL,
+    branch_id UUID,
+    merchant_id UUID,
     preparation_time DECIMAL(10,2) NOT NULL DEFAULT 0,
     is_fasting BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
@@ -95,12 +96,36 @@ CREATE TABLE IF NOT EXISTS menus (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_menus_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_menus_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
     CONSTRAINT chk_menus_ingredients CHECK (array_length(ingredients, 1) > 0)
 );
 
 -- Create index on name for faster lookups
 CREATE INDEX IF NOT EXISTS idx_menus_name ON menus(name) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_menus_created_at ON menus(created_at) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_menus_master ON menus(created_at) WHERE is_deleted = FALSE AND branch_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_menus_merchant_id ON menus(merchant_id) WHERE is_deleted = FALSE AND branch_id IS NULL;
+
+-- ============================================
+-- BRANCH MENU OVERRIDES (master menu per-branch availability)
+-- ============================================
+CREATE TABLE IF NOT EXISTS branch_menu_overrides (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    branch_id UUID NOT NULL,
+    menu_id UUID NOT NULL,
+    is_available BOOLEAN NOT NULL DEFAULT FALSE,
+    is_excluded BOOLEAN NOT NULL DEFAULT FALSE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_branch_menu_overrides_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_branch_menu_overrides_menu FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE,
+    CONSTRAINT uq_branch_menu_overrides_branch_menu UNIQUE (branch_id, menu_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_branch_id ON branch_menu_overrides(branch_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_menu_id ON branch_menu_overrides(menu_id) WHERE is_deleted = FALSE;
 
 -- ============================================
 -- CATEGORIES TABLE
@@ -184,7 +209,8 @@ CREATE TRIGGER update_ingredients_updated_at
 COMMENT ON TABLE merchants IS 'Stores merchant/restaurant information';
 COMMENT ON TABLE branches IS 'Stores branch locations for merchants';
 COMMENT ON TABLE users IS 'Stores user accounts with authentication information';
-COMMENT ON TABLE menus IS 'Stores menu information';
+COMMENT ON TABLE menus IS 'Stores menu information; branch_id NULL = master menu item';
+COMMENT ON TABLE branch_menu_overrides IS 'Per-branch availability overrides for master menu items';
 COMMENT ON TABLE categories IS 'Stores category information with name and icon';
 COMMENT ON TABLE ingredients IS 'Stores ingredient names and icon';
 

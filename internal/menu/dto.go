@@ -19,6 +19,7 @@ type MenuRequest struct {
 	Ingredients     []string                     `json:"ingredients"`
 	CategoryID      string                       `json:"category_id"`
 	BranchID        string                       `json:"branch_id"`
+	MerchantID      string                       `json:"merchant_id"`
 	IsFasting       *bool                        `json:"is_fasting"`
 	PreparationTime float64                      `json:"preparation_time"`
 	IsAvailable     *bool                        `json:"is_available"`
@@ -35,6 +36,9 @@ type MenuDTO struct {
 	Category        *category.CategoryDTO       `json:"category"`
 	Ingredients     []*ingredient.IngredientDTO `json:"ingredients"`
 	BranchID        string                      `json:"branch_id"`
+	MerchantID      string                      `json:"merchant_id"`
+	IsMaster        bool                        `json:"is_master"`
+	IsExcluded      bool                        `json:"is_excluded"`
 	IsFasting       bool                        `json:"is_fasting"`
 	IsAvailable     bool                        `json:"is_available"`
 	PreparationTime float64                     `json:"preparation_time"`
@@ -45,18 +49,32 @@ func (m *MenuRequest) IsEmpty() bool {
 	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsAvailable == nil && m.PreparationTime == 0
 }
 
-func (m *MenuRequest) ToModel() Menu {
+func (m *MenuRequest) ToModel(isMaster bool) Menu {
 	ingredients := make(pq.StringArray, len(m.Ingredients))
 	copy(ingredients, m.Ingredients)
+	branchID := common.ToNUllString(m.BranchID)
+	merchantID := common.ToNUllString(m.MerchantID)
+	if isMaster {
+		branchID = common.ToNUllString("")
+	}
+	isFasting := false
+	if m.IsFasting != nil {
+		isFasting = *m.IsFasting
+	}
+	isAvailable := true
+	if m.IsAvailable != nil {
+		isAvailable = *m.IsAvailable
+	}
 	return Menu{
 		Name:            common.FormatText(m.Name),
 		Description:     m.Description,
 		Price:           m.Price,
 		Ingredients:     ingredients,
 		CategoryID:      common.ParseStringToUUID(m.CategoryID),
-		BranchID:        common.ParseStringToUUID(m.BranchID),
-		IsFasting:       *m.IsFasting,
-		IsAvailable:     *m.IsAvailable,
+		BranchID:        branchID,
+		MerchantID:      merchantID,
+		IsFasting:       isFasting,
+		IsAvailable:     isAvailable,
 		PreparationTime: m.PreparationTime,
 	}
 }

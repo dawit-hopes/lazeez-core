@@ -280,6 +280,9 @@ func (r *DAL[T]) Count(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// IsNull is a filter value that generates SQL "col IS NULL".
+type IsNull struct{}
+
 // ILike is a filter value that generates SQL "col ILIKE $n ESCAPE '\'" for pattern matching.
 // The value is escaped for LIKE special chars (% and _) and wrapped in % for "contains" search.
 type ILike string
@@ -305,18 +308,21 @@ func (r *DAL[T]) buildWhereClause(filters map[string]any, startAt int) (string, 
 	var clauses []string
 	var args []any
 
-	i := startAt + 1
+	argIndex := startAt
 	for col, val := range filters {
 		switch v := val.(type) {
+		case IsNull:
+			clauses = append(clauses, fmt.Sprintf("%s IS NULL", col))
 		case ILike:
+			argIndex++
 			pattern := "%" + escapeLike(string(v)) + "%"
-			clauses = append(clauses, fmt.Sprintf("%s ILIKE $%d ESCAPE '\\'", col, i))
+			clauses = append(clauses, fmt.Sprintf("%s ILIKE $%d ESCAPE '\\'", col, argIndex))
 			args = append(args, pattern)
 		default:
-			clauses = append(clauses, fmt.Sprintf("%s = $%d", col, i))
+			argIndex++
+			clauses = append(clauses, fmt.Sprintf("%s = $%d", col, argIndex))
 			args = append(args, val)
 		}
-		i++
 	}
 
 	return "WHERE " + strings.Join(clauses, " AND "), args

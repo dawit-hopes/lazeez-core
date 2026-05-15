@@ -16,12 +16,12 @@ import (
 )
 
 type MenuService interface {
-	Create(ctx context.Context, req MenuRequest) (*MenuDTO, error)
-	Get(ctx context.Context, id string, branchID string) (*MenuDTO, error)
-	List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*MenuDTO], error)
-	Update(ctx context.Context, id string, req MenuRequest) error
-	Delete(ctx context.Context, id string, branchID string) error
-	UnDelete(ctx context.Context, id string, branchID string) error
+	Create(ctx context.Context, req MenuRequest, role string) (*MenuDTO, error)
+	Get(ctx context.Context, id string, branchID, merchantID string) (*MenuDTO, error)
+	List(ctx context.Context, filter common.Filter, branchID, merchantID string, role string, scope ListScope) (*common.PaginatedResponse[[]*MenuDTO], error)
+	Update(ctx context.Context, id string, req MenuRequest, role string) error
+	Delete(ctx context.Context, id string, branchID, merchantID string, role string) error
+	UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error
 }
 
 type menuService struct {
@@ -55,10 +55,39 @@ func NewMenuService(menuRepository MenuRepository,
 	}
 }
 
-func (s *menuService) validateMenu(ctx context.Context, req MenuRequest) error {
+func isSuperAdmin(role string) bool {
+	return role == "super_admin"
+}
+
+func isBranchUser(role string) bool {
+	return role == "branch_manager" || role == "super_branch_admin" || role == "branch_staff"
+}
+
+func isSuperBranchAdmin(role string) bool {
+	return role == "super_branch_admin"
+}
+
+func isBranchManager(role string) bool {
+	return role == "branch_manager" || role == "branch_staff"
+}
+
+func canManageMasterMenu(role, userMerchantID, menuMerchantID string) bool {
+	if isSuperAdmin(role) {
+		return true
+	}
+	if isSuperBranchAdmin(role) && userMerchantID != "" && userMerchantID == menuMerchantID {
+		return true
+	}
+	return false
+}
+
+func isMasterMenuCreate(role string, branchID string) bool {
+	return branchID == "" && (isSuperBranchAdmin(role) || isSuperAdmin(role))
+}
+
+func (s *menuService) validateMenu(ctx context.Context, req MenuRequest, isMaster bool) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	// category
 	g.Go(func() error {
 		_, err := s.categoryService.Get(ctx, req.CategoryID)
 		if err != nil {
@@ -68,17 +97,17 @@ func (s *menuService) validateMenu(ctx context.Context, req MenuRequest) error {
 		return nil
 	})
 
-	// branch
-	g.Go(func() error {
-		_, err := s.branchService.Get(ctx, req.BranchID)
-		if err != nil {
-			s.logger.Error("Failed to get branch", "error", err)
-			return err
-		}
-		return nil
-	})
+	if !isMaster {
+		g.Go(func() error {
+			_, err := s.branchService.Get(ctx, req.BranchID)
+			if err != nil {
+				s.logger.Error("Failed to get branch", "error", err)
+				return err
+			}
+			return nil
+		})
+	}
 
-	// ingredients
 	g.Go(func() error {
 		ingGroup, ingCtx := errgroup.WithContext(ctx)
 		for _, id := range req.Ingredients {
@@ -95,9 +124,13 @@ func (s *menuService) validateMenu(ctx context.Context, req MenuRequest) error {
 		return ingGroup.Wait()
 	})
 
-	// name
 	g.Go(func() error {
-		if err := s.menuRepository.CheckExists(ctx, req.Name, req.BranchID); err != nil {
+		if isMaster {
+			if err := s.menuRepository.CheckMasterExists(ctx, req.Name, req.MerchantID); err != nil {
+				s.logger.Error("Failed to check if master menu exists", "error", err)
+				return err
+			}
+		} else if err := s.menuRepository.CheckExists(ctx, req.Name, req.BranchID); err != nil {
 			s.logger.Error("Failed to check if menu exists", "error", err)
 			return err
 		}
@@ -107,18 +140,29 @@ func (s *menuService) validateMenu(ctx context.Context, req MenuRequest) error {
 	return g.Wait()
 }
 
-func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, error) {
-	if err := s.validateMenu(ctx, req); err != nil {
+func (s *menuService) Create(ctx context.Context, req MenuRequest, role string) (*MenuDTO, error) {
+	isMaster := isMasterMenuCreate(role, req.BranchID)
+	if isMaster && req.MerchantID == "" && !isSuperAdmin(role) {
+		return nil, common.ErrBranchAdminMissingMerchant
+	}
+	if isBranchManager(role) && req.BranchID == "" {
+		return nil, common.ErrUnAuthorized
+	}
+	if isSuperBranchAdmin(role) && req.BranchID == "" {
+		// Restaurant owner creates master menu for their merchant.
+	} else if !isSuperAdmin(role) && !isBranchManager(role) {
+		return nil, common.ErrUnAuthorized
+	}
+
+	if err := s.validateMenu(ctx, req, isMaster); err != nil {
 		s.logger.Error("Failed to validate menu", "error", err)
 		return nil, err
 	}
 
-	// Create modifier groups and options (if any) and collect their IDs.
 	modifierGroupIDs := make(pq.StringArray, 0, len(req.Modifiers))
 	modifierGroupDTOs := make([]modgroup.ModifierGroupDTO, 0, len(req.Modifiers))
 
 	for _, mgReq := range req.Modifiers {
-		// Validate group and options using their own validators
 		if err := mgReq.Validate(); err != nil {
 			s.logger.Error("Failed to validate modifier group", "error", err)
 			return nil, err
@@ -174,7 +218,14 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, er
 		modifierGroupDTOs = append(modifierGroupDTOs, groupModel.ToDTO(optionDTOs))
 	}
 
-	menu := req.ToModel()
+	menu := req.ToModel(isMaster)
+	if !isMaster && req.BranchID != "" {
+		br, err := s.branchService.Get(ctx, req.BranchID)
+		if err != nil {
+			return nil, err
+		}
+		menu.MerchantID = common.ToNUllString(br.MerchantID)
+	}
 	if req.Image != nil {
 		imageURL, err := s.fileService.UploadFile(ctx, &req.ImageHeader)
 		if err != nil {
@@ -191,60 +242,60 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest) (*MenuDTO, er
 		return nil, err
 	}
 
-	// Build response DTO, including category, ingredients, and modifier groups/options.
 	menuDTO := menu.ToDTO()
-
-	// Enrich category and ingredients as in List/Get
 	s.enrichMenuDTO(ctx, &menuDTO, menuDTO.CategoryID, menu.Ingredients)
 	menuDTO.Modifiers = modifierGroupDTOs
 
 	return &menuDTO, nil
 }
 
-func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) error {
-	existingMenu, err := s.menuRepository.Get(ctx, id, req.BranchID)
+func (s *menuService) Update(ctx context.Context, id string, req MenuRequest, role string) error {
+	branchID := req.BranchID
+	existingMenu, err := s.loadMenuForAction(ctx, id, branchID, req.MerchantID)
 	if err != nil {
 		s.logger.Error("Failed to get menu", "error", err)
 		return err
 	}
 
+	if existingMenu.IsMaster() {
+		if isBranchManager(role) {
+			return s.updateMasterFromBranch(ctx, id, branchID, req)
+		}
+		if !canManageMasterMenu(role, req.MerchantID, existingMenu.MerchantIDString()) {
+			return common.ErrUnAuthorized
+		}
+	} else if isBranchManager(role) {
+		if existingMenu.BranchIDString() != branchID {
+			return common.ErrUnAuthorized
+		}
+	} else if !canManageMasterMenu(role, req.MerchantID, existingMenu.MerchantIDString()) && !isSuperAdmin(role) {
+		return common.ErrUnAuthorized
+	}
+
 	if req.Name != "" {
-		if err := s.menuRepository.CheckExists(ctx, req.Name, req.BranchID); err != nil {
-			s.logger.Error("Failed to check if menu exists", "error", err)
+		if existingMenu.IsMaster() {
+			if err := s.menuRepository.CheckMasterExists(ctx, req.Name, existingMenu.MerchantIDString()); err != nil {
+				return err
+			}
+		} else if err := s.menuRepository.CheckExists(ctx, req.Name, existingMenu.BranchIDString()); err != nil {
 			return err
 		}
 		existingMenu.Name = req.Name
 	}
 
 	if req.CategoryID != "" {
-		_, err := s.categoryService.Get(ctx, req.CategoryID)
-		if err != nil {
-			s.logger.Error("Failed to get category", "error", err)
+		if _, err := s.categoryService.Get(ctx, req.CategoryID); err != nil {
 			return err
 		}
-
 		existingMenu.CategoryID = common.ParseStringToUUID(req.CategoryID)
 	}
 
-	if req.BranchID != "" {
-		_, err := s.branchService.Get(ctx, req.BranchID)
-		if err != nil {
-			s.logger.Error("Failed to get branch", "error", err)
-			return err
-		}
-		existingMenu.BranchID = common.ParseStringToUUID(req.BranchID)
-	}
-
 	if len(req.Ingredients) > 0 {
-		for _, ingredient := range req.Ingredients {
-			_, err := s.ingredientService.Get(ctx, ingredient)
-			if err != nil {
-				s.logger.Error("Failed to get ingredient", "error", err)
+		for _, ingredientID := range req.Ingredients {
+			if _, err := s.ingredientService.Get(ctx, ingredientID); err != nil {
 				return err
 			}
-
 		}
-
 		ingredients := make(pq.StringArray, len(req.Ingredients))
 		copy(ingredients, req.Ingredients)
 		existingMenu.Ingredients = ingredients
@@ -253,39 +304,47 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest) er
 	if req.Image != nil {
 		imageURL, err := s.fileService.UploadFile(ctx, &req.ImageHeader)
 		if err != nil {
-			s.logger.Error("Failed to upload image", "error", err)
 			return err
 		}
 		existingMenu.Image = imageURL
 	}
 
-	if req.IsFasting != nil && *req.IsFasting != existingMenu.IsFasting {
+	if req.IsFasting != nil {
 		existingMenu.IsFasting = *req.IsFasting
 	}
 
-	if req.IsAvailable != nil && *req.IsAvailable != existingMenu.IsAvailable {
+	if req.IsAvailable != nil {
 		existingMenu.IsAvailable = *req.IsAvailable
 	}
 
-	if req.Description != existingMenu.Description {
+	if req.Description != "" {
 		existingMenu.Description = req.Description
 	}
 
-	if req.Price != existingMenu.Price {
+	if req.Price != 0 {
 		existingMenu.Price = req.Price
 	}
 
-	if req.PreparationTime != existingMenu.PreparationTime {
+	if req.PreparationTime != 0 {
 		existingMenu.PreparationTime = req.PreparationTime
 	}
 
-	err = s.menuRepository.Update(ctx, existingMenu)
-	if err != nil {
-		s.logger.Error("Failed to update menu", "error", err)
-		return err
-	}
+	return s.menuRepository.Update(ctx, existingMenu)
+}
 
-	return nil
+func (s *menuService) updateMasterFromBranch(ctx context.Context, id, branchID string, req MenuRequest) error {
+	if branchID == "" {
+		return common.ErrUnAuthorized
+	}
+	if req.IsAvailable == nil {
+		return common.ErrNoDataToUpdate
+	}
+	// Branch users may only toggle availability on inherited master items.
+	if len(req.Ingredients) > 0 || req.Name != "" || req.CategoryID != "" || req.Image != nil ||
+		req.IsFasting != nil || req.Description != "" || req.Price != 0 || req.PreparationTime != 0 {
+		return common.ErrUnAuthorized
+	}
+	return s.menuRepository.SetBranchOverride(ctx, branchID, id, *req.IsAvailable)
 }
 
 func (s *menuService) enrichMenuDTO(ctx context.Context, dto *MenuDTO, categoryID string, ingredientIDs []string) {
@@ -338,8 +397,16 @@ func (s *menuService) buildModifierGroups(ctx context.Context, modifierGroupIDs 
 	return groups, nil
 }
 
-func (s *menuService) Get(ctx context.Context, id string, branchID string) (*MenuDTO, error) {
-	menu, err := s.menuRepository.Get(ctx, id, branchID)
+func (s *menuService) Get(ctx context.Context, id string, branchID, merchantID string) (*MenuDTO, error) {
+	var menu Menu
+	var err error
+	if branchID != "" {
+		menu, err = s.menuRepository.Get(ctx, id, branchID)
+	} else if merchantID != "" {
+		menu, err = s.menuRepository.GetMaster(ctx, id, merchantID)
+	} else {
+		return nil, common.ErrUnAuthorized
+	}
 	if err != nil {
 		s.logger.Error("Failed to get menu", "error", err)
 		return nil, err
@@ -358,33 +425,97 @@ func (s *menuService) Get(ctx context.Context, id string, branchID string) (*Men
 	return &menuDTO, nil
 }
 
-func (s *menuService) Delete(ctx context.Context, id string, branchID string) error {
-	if err := s.menuRepository.Delete(ctx, id, branchID); err != nil {
-		s.logger.Error("Failed to delete menu", "error", err)
-		return err
-	}
-
-	return nil
-}
-
-func (s *menuService) UnDelete(ctx context.Context, id string, branchID string) error {
-	s.logger.Info("Undeleting menu", "id", id)
-	err := s.menuRepository.UnDelete(ctx, id, branchID)
+func (s *menuService) Delete(ctx context.Context, id string, branchID, merchantID string, role string) error {
+	existing, err := s.loadMenuForAction(ctx, id, branchID, merchantID)
 	if err != nil {
-		s.logger.Error("Failed to undelete menu", "error", err)
 		return err
 	}
-	return nil
+
+	if existing.IsMaster() {
+		if isBranchManager(role) {
+			if branchID == "" {
+				return common.ErrUnAuthorized
+			}
+			return s.menuRepository.SetBranchExcluded(ctx, branchID, id, true)
+		}
+		if !canManageMasterMenu(role, merchantID, existing.MerchantIDString()) {
+			return common.ErrUnAuthorized
+		}
+		return s.menuRepository.Delete(ctx, id, "")
+	}
+
+	if isBranchManager(role) && existing.BranchIDString() != branchID {
+		return common.ErrUnAuthorized
+	}
+
+	return s.menuRepository.Delete(ctx, id, existing.BranchIDString())
 }
 
-func (s *menuService) List(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*MenuDTO], error) {
-	result, err := s.menuRepository.List(ctx, filter, branchID)
+func (s *menuService) loadMenuForAction(ctx context.Context, id, branchID, merchantID string) (Menu, error) {
+	if branchID != "" {
+		return s.menuRepository.Get(ctx, id, branchID)
+	}
+	if merchantID != "" {
+		return s.menuRepository.GetMaster(ctx, id, merchantID)
+	}
+	return Menu{}, common.ErrUnAuthorized
+}
+
+func (s *menuService) UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error {
+	existing, err := s.loadMenuForAction(ctx, id, branchID, merchantID)
+	if err != nil {
+		return err
+	}
+
+	if existing.IsMaster() && isBranchManager(role) {
+		if branchID == "" {
+			return common.ErrUnAuthorized
+		}
+		return s.menuRepository.SetBranchExcluded(ctx, branchID, id, false)
+	}
+
+	deleteBranchID := existing.BranchIDString()
+	if existing.IsMaster() {
+		deleteBranchID = ""
+	}
+	return s.menuRepository.UnDelete(ctx, id, deleteBranchID)
+}
+
+func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, merchantID string, role string, scope ListScope) (*common.PaginatedResponse[[]*MenuDTO], error) {
+	if scope == "" {
+		switch {
+		case isSuperBranchAdmin(role) && branchID == "":
+			scope = ScopeMaster
+		case isSuperAdmin(role) && branchID == "":
+			scope = ScopeAllBranches
+		case isSuperBranchAdmin(role):
+			scope = ScopeAllBranches
+		case isBranchManager(role):
+			scope = ScopeBranchManage
+		default:
+			scope = ScopeBranchEffective
+		}
+	}
+
+	if scope == ScopeMaster && merchantID == "" {
+		return nil, common.ErrBranchAdminMissingMerchant
+	}
+
+	if scope == ScopeBranchEffective && branchID == "" {
+		return nil, common.ErrUnAuthorized
+	}
+
+	if scope == ScopeAllBranches && isSuperBranchAdmin(role) && merchantID == "" {
+		return nil, common.ErrBranchAdminMissingMerchant
+	}
+
+	result, err := s.menuRepository.ListScoped(ctx, filter, scope, branchID, merchantID)
 	if err != nil {
 		s.logger.Error("Failed to list menus", "error", err)
 		return nil, err
 	}
 	menus := result.Data
-	// Collect unique category and ingredient IDs for batch lookup
+
 	uniqueCategoryIDs := make(map[string]struct{})
 	uniqueIngredientIDs := make(map[string]struct{})
 	for _, menu := range menus {
@@ -423,7 +554,6 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID s
 			if modifiers, err := s.buildModifierGroups(ctx, menu.Modifiers); err == nil {
 				dto.Modifiers = modifiers
 			} else {
-				// If we fail to build modifiers for a specific menu, log and continue
 				s.logger.Error("Failed to build modifiers for menu", "menu_id", menu.ID, "error", err)
 			}
 		}
