@@ -8,7 +8,10 @@ import (
 
 	"lazeez-core/config"
 
+	"log"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 )
 
 // App holds all application dependencies
@@ -24,6 +27,12 @@ func NewApp() (*App, error) {
 	logger := config.NewLogger()
 	logger.Info("Initializing application...")
 
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	} else {
+		log.Println("Successfully loaded .env file")
+	}
+
 	// Initialize database connection
 	db, err := initDB(logger)
 	if err != nil {
@@ -32,7 +41,6 @@ func NewApp() (*App, error) {
 
 	// Initialize router
 	router := chi.NewRouter()
-	
 
 	// Initialize all dependencies
 	deps, err := initializeDependencies(db, logger)
