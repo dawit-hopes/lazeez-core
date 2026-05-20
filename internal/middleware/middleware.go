@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
@@ -182,14 +181,18 @@ func (m *middleware) decodeToken(token string) (map[string]any, error) {
 		return nil, common.ErrUnAuthorized
 	}
 
-	fmt.Println("branchID", branchID)
-	fmt.Println("roleStr", roleStr)
-	fmt.Println("uid", uid)
+	merchantID := ""
+	if midRaw, exists := claims["mid"]; exists && midRaw != nil {
+		if midStr, ok := midRaw.(string); ok {
+			merchantID = midStr
+		}
+	}
 
 	return map[string]any{
 		"uid": uid,
 		"bid": branchID,
 		"rol": roleStr,
+		"mid": merchantID,
 	}, nil
 }
 

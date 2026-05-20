@@ -43,6 +43,14 @@ func (s *orderItemService) validateOrderItem(ctx context.Context, orderItem Orde
 			s.logger.Error("failed to get menu item", "error", err)
 			return err
 		}
+		if menuItem.IsExcluded {
+			s.logger.Error("menu item is excluded from branch", "menu_item_id", orderItem.MenuItemID, "branch_id", orderItem.BranchID)
+			return common.ErrMenuNotFound
+		}
+		if !menuItem.IsAvailable {
+			s.logger.Error("menu item is unavailable", "menu_item_id", orderItem.MenuItemID, "branch_id", orderItem.BranchID)
+			return common.ErrMenuNotFound
+		}
 		if menuItem.Price != orderItem.Price {
 			s.logger.Error("menu item price does not match order item price", "menu item price", menuItem.Price, "order item price", orderItem.Price)
 			return common.ErrMenuPriceMismatch

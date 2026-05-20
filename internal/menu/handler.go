@@ -20,6 +20,10 @@ type MenuHandler interface {
 	Delete(w http.ResponseWriter, r *http.Request)
 	UnDelete(w http.ResponseWriter, r *http.Request)
 	List(w http.ResponseWriter, r *http.Request)
+
+
+	// public handlers
+	ListMenus(w http.ResponseWriter, r *http.Request)
 }
 
 type menuHandler struct {
@@ -128,10 +132,14 @@ func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) {
 	if mid := strings.TrimSpace(r.FormValue("merchant_id")); mid != "" {
 		req.MerchantID = mid
 	}
-	isFasting := r.FormValue("is_fasting") == "true"
-	isAvailable := r.FormValue("is_available") == "true"
-	req.IsFasting = &isFasting
-	req.IsAvailable = &isAvailable
+	if v := r.FormValue("is_fasting"); v != "" {
+		isFasting := v == "true"
+		req.IsFasting = &isFasting
+	}
+	if v := r.FormValue("is_available"); v != "" {
+		isAvailable := v == "true"
+		req.IsAvailable = &isAvailable
+	}
 
 	if mg := r.FormValue("modifier_groups"); mg != "" {
 		if err := json.Unmarshal([]byte(mg), &req.Modifiers); err != nil {
@@ -177,6 +185,28 @@ func (h *menuHandler) resolveMerchantID(r *http.Request) (string, error) {
 		return "", common.ErrBranchAdminMissingMerchant
 	}
 	return userDTO.MerchantID, nil
+}
+
+func (h *menuHandler) resolveBranchID(r *http.Request) (string, error) {
+	if q := strings.TrimSpace(r.URL.Query().Get("branch_id")); q != "" {
+		return q, nil
+	}
+	if branchID, ok := middleware.GetBranchIDFromContext(r.Context()); ok && branchID != "" {
+		return branchID, nil
+	}
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		return "", common.ErrUnAuthorized
+	}
+	userDTO, err := h.userService.GetUserByIDForLogin(r.Context(), uid)
+	if err != nil {
+		h.logger.Error("Failed to resolve branch for user", "user_id", uid, "error", err)
+		return "", err
+	}
+	if userDTO.BranchID == "" {
+		return "", common.ErrUnAuthorized
+	}
+	return userDTO.BranchID, nil
 }
 
 func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -327,9 +357,20 @@ func (h *menuHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
-	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 	role, _ := middleware.GetRoleFromContext(r.Context())
 	scope := h.parseScope(r)
+
+	branchID := ""
+	if role == "branch_manager" || role == "branch_staff" {
+		var err error
+		branchID, err = h.resolveBranchID(r)
+		if err != nil {
+			common.WriteErrorResponse(w, err)
+			return
+		}
+	} else {
+		branchID, _ = middleware.GetBranchIDFromContext(r.Context())
+	}
 
 	merchantID, err := h.resolveMerchantID(r)
 	if err != nil && (role == "super_branch_admin" || scope == ScopeMaster) {
@@ -345,6 +386,30 @@ func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.menuService.List(r.Context(), filter, branchID, merchantID, role, scope)
+	if err != nil {
+		h.logger.Error("Failed to list menus", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Menus fetched successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+
+func (h *menuHandler) ListMenus(w http.ResponseWriter, r *http.Request) {
+	filter := common.ParseFilter(r)
+	reference := r.URL.Query().Get("reference")
+
+	if reference == "" {
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+
+	result, err := h.menuService.ListMenus(r.Context(), filter, reference)
 	if err != nil {
 		h.logger.Error("Failed to list menus", "error", err)
 		common.WriteErrorResponse(w, err)

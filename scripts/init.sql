@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS branch_menu_overrides (
 
 CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_branch_id ON branch_menu_overrides(branch_id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_menu_id ON branch_menu_overrides(menu_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_excluded ON branch_menu_overrides(branch_id, menu_id) WHERE is_deleted = FALSE AND is_excluded = TRUE;
 
 -- ============================================
 -- CATEGORIES TABLE

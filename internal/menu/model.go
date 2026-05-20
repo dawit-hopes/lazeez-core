@@ -24,6 +24,8 @@ type Menu struct {
 	Modifiers       pq.StringArray `json:"modifiers" db:"modifiers"`
 	// Excluded is set only on branch list queries (not persisted on menus table).
 	Excluded bool `json:"-" db:"-"`
+	// MasterItem marks rows that originate from the restaurant master menu when branch_id is projected for display.
+	MasterItem bool `json:"-" db:"-"`
 }
 
 func (m *Menu) Table() string {
@@ -53,6 +55,9 @@ func (m *Menu) Addr() []any {
 }
 
 func (m *Menu) IsMaster() bool {
+	if m.MasterItem {
+		return true
+	}
 	return !m.BranchID.Valid || m.BranchID.String == ""
 }
 

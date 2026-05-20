@@ -2,6 +2,7 @@ package menu
 
 import (
 	"context"
+	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/category"
@@ -22,6 +23,9 @@ type MenuService interface {
 	Update(ctx context.Context, id string, req MenuRequest, role string) error
 	Delete(ctx context.Context, id string, branchID, merchantID string, role string) error
 	UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error
+
+	// public services
+	ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error)
 }
 
 type menuService struct {
@@ -340,8 +344,9 @@ func (s *menuService) updateMasterFromBranch(ctx context.Context, id, branchID s
 		return common.ErrNoDataToUpdate
 	}
 	// Branch users may only toggle availability on inherited master items.
-	if len(req.Ingredients) > 0 || req.Name != "" || req.CategoryID != "" || req.Image != nil ||
-		req.IsFasting != nil || req.Description != "" || req.Price != 0 || req.PreparationTime != 0 {
+	if len(req.Ingredients) > 0 || len(req.Modifiers) > 0 || req.Name != "" || req.CategoryID != "" ||
+		req.Image != nil || req.IsFasting != nil || req.Description != "" || req.Price != 0 ||
+		req.PreparationTime != 0 {
 		return common.ErrUnAuthorized
 	}
 	return s.menuRepository.SetBranchOverride(ctx, branchID, id, *req.IsAvailable)
@@ -462,16 +467,28 @@ func (s *menuService) loadMenuForAction(ctx context.Context, id, branchID, merch
 }
 
 func (s *menuService) UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error {
-	existing, err := s.loadMenuForAction(ctx, id, branchID, merchantID)
-	if err != nil {
-		return err
-	}
-
-	if existing.IsMaster() && isBranchManager(role) {
+	if isBranchManager(role) {
 		if branchID == "" {
 			return common.ErrUnAuthorized
 		}
-		return s.menuRepository.SetBranchExcluded(ctx, branchID, id, false)
+		br, err := s.branchService.Get(ctx, branchID)
+		if err != nil {
+			return err
+		}
+		// Restore excluded master item — loadMenuForAction skips excluded rows, so use GetMaster.
+		master, err := s.menuRepository.GetMaster(ctx, id, br.MerchantID)
+		if err == nil && master.IsMaster() {
+			return s.menuRepository.SetBranchExcluded(ctx, branchID, id, false)
+		}
+		if err != nil && !errors.Is(err, common.ErrMenuNotFound) {
+			return err
+		}
+		return s.menuRepository.UnDelete(ctx, id, branchID)
+	}
+
+	existing, err := s.loadMenuForAction(ctx, id, branchID, merchantID)
+	if err != nil {
+		return err
 	}
 
 	deleteBranchID := existing.BranchIDString()
@@ -505,8 +522,20 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, 
 		return nil, common.ErrUnAuthorized
 	}
 
+	if scope == ScopeBranchManage && branchID == "" {
+		return nil, common.ErrUnAuthorized
+	}
+
 	if scope == ScopeAllBranches && isSuperBranchAdmin(role) && merchantID == "" {
 		return nil, common.ErrBranchAdminMissingMerchant
+	}
+
+	if branchID != "" && (scope == ScopeBranchManage || scope == ScopeBranchEffective) {
+		if br, err := s.branchService.Get(ctx, branchID); err == nil && br.MerchantID != "" {
+			if err := s.menuRepository.AssignOrphanMasterMenus(ctx, br.MerchantID); err != nil {
+				s.logger.Error("Failed to assign orphan master menus", "error", err)
+			}
+		}
 	}
 
 	result, err := s.menuRepository.ListScoped(ctx, filter, scope, branchID, merchantID)
@@ -564,4 +593,13 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, 
 		Data: menuDTOs,
 		Meta: result.Meta,
 	}, nil
+}
+
+func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error) {
+	result, err := s.menuRepository.ListMenus(ctx, filter, reference)
+	if err != nil {
+		s.logger.Error("Failed to list menus", "error", err)
+		return nil, err
+	}
+	return result, nil
 }

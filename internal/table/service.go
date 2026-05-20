@@ -138,6 +138,7 @@ func (s *tableService) RegenerateQRCode(ctx context.Context, id string, branchID
 	}
 	table.QRCode = qrCodeURL
 	table.QRVersion++
+	s.logger.Info("QR code generated", "qr_code_url", qrCodeURL, "table_id", table.ID)
 	return s.repository.Update(ctx, *table)
 }
 

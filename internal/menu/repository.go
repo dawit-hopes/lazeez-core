@@ -33,6 +33,11 @@ type MenuRepository interface {
 	SetBranchOverride(ctx context.Context, branchID, menuID string, isAvailable bool) error
 	SetBranchExcluded(ctx context.Context, branchID, menuID string, excluded bool) error
 	RemoveBranchOverride(ctx context.Context, branchID, menuID string) error
+	AssignOrphanMasterMenus(ctx context.Context, merchantID string) error
+
+
+	// public repository
+	ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error)	
 }
 
 type menuRepository struct {
@@ -85,7 +90,8 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 			m.is_fasting,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
-			m.created_at, m.updated_at
+			m.created_at, m.updated_at,
+			COALESCE(o.is_excluded, FALSE) AS is_excluded
 		FROM menus m
 		INNER JOIN branches b ON b.id = $2 AND b.is_deleted = FALSE
 		LEFT JOIN branch_menu_overrides o
@@ -94,8 +100,15 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 			AND m.merchant_id = b.merchant_id`
 
 	var menu Menu
+	var isExcluded bool
 	err := r.join.QueryRow(ctx, query, []any{id, branchID}, func(row *sql.Row) error {
-		return row.Scan(menu.Addr()...)
+		return row.Scan(
+			&menu.ID, &menu.Name, &menu.Image, &menu.DeletedAt, &menu.IsDeleted,
+			&menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsAvailable,
+			&menu.Description, &menu.Price, &menu.Ingredients, &menu.CategoryID,
+			&menu.Modifiers, &menu.PreparationTime, &menu.CreatedAt, &menu.UpdatedAt,
+			&isExcluded,
+		)
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -103,6 +116,11 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 		}
 		r.logger.Error("failed to get master menu for branch", "error", err)
 		return Menu{}, common.ErrInternalServerError
+	}
+	menu.Excluded = isExcluded
+	menu.MasterItem = true
+	if isExcluded {
+		return Menu{}, common.ErrMenuNotFound
 	}
 	return menu, nil
 }
@@ -282,7 +300,7 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 
 	args = append(args, limit, offset)
 
-	rows, err := r.listBranchMenuRows(ctx, query, args)
+	rows, err := r.listBranchMenuRows(ctx, query, args, false)
 	if err != nil {
 		r.logger.Error("failed to list branch menus", "error", err)
 		return nil, common.ErrInternalServerError
@@ -291,6 +309,9 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 	ptrs := make([]*Menu, len(rows))
 	for i := range rows {
 		rows[i].Menu.Excluded = rows[i].IsExcluded
+		if rows[i].Menu.IsMaster() {
+			rows[i].Menu.MasterItem = true
+		}
 		ptrs[i] = &rows[i].Menu
 	}
 	return &common.PaginatedResponse[[]*Menu]{
@@ -302,23 +323,23 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 type menuWithMeta struct {
 	Menu       Menu
 	IsExcluded bool
+	IsMaster   bool
 }
 
-func (r *menuRepository) listBranchMenuRows(ctx context.Context, query string, args []any) ([]menuWithMeta, error) {
-	instance := &Menu{}
-	cols := instance.Columns()
-	selectCols := append(cols, "created_at", "updated_at", "is_excluded")
-
-	// Query already selects all needed columns; use custom scan
+func (r *menuRepository) listBranchMenuRows(ctx context.Context, query string, args []any, withMasterFlag bool) ([]menuWithMeta, error) {
 	rawRows, err := common.QueryRows(r.join, ctx, query, args, func(rows *sql.Rows) (menuWithMeta, error) {
 		var item menuWithMeta
-		if err := rows.Scan(
+		scanTargets := []any{
 			&item.Menu.ID, &item.Menu.Name, &item.Menu.Image, &item.Menu.DeletedAt, &item.Menu.IsDeleted,
 			&item.Menu.BranchID, &item.Menu.MerchantID, &item.Menu.IsFasting, &item.Menu.IsAvailable,
 			&item.Menu.Description, &item.Menu.Price, &item.Menu.Ingredients, &item.Menu.CategoryID,
 			&item.Menu.Modifiers, &item.Menu.PreparationTime, &item.Menu.CreatedAt, &item.Menu.UpdatedAt,
-			&item.IsExcluded,
-		); err != nil {
+		}
+		if withMasterFlag {
+			scanTargets = append(scanTargets, &item.IsMaster)
+		}
+		scanTargets = append(scanTargets, &item.IsExcluded)
+		if err := rows.Scan(scanTargets...); err != nil {
 			return menuWithMeta{}, err
 		}
 		return item, nil
@@ -326,7 +347,6 @@ func (r *menuRepository) listBranchMenuRows(ctx context.Context, query string, a
 	if err != nil {
 		return nil, err
 	}
-	_ = selectCols
 	return rawRows, nil
 }
 
@@ -358,28 +378,33 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 			m.is_fasting,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
-			m.created_at, m.updated_at
+			m.created_at, m.updated_at,
+			(m.branch_id IS NULL) AS is_master,
+			COALESCE(o.is_excluded, FALSE) AS is_excluded
 		FROM branches b
 		INNER JOIN menus m ON m.is_deleted = FALSE
 			AND (m.branch_id = b.id OR (m.branch_id IS NULL AND m.merchant_id = b.merchant_id))
 		LEFT JOIN branch_menu_overrides o
 			ON o.menu_id = m.id AND o.branch_id = b.id AND o.is_deleted = FALSE
 		WHERE b.is_deleted = FALSE
+			AND NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
 			%s
 		ORDER BY b.branch_name, m.created_at DESC
 		LIMIT $%d OFFSET $%d`, searchClause, argIdx, argIdx+1)
 
 	args = append(args, limit, offset)
 
-	menus, err := common.QueryRows(r.join, ctx, query, args, scanMenuRow)
+	rows, err := r.listBranchMenuRows(ctx, query, args, true)
 	if err != nil {
 		r.logger.Error("failed to list all branches effective menus", "error", err)
 		return nil, common.ErrInternalServerError
 	}
 
-	ptrs := make([]*Menu, len(menus))
-	for i := range menus {
-		ptrs[i] = &menus[i]
+	ptrs := make([]*Menu, len(rows))
+	for i := range rows {
+		rows[i].Menu.Excluded = rows[i].IsExcluded
+		rows[i].Menu.MasterItem = rows[i].IsMaster
+		ptrs[i] = &rows[i].Menu
 	}
 	return &common.PaginatedResponse[[]*Menu]{
 		Data: ptrs,
@@ -448,13 +473,36 @@ func (r *menuRepository) SetBranchExcluded(ctx context.Context, branchID, menuID
 		ON CONFLICT (branch_id, menu_id)
 		DO UPDATE SET
 			is_excluded = EXCLUDED.is_excluded,
-			is_available = CASE WHEN EXCLUDED.is_excluded THEN FALSE ELSE TRUE END,
+			is_available = CASE
+				WHEN EXCLUDED.is_excluded THEN FALSE
+				ELSE COALESCE(
+					branch_menu_overrides.is_available,
+					(SELECT m.is_available FROM menus m WHERE m.id = branch_menu_overrides.menu_id AND m.is_deleted = FALSE),
+					TRUE
+				)
+			END,
 			is_deleted = FALSE,
 			updated_at = NOW()`
 
 	_, err := r.join.Exec(ctx, query, branchID, menuID, excluded)
 	if err != nil {
 		r.logger.Error("failed to set branch menu excluded", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
+
+func (r *menuRepository) AssignOrphanMasterMenus(ctx context.Context, merchantID string) error {
+	if merchantID == "" {
+		return nil
+	}
+	query := `
+		UPDATE menus
+		SET merchant_id = $1, updated_at = NOW()
+		WHERE branch_id IS NULL AND merchant_id IS NULL AND is_deleted = FALSE`
+	_, err := r.join.Exec(ctx, query, merchantID)
+	if err != nil {
+		r.logger.Error("failed to assign orphan master menus to merchant", "error", err)
 		return common.ErrInternalServerError
 	}
 	return nil
@@ -472,4 +520,32 @@ func (r *menuRepository) RemoveBranchOverride(ctx context.Context, branchID, men
 		return common.ErrInternalServerError
 	}
 	return nil
+}
+
+
+func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error) {
+	query := `
+		SELECT m.id, m.name, m.image, m.deleted_at, m.is_deleted, m.branch_id, m.merchant_id,
+		FROM menus m
+		WHERE m.is_deleted = FALSE
+		AND m.reference = $1
+		ORDER BY m.created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	menus, err := common.QueryRows(r.join, ctx, query, []any{reference, filter.Limit, filter.Page}, func(rows *sql.Rows) (*MenuDTO, error) {
+		var menu MenuDTO
+		err := rows.Scan(&menu.ID, &menu.Name, &menu.Image, &menu.DeletedAt, &menu.IsDeleted, &menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsAvailable, &menu.Description, &menu.Price, &menu.Ingredients, &menu.CategoryID, &menu.Modifiers, &menu.PreparationTime, &menu.CreatedAt, &menu.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		return &menu, nil
+	})
+	if err != nil {
+		r.logger.Error("failed to list menus", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+	return &common.PaginatedResponse[[]*MenuDTO]{
+		Data: menus,
+		Meta: common.BuildPaginationMeta(int64(len(menus)), filter.Page, filter.Limit),
+	}, nil
 }
