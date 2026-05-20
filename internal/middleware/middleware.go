@@ -198,7 +198,16 @@ func (m *middleware) decodeToken(token string) (map[string]any, error) {
 
 // Default CORS origins when CORS_ALLOWED_ORIGINS is not set (local dev).
 var defaultCORSOrigins = []string{
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+	"http://localhost:8080",
+	"http://127.0.0.1:8080",
 	"http://localhost:8081",
+	"http://127.0.0.1:8081",
+	"http://localhost:8082",
+	"http://127.0.0.1:8082",
+	"http://localhost:3000",
+	"http://127.0.0.1:3000",
 	"http://10.121.241.209:8081",
 	"http://172.21.0.1:8081",
 	"http://172.19.0.1:8081",
@@ -206,7 +215,6 @@ var defaultCORSOrigins = []string{
 	"http://172.24.0.1:8081",
 	"http://10.22.209.1:8082",
 	"http://172.18.0.1:8082",
-	"http://localhost:8082",
 }
 
 func getAllowedOrigins() []string {
@@ -233,7 +241,7 @@ func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders: []string{
 			"Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token",
-			"Origin", "Accept",
+			"Origin", "Accept", "X-Session-Key",
 		},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,

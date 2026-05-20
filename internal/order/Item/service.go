@@ -8,6 +8,7 @@ import (
 	"lazeez-core/internal/menu"
 	option "lazeez-core/internal/modifiers/option"
 
+	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -63,6 +64,9 @@ func (s *orderItemService) validateOrderItem(ctx context.Context, orderItem Orde
 		modifierGroupGroup, modifierGroupCtx := errgroup.WithContext(ctx)
 		for _, modifierOptionID := range orderItem.ModifierOptions {
 			modifierOptionID := modifierOptionID
+			if modifierOptionID == "" {
+				continue
+			}
 			modifierGroupGroup.Go(func() error {
 				_, err := s.modifierOptionService.Get(modifierGroupCtx, modifierOptionID)
 				if err != nil {
@@ -94,14 +98,20 @@ func (s *orderItemService) Create(ctx context.Context, orderItem OrderItemReques
 		return err
 	}
 
+	mods := pq.StringArray(orderItem.ModifierOptions)
+	if mods == nil {
+		mods = pq.StringArray{}
+	}
+
 	orderItemModel := OrderItem{
 		OrderID:         orderItem.OrderID,
 		MenuItemID:      orderItem.MenuItemID,
-		ModifierOptions: orderItem.ModifierOptions,
+		ModifierOptions: mods,
 		Quantity:        orderItem.Quantity,
 		Price:           orderItem.Price,
 		Total:           orderItem.Total,
 	}
+	orderItemModel.ID = common.GenerateUUID()
 
 	if err := s.orderItemRepository.Create(ctx, orderItemModel); err != nil {
 		s.logger.Error("failed to create order item", "error", err)

@@ -53,13 +53,15 @@ func (h *orderHandler) CreateClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.orderService.CreateClient(r.Context(), req); err != nil {
+	order, err := h.orderService.CreateClient(r.Context(), req)
+	if err != nil {
 		h.logger.Error("Failed to create order", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	common.WriteSuccessResponse(w, common.Response{
+		Data:       order,
 		Message:    "Order created successfully",
 		StatusCode: http.StatusOK,
 	})

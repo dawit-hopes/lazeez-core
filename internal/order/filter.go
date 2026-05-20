@@ -82,7 +82,7 @@ func BuildOrderFilterClause(filter OrderFilter, baseArgs []any) (string, []any) 
 	}
 	if filter.Search != "" {
 		pattern := common.ILikePattern(filter.Search)
-		conds = append(conds, "(o.table_number::text ILIKE $"+strconv.Itoa(n)+" OR o.id::text ILIKE $"+strconv.Itoa(n)+" OR o.session_key ILIKE $"+strconv.Itoa(n)+")")
+		conds = append(conds, "(o.order_number::text ILIKE $"+strconv.Itoa(n)+" OR o.table_number::text ILIKE $"+strconv.Itoa(n)+" OR o.id::text ILIKE $"+strconv.Itoa(n)+" OR o.session_key ILIKE $"+strconv.Itoa(n)+")")
 		args = append(args, pattern)
 	}
 

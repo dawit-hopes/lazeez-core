@@ -536,6 +536,7 @@ SELECT
 		'active_order_id', NULLIF(t.active_order_id::text, '')
 	)) AS table,
 	json_strip_nulls(json_build_object(
+		'id', b.id::text,
 		'branch_name', b.branch_name,
 		'address', NULLIF(b.address, ''),
 		'phone_number', NULLIF(b.phone_number, '')

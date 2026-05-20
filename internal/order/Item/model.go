@@ -2,13 +2,15 @@ package item
 
 import (
 	"lazeez-core/internal/common"
+
+	"github.com/lib/pq"
 )
 
 type OrderItem struct {
 	common.Base
-	OrderID         string   `db:"order_id"`
-	MenuItemID      string   `db:"menu_item_id"`
-	ModifierOptions []string `db:"modifier_options"`
+	OrderID         string         `db:"order_id"`
+	MenuItemID      string         `db:"menu_item_id"`
+	ModifierOptions pq.StringArray `db:"modifier_options"`
 	Quantity        int      `db:"quantity"`
 	Price           float64  `db:"price"`
 	Total           float64  `db:"total"`
@@ -34,7 +36,7 @@ func (o *OrderItem) ToDTO() OrderItemDTO {
 	return OrderItemDTO{
 		ID:              o.ID,
 		MenuItemID:      o.MenuItemID,
-		ModifierOptions: o.ModifierOptions,
+		ModifierOptions: []string(o.ModifierOptions),
 		Quantity:        o.Quantity,
 		Price:           o.Price,
 		Total:           o.Total,

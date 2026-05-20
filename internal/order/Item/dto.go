@@ -3,6 +3,7 @@ package item
 type OrderItemDTO struct {
 	ID              string   `json:"id"`
 	MenuItemID      string   `json:"menu_item_id"`
+	Name            string   `json:"name,omitempty"`
 	ModifierOptions []string `json:"modifier_options"`
 	Quantity        int      `json:"quantity"`
 	Price           float64  `json:"price"`

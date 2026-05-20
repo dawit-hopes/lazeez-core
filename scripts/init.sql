@@ -286,10 +286,12 @@ COMMENT ON TABLE modifier_groups IS 'Modifier groups for menus (e.g. Size, Extra
 -- ============================================
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_number INTEGER NOT NULL,
     table_number INTEGER NOT NULL,
     branch_id UUID NOT NULL,
     session_key VARCHAR(255),
     order_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    cancellation_reason TEXT,
     total DECIMAL(10, 2) NOT NULL,
     payment_method VARCHAR(50),
     payment_status VARCHAR(50) DEFAULT 'pending',
@@ -304,6 +306,7 @@ CREATE TABLE IF NOT EXISTS orders (
     CONSTRAINT fk_orders_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_order_number ON orders(branch_id, order_number) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_orders_branch_id ON orders(branch_id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_orders_session_key ON orders(session_key) WHERE is_deleted = FALSE AND session_key IS NOT NULL;
@@ -332,6 +335,7 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id) WHE
 
 COMMENT ON TABLE orders IS 'Stores customer orders; session_key identifies client (QR code), branch_id for restaurant';
 COMMENT ON TABLE order_items IS 'Line items for each order; links to menus (menu_item_id)';
+COMMENT ON COLUMN orders.order_number IS 'Short 6-digit display number shown to guests and staff (100000-999999)';
 COMMENT ON COLUMN orders.session_key IS 'Client identifier from QR code; used for client get/list';
 COMMENT ON COLUMN orders.order_status IS 'pending, processing, ready, completed, cancelled';
 
