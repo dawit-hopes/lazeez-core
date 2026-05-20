@@ -25,7 +25,7 @@ type MenuService interface {
 	UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error
 
 	// public services
-	ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error)
+	ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
 }
 
 type menuService struct {
@@ -163,63 +163,9 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest, role string) 
 		return nil, err
 	}
 
-	modifierGroupIDs := make(pq.StringArray, 0, len(req.Modifiers))
-	modifierGroupDTOs := make([]modgroup.ModifierGroupDTO, 0, len(req.Modifiers))
-
-	for _, mgReq := range req.Modifiers {
-		if err := mgReq.Validate(); err != nil {
-			s.logger.Error("Failed to validate modifier group", "error", err)
-			return nil, err
-		}
-
-		optionIDs := make(pq.StringArray, 0, len(mgReq.Options))
-		optionDTOs := make([]modoption.ModifierOptionDTO, 0, len(mgReq.Options))
-		for _, optReq := range mgReq.Options {
-			if err := optReq.Validate(); err != nil {
-				s.logger.Error("Failed to validate modifier option", "error", err)
-				return nil, err
-			}
-
-			optionModel := modoption.ModifierOption{
-				Base: common.Base{
-					ID:        common.GenerateUUID(),
-					IsDeleted: false,
-				},
-				Name:            common.FormatText(optReq.Name),
-				PriceAdjustment: optReq.PriceAdjustment,
-				IsDefault:       optReq.IsDefault,
-				IsAvailable:     optReq.IsAvailable,
-			}
-
-			if err := s.modifierOptionService.Create(ctx, optionModel); err != nil {
-				s.logger.Error("Failed to create modifier option", "error", err)
-				return nil, err
-			}
-
-			optionIDs = append(optionIDs, optionModel.ID)
-			optionDTOs = append(optionDTOs, optionModel.ToDTO())
-		}
-
-		groupModel := modgroup.ModifierGroup{
-			Base: common.Base{
-				ID:        common.GenerateUUID(),
-				IsDeleted: false,
-			},
-			Name:          common.FormatText(mgReq.Name),
-			SelectionType: string(mgReq.SelectionType),
-			IsRequired:    mgReq.IsRequired,
-			MinSelections: mgReq.MinSelections,
-			MaxSelections: mgReq.MaxSelections,
-			Options:       optionIDs,
-		}
-
-		if err := s.modifierGroupService.Create(ctx, groupModel); err != nil {
-			s.logger.Error("Failed to create modifier group", "error", err)
-			return nil, err
-		}
-
-		modifierGroupIDs = append(modifierGroupIDs, groupModel.ID)
-		modifierGroupDTOs = append(modifierGroupDTOs, groupModel.ToDTO(optionDTOs))
+	modifierGroupIDs, modifierGroupDTOs, err := s.createModifierGroupsFromRequest(ctx, req.Modifiers)
+	if err != nil {
+		return nil, err
 	}
 
 	menu := req.ToModel(isMaster)
@@ -277,14 +223,17 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest, ro
 	}
 
 	if req.Name != "" {
-		if existingMenu.IsMaster() {
-			if err := s.menuRepository.CheckMasterExists(ctx, req.Name, existingMenu.MerchantIDString()); err != nil {
+		newName := common.FormatText(req.Name)
+		if newName != existingMenu.Name {
+			if existingMenu.IsMaster() {
+				if err := s.menuRepository.CheckMasterExists(ctx, newName, existingMenu.MerchantIDString()); err != nil {
+					return err
+				}
+			} else if err := s.menuRepository.CheckExists(ctx, newName, existingMenu.BranchIDString()); err != nil {
 				return err
 			}
-		} else if err := s.menuRepository.CheckExists(ctx, req.Name, existingMenu.BranchIDString()); err != nil {
-			return err
 		}
-		existingMenu.Name = req.Name
+		existingMenu.Name = newName
 	}
 
 	if req.CategoryID != "" {
@@ -333,7 +282,78 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest, ro
 		existingMenu.PreparationTime = req.PreparationTime
 	}
 
+	if req.ModifiersSet {
+		modifierGroupIDs, _, err := s.createModifierGroupsFromRequest(ctx, req.Modifiers)
+		if err != nil {
+			return err
+		}
+		existingMenu.Modifiers = modifierGroupIDs
+	}
+
 	return s.menuRepository.Update(ctx, existingMenu)
+}
+
+func (s *menuService) createModifierGroupsFromRequest(ctx context.Context, modifiers []modgroup.ModifierGroupRequest) (pq.StringArray, []modgroup.ModifierGroupDTO, error) {
+	modifierGroupIDs := make(pq.StringArray, 0, len(modifiers))
+	modifierGroupDTOs := make([]modgroup.ModifierGroupDTO, 0, len(modifiers))
+
+	for _, mgReq := range modifiers {
+		if err := mgReq.Validate(); err != nil {
+			s.logger.Error("Failed to validate modifier group", "error", err)
+			return nil, nil, err
+		}
+
+		optionIDs := make(pq.StringArray, 0, len(mgReq.Options))
+		optionDTOs := make([]modoption.ModifierOptionDTO, 0, len(mgReq.Options))
+		for _, optReq := range mgReq.Options {
+			if err := optReq.Validate(); err != nil {
+				s.logger.Error("Failed to validate modifier option", "error", err)
+				return nil, nil, err
+			}
+
+			optionModel := modoption.ModifierOption{
+				Base: common.Base{
+					ID:        common.GenerateUUID(),
+					IsDeleted: false,
+				},
+				Name:            common.FormatText(optReq.Name),
+				PriceAdjustment: optReq.PriceAdjustment,
+				IsDefault:       optReq.IsDefault,
+				IsAvailable:     optReq.IsAvailable,
+			}
+
+			if err := s.modifierOptionService.Create(ctx, optionModel); err != nil {
+				s.logger.Error("Failed to create modifier option", "error", err)
+				return nil, nil, err
+			}
+
+			optionIDs = append(optionIDs, optionModel.ID)
+			optionDTOs = append(optionDTOs, optionModel.ToDTO())
+		}
+
+		groupModel := modgroup.ModifierGroup{
+			Base: common.Base{
+				ID:        common.GenerateUUID(),
+				IsDeleted: false,
+			},
+			Name:          common.FormatText(mgReq.Name),
+			SelectionType: string(mgReq.SelectionType),
+			IsRequired:    mgReq.IsRequired,
+			MinSelections: mgReq.MinSelections.Int(),
+			MaxSelections: mgReq.MaxSelections.Int(),
+			Options:       optionIDs,
+		}
+
+		if err := s.modifierGroupService.Create(ctx, groupModel); err != nil {
+			s.logger.Error("Failed to create modifier group", "error", err)
+			return nil, nil, err
+		}
+
+		modifierGroupIDs = append(modifierGroupIDs, groupModel.ID)
+		modifierGroupDTOs = append(modifierGroupDTOs, groupModel.ToDTO(optionDTOs))
+	}
+
+	return modifierGroupIDs, modifierGroupDTOs, nil
 }
 
 func (s *menuService) updateMasterFromBranch(ctx context.Context, id, branchID string, req MenuRequest) error {
@@ -344,7 +364,7 @@ func (s *menuService) updateMasterFromBranch(ctx context.Context, id, branchID s
 		return common.ErrNoDataToUpdate
 	}
 	// Branch users may only toggle availability on inherited master items.
-	if len(req.Ingredients) > 0 || len(req.Modifiers) > 0 || req.Name != "" || req.CategoryID != "" ||
+	if len(req.Ingredients) > 0 || req.ModifiersSet || req.Name != "" || req.CategoryID != "" ||
 		req.Image != nil || req.IsFasting != nil || req.Description != "" || req.Price != 0 ||
 		req.PreparationTime != 0 {
 		return common.ErrUnAuthorized
@@ -595,7 +615,7 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, 
 	}, nil
 }
 
-func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error) {
+func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error) {
 	result, err := s.menuRepository.ListMenus(ctx, filter, reference)
 	if err != nil {
 		s.logger.Error("Failed to list menus", "error", err)

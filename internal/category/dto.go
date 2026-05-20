@@ -14,3 +14,9 @@ type CategoryDTO struct {
 	Name string `json:"name"`
 	Icon string `json:"icon"`
 }
+
+
+type CategoryResponseSimplified struct {
+	Name string `json:"name"`
+	Icon string `json:"icon,omitempty"`
+}

@@ -1,8 +1,25 @@
 package group
 
 import (
+	"errors"
+
+	"lazeez-core/internal/common"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
+
+func flexIntAtLeast(min int, message string) validation.RuleFunc {
+	return func(value any) error {
+		n, ok := value.(common.FlexInt)
+		if !ok {
+			return nil
+		}
+		if n.Int() < min {
+			return errors.New(message)
+		}
+		return nil
+	}
+}
 
 func (r *ModifierGroupRequest) Validate() error {
 	return validation.ValidateStruct(r,
@@ -15,12 +32,10 @@ func (r *ModifierGroupRequest) Validate() error {
 			validation.In(SelectionTypeSingle, SelectionTypeMultiple).Error("selection type must be single or multiple"),
 		),
 		validation.Field(&r.MinSelections,
-			validation.Required.Error("min selections is required"),
-			validation.Min(0).Error("min selections must be greater than 0"),
+			validation.By(flexIntAtLeast(0, "min selections must be at least 0")),
 		),
 		validation.Field(&r.MaxSelections,
-			validation.Required.Error("max selections is required"),
-			validation.Min(0).Error("max selections must be greater than 0"),
+			validation.By(flexIntAtLeast(0, "max selections must be at least 0")),
 		),
 	)
 }

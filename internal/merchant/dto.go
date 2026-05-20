@@ -41,3 +41,9 @@ func (m *MerchantDTO) ToModel() Merchant {
 		Logo: m.Logo,
 	}
 }
+
+
+type MerchantResponseSimplified struct {
+	Name string `json:"name"`
+	Logo string `json:"logo,omitempty"`
+}

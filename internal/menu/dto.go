@@ -1,10 +1,13 @@
 package menu
 
 import (
+	"lazeez-core/internal/branch"
 	"lazeez-core/internal/category"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/ingredient"
+	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/modifiers/group"
+	"lazeez-core/internal/table"
 	"mime/multipart"
 
 	"github.com/lib/pq"
@@ -24,6 +27,7 @@ type MenuRequest struct {
 	PreparationTime float64                      `json:"preparation_time"`
 	IsAvailable     *bool                        `json:"is_available"`
 	Modifiers       []group.ModifierGroupRequest `json:"modifier_groups"`
+	ModifiersSet    bool                         `json:"-"`
 }
 
 type MenuDTO struct {
@@ -46,7 +50,7 @@ type MenuDTO struct {
 }
 
 func (m *MenuRequest) IsEmpty() bool {
-	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsAvailable == nil && m.PreparationTime == 0
+	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet
 }
 
 func (m *MenuRequest) ToModel(isMaster bool) Menu {
@@ -77,4 +81,50 @@ func (m *MenuRequest) ToModel(isMaster bool) Menu {
 		IsAvailable:     isAvailable,
 		PreparationTime: m.PreparationTime,
 	}
+}
+
+// ModifierOptionPublic is a guest-facing modifier option (no audit fields).
+type ModifierOptionPublic struct {
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	PriceAdjustment float64 `json:"price_adjustment"`
+	IsDefault       bool    `json:"is_default,omitempty"`
+	IsAvailable     bool    `json:"is_available"`
+}
+
+// ModifierGroupPublic is a guest-facing modifier group (no audit fields).
+type ModifierGroupPublic struct {
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	SelectionType group.SelectionType    `json:"selection_type"`
+	IsRequired    bool                   `json:"is_required"`
+	MinSelections common.FlexInt         `json:"min_selections,omitempty"`
+	MaxSelections common.FlexInt         `json:"max_selections,omitempty"`
+	Options       []ModifierOptionPublic `json:"options,omitempty"`
+}
+
+// MenuDTOPublic is a single menu item for the guest-facing catalog.
+type MenuDTOPublic struct {
+	ID              string                                `json:"id"`
+	Name            string                                `json:"name"`
+	Image           string                                `json:"image,omitempty"`
+	Description     string                                `json:"description,omitempty"`
+	Price           float64                               `json:"price"`
+	Category        *category.CategoryResponseSimplified    `json:"category,omitempty"`
+	Ingredients     []ingredient.IngredientResponseSimplified `json:"ingredients"`
+	IsFasting       bool                                  `json:"is_fasting,omitempty"`
+	IsAvailable     bool                                  `json:"is_available"`
+	PreparationTime float64                               `json:"preparation_time,omitempty"`
+	Modifiers       []ModifierGroupPublic                 `json:"modifier_groups,omitempty"`
+}
+
+// PublicMenuCatalogResponse is returned when a guest scans a table QR (reference).
+// Table, branch, and merchant are resolved once from the reference; menus are paginated.
+type PublicMenuCatalogResponse struct {
+	Table    *table.TableResponseSimplified     `json:"table"`
+	Branch   *branch.BranchResponseSimplified   `json:"branch"`
+	Merchant *merchant.MerchantResponseSimplified `json:"merchant"`
+	Menus    []*MenuDTOPublic                   `json:"menus"`
+	Meta     common.PaginationMeta              `json:"meta"`
+	Categories []*category.CategoryResponseSimplified `json:"categories"`
 }

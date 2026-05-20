@@ -17,6 +17,7 @@ type CategoryRepository interface {
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Category], error)
+	ListForBranch(ctx context.Context, branchID string) ([]*CategoryResponseSimplified, error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -150,4 +151,23 @@ func (r *categoryRepository) CheckExists(ctx context.Context, name string) error
 	}
 
 	return common.ErrCategoryAlreadyExists
+}
+
+
+func (r *categoryRepository) ListForBranch(ctx context.Context, branchID string) ([]*CategoryResponseSimplified, error) {
+	filter := map[string]any{"branch_id": branchID}
+	results, err := r.dal.List(ctx, filter, 1, 1000)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("no categories found for branch", "error", err)
+			return nil, common.ErrNotFound
+		}
+		r.logger.Error("failed to list categories for branch", "error", err)
+		return nil, common.ErrInternalServerError	
+	}
+	categoryDTOs := make([]*CategoryResponseSimplified, len(results))
+	for i, category := range results {
+		categoryDTOs[i] = category.ToResponseSimplified()
+	}
+	return categoryDTOs, nil
 }

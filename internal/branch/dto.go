@@ -11,3 +11,10 @@ type BranchResponse struct {
 	Address     string `json:"address"`
 	PhoneNumber string `json:"phone_number"`
 }
+
+
+type BranchResponseSimplified struct {
+	BranchName  string `json:"branch_name"`
+	Address     string `json:"address,omitempty"`
+	PhoneNumber string `json:"phone_number,omitempty"`
+}

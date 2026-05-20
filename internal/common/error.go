@@ -66,4 +66,6 @@ var (
 	ErrBranchAdminMissingMerchant       = &Errors{Code: BadRequest, Message: "account must be linked to a restaurant (merchant). Sign out and sign in again, or contact support."}
 	ErrTableNotFound                    = &Errors{Code: NotFound, Message: "table not found"}
 	ErrTableAlreadyExists               = &Errors{Code: BadRequest, Message: "table with this information already exists"}
+	ErrReferenceNotValid                = &Errors{Code: BadRequest, Message: "reference is not valid"}
+	ErrNotFound                         = &Errors{Code: NotFound, Message: "resource not found"}
 )

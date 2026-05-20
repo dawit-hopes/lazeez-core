@@ -13,6 +13,7 @@ type CategoryService interface {
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*CategoryDTO], error)
+	ListForBranch(ctx context.Context, branchID string) ([]*CategoryResponseSimplified, error)
 	CheckExists(ctx context.Context, name string) error
 }
 
@@ -122,6 +123,15 @@ func (s *categoryService) UnDelete(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *categoryService) ListForBranch(ctx context.Context, branchID string) ([]*CategoryResponseSimplified, error) {
+	categories, err := s.categoryRepository.ListForBranch(ctx, branchID)
+	if err != nil {
+		s.logger.Error("Failed to list categories for branch", "error", err)
+		return nil, err
+	}
+	return categories, nil
 }
 
 func (s *categoryService) CheckExists(ctx context.Context, name string) error {

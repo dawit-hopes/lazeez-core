@@ -39,3 +39,11 @@ func (c *Category) ToDTO() CategoryDTO {
 		Icon: c.Icon,
 	}
 }
+
+
+func (c *Category) ToResponseSimplified() *CategoryResponseSimplified {
+	return &CategoryResponseSimplified{
+		Name: c.Name,
+		Icon: c.Icon,
+	}
+}

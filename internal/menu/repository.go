@@ -3,11 +3,14 @@ package menu
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"lazeez-core/config"
+	"lazeez-core/internal/category"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/ingredient"
 )
 
 type ListScope string
@@ -37,7 +40,7 @@ type MenuRepository interface {
 
 
 	// public repository
-	ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error)	
+	ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
 }
 
 type menuRepository struct {
@@ -523,29 +526,257 @@ func (r *menuRepository) RemoveBranchOverride(ctx context.Context, branchID, men
 }
 
 
-func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, reference string) (*common.PaginatedResponse[[]*MenuDTO], error) {
-	query := `
-		SELECT m.id, m.name, m.image, m.deleted_at, m.is_deleted, m.branch_id, m.merchant_id,
-		FROM menus m
-		WHERE m.is_deleted = FALSE
-		AND m.reference = $1
-		ORDER BY m.created_at DESC
-		LIMIT $2 OFFSET $3`
+// menuPublicContextByReference resolves simplified table, branch, and merchant from a QR reference.
+const menuPublicContextByReference = `
+SELECT
+	json_strip_nulls(json_build_object(
+		'table_name', t.table_name,
+		'reference', t.reference,
+		'status', t.status,
+		'active_order_id', NULLIF(t.active_order_id::text, '')
+	)) AS table,
+	json_strip_nulls(json_build_object(
+		'branch_name', b.branch_name,
+		'address', NULLIF(b.address, ''),
+		'phone_number', NULLIF(b.phone_number, '')
+	)) AS branch,
+	json_strip_nulls(json_build_object('name', mer.name, 'logo', NULLIF(mer.logo, ''))) AS merchant
+FROM tables t
+INNER JOIN branches b ON b.id = t.branch_id AND b.is_deleted = FALSE
+INNER JOIN merchants mer ON mer.id = b.merchant_id AND mer.is_deleted = FALSE
+WHERE t.reference = $1 AND t.is_deleted = FALSE`
 
-	menus, err := common.QueryRows(r.join, ctx, query, []any{reference, filter.Limit, filter.Page}, func(rows *sql.Rows) (*MenuDTO, error) {
-		var menu MenuDTO
-		err := rows.Scan(&menu.ID, &menu.Name, &menu.Image, &menu.DeletedAt, &menu.IsDeleted, &menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsAvailable, &menu.Description, &menu.Price, &menu.Ingredients, &menu.CategoryID, &menu.Modifiers, &menu.PreparationTime, &menu.CreatedAt, &menu.UpdatedAt)
-		if err != nil {
+// menuPublicListBase lists available branch-effective menus; CTE resolves branch once, JOINs replace per-row subqueries.
+const menuPublicListBase = `
+WITH ctx AS (
+	SELECT t.branch_id, b.merchant_id
+	FROM tables t
+	INNER JOIN branches b ON b.id = t.branch_id AND b.is_deleted = FALSE
+	WHERE t.reference = $1 AND t.is_deleted = FALSE
+)
+SELECT
+	m.id,
+	m.name,
+	m.image,
+	m.is_fasting,
+	COALESCE(o.is_available, m.is_available) AS is_available,
+	m.description,
+	m.price,
+	m.preparation_time,
+	CASE WHEN c.id IS NOT NULL THEN json_strip_nulls(json_build_object('name', c.name, 'icon', NULLIF(c.icon, ''))) END AS category,
+	COALESCE(ing.ingredients, '[]'::json) AS ingredients,
+	COALESCE(mods.modifier_groups, '[]'::json) AS modifier_groups
+FROM ctx
+INNER JOIN menus m ON m.is_deleted = FALSE
+	AND (m.branch_id = ctx.branch_id OR (m.branch_id IS NULL AND m.merchant_id = ctx.merchant_id))
+LEFT JOIN branch_menu_overrides o
+	ON o.menu_id = m.id AND o.branch_id = ctx.branch_id AND o.is_deleted = FALSE
+LEFT JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
+LEFT JOIN LATERAL (
+	SELECT json_agg(json_strip_nulls(json_build_object('name', i.name, 'icon', NULLIF(i.icon, ''))) ORDER BY u.ord) AS ingredients
+	FROM unnest(m.ingredients) WITH ORDINALITY AS u(ing_id, ord)
+	INNER JOIN ingredients i ON i.id::text = u.ing_id AND i.is_deleted = FALSE
+) ing ON TRUE
+LEFT JOIN LATERAL (
+	SELECT json_agg(
+		json_strip_nulls(json_build_object(
+			'id', mg.id,
+			'name', mg.name,
+			'selection_type', mg.selection_type,
+			'is_required', mg.is_required,
+			'min_selections', NULLIF(mg.min_selections, 0),
+			'max_selections', NULLIF(mg.max_selections, 0),
+			'options', COALESCE(opts.options, '[]'::json)
+		)) ORDER BY g.ord
+	) AS modifier_groups
+	FROM unnest(m.modifiers) WITH ORDINALITY AS g(mg_id, ord)
+	INNER JOIN modifier_groups mg ON mg.id::text = g.mg_id AND mg.is_deleted = FALSE
+	LEFT JOIN LATERAL (
+		SELECT json_agg(
+			json_strip_nulls(json_build_object(
+				'id', mo.id,
+				'name', mo.name,
+				'price_adjustment', mo.price_adjustment,
+				'is_default', CASE WHEN mo.is_default THEN TRUE END,
+				'is_available', mo.is_available
+			)) ORDER BY o.ord
+		) AS options
+		FROM unnest(mg.options) WITH ORDINALITY AS o(opt_id, ord)
+		INNER JOIN modifier_options mo ON mo.id::text = o.opt_id AND mo.is_deleted = FALSE
+	) opts ON TRUE
+) mods ON TRUE
+WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
+	AND COALESCE(o.is_available, m.is_available) = TRUE`
+
+// menuPublicCategoriesByReference lists distinct categories used by available menus at the table's branch.
+const menuPublicCategoriesByReference = `
+WITH ctx AS (
+	SELECT t.branch_id, b.merchant_id
+	FROM tables t
+	INNER JOIN branches b ON b.id = t.branch_id AND b.is_deleted = FALSE
+	WHERE t.reference = $1 AND t.is_deleted = FALSE
+)
+SELECT DISTINCT c.name, c.icon
+FROM ctx
+INNER JOIN menus m ON m.is_deleted = FALSE
+	AND (m.branch_id = ctx.branch_id OR (m.branch_id IS NULL AND m.merchant_id = ctx.merchant_id))
+LEFT JOIN branch_menu_overrides o
+	ON o.menu_id = m.id AND o.branch_id = ctx.branch_id AND o.is_deleted = FALSE
+INNER JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
+WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
+	AND COALESCE(o.is_available, m.is_available) = TRUE
+ORDER BY c.name`
+
+func (r *menuRepository) listPublicCategories(ctx context.Context, reference string) ([]*category.CategoryResponseSimplified, error) {
+	rows, err := common.QueryRows(r.join, ctx, menuPublicCategoriesByReference, []any{reference}, func(rows *sql.Rows) (*category.CategoryResponseSimplified, error) {
+		var cat category.CategoryResponseSimplified
+		var icon sql.NullString
+		if err := rows.Scan(&cat.Name, &icon); err != nil {
 			return nil, err
 		}
-		return &menu, nil
+		if icon.Valid && icon.String != "" {
+			cat.Icon = icon.String
+		}
+		return &cat, nil
 	})
 	if err != nil {
-		r.logger.Error("failed to list menus", "error", err)
+		return nil, err
+	}
+	if rows == nil {
+		return []*category.CategoryResponseSimplified{}, nil
+	}
+	return rows, nil
+}
+
+func (r *menuRepository) getPublicMenuContext(ctx context.Context, reference string) (*PublicMenuCatalogResponse, error) {
+	var tableJSON, branchJSON, merchantJSON []byte
+	err := r.join.QueryRow(ctx, menuPublicContextByReference, []any{reference}, func(row *sql.Row) error {
+		return row.Scan(&tableJSON, &branchJSON, &merchantJSON)
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, common.ErrReferenceNotValid
+		}
+		return nil, err
+	}
+
+	var catalog PublicMenuCatalogResponse
+	if err := json.Unmarshal(tableJSON, &catalog.Table); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(branchJSON, &catalog.Branch); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(merchantJSON, &catalog.Merchant); err != nil {
+		return nil, err
+	}
+	return &catalog, nil
+}
+
+func (r *menuRepository) scanMenuPublicFromRows(rows *sql.Rows, dto *MenuDTOPublic) error {
+	var categoryJSON, ingredientsJSON, modifiersJSON []byte
+	var image, description sql.NullString
+	err := rows.Scan(
+		&dto.ID, &dto.Name, &image,
+		&dto.IsFasting, &dto.IsAvailable,
+		&description, &dto.Price, &dto.PreparationTime,
+		&categoryJSON, &ingredientsJSON, &modifiersJSON,
+	)
+	if err != nil {
+		return err
+	}
+	if image.Valid && image.String != "" {
+		dto.Image = image.String
+	}
+	if description.Valid && description.String != "" {
+		dto.Description = description.String
+	}
+	return r.unmarshalMenuPublicRelations(dto, categoryJSON, ingredientsJSON, modifiersJSON)
+}
+
+func (r *menuRepository) unmarshalMenuPublicRelations(
+	dto *MenuDTOPublic,
+	categoryJSON, ingredientsJSON, modifiersJSON []byte,
+) error {
+	if len(categoryJSON) > 0 && string(categoryJSON) != "null" {
+		var cat category.CategoryResponseSimplified
+		if err := json.Unmarshal(categoryJSON, &cat); err != nil {
+			return err
+		}
+		dto.Category = &cat
+	}
+
+	ingredients := []ingredient.IngredientResponseSimplified{}
+	if len(ingredientsJSON) > 0 && string(ingredientsJSON) != "null" {
+		if err := json.Unmarshal(ingredientsJSON, &ingredients); err != nil {
+			return err
+		}
+	}
+	dto.Ingredients = ingredients
+
+	modifiers := []ModifierGroupPublic{}
+	if len(modifiersJSON) > 0 && string(modifiersJSON) != "null" {
+		if err := json.Unmarshal(modifiersJSON, &modifiers); err != nil {
+			return err
+		}
+	}
+	dto.Modifiers = modifiers
+
+	return nil
+}
+
+func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error) {
+	catalog, err := r.getPublicMenuContext(ctx, reference)
+	if err != nil {
+		if errors.Is(err, common.ErrReferenceNotValid) {
+			return nil, err
+		}
+		r.logger.Error("failed to resolve table reference", "error", err)
 		return nil, common.ErrInternalServerError
 	}
-	return &common.PaginatedResponse[[]*MenuDTO]{
-		Data: menus,
-		Meta: common.BuildPaginationMeta(int64(len(menus)), filter.Page, filter.Limit),
-	}, nil
+
+	categories, err := r.listPublicCategories(ctx, reference)
+	if err != nil {
+		r.logger.Error("failed to list public categories", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+	catalog.Categories = categories
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	offset := (filter.Page - 1) * limit
+	if filter.Page <= 0 {
+		offset = 0
+	}
+
+	searchClause := ""
+	args := []any{reference}
+	if filter.Search != "" {
+		searchClause = " AND m.name ILIKE $2 ESCAPE '\\'"
+		args = append(args, "%"+filter.Search+"%")
+	}
+	argN := len(args)
+	query := fmt.Sprintf(
+		menuPublicListBase+searchClause+` ORDER BY (m.branch_id IS NULL) DESC, m.created_at DESC LIMIT $%d OFFSET $%d`,
+		argN+1, argN+2,
+	)
+	args = append(args, limit, offset)
+
+	menus, err := common.QueryRows(r.join, ctx, query, args, func(rows *sql.Rows) (*MenuDTOPublic, error) {
+		var dto MenuDTOPublic
+		if err := r.scanMenuPublicFromRows(rows, &dto); err != nil {
+			return nil, err
+		}
+		return &dto, nil
+	})
+	if err != nil {
+		r.logger.Error("failed to list public menus", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
+	catalog.Menus = menus
+	catalog.Meta = common.BuildPaginationMeta(int64(len(menus)), filter.Page, limit)
+	return catalog, nil
 }

@@ -9,6 +9,15 @@ import (
 )
 
 func NewMenuRoutes(router chi.Router, handler MenuHandler, middleware middleware.Middleware) {
+	publicRoutes := []common.Route{
+		{
+			Method:  http.MethodGet,
+			Path:    "/client/menus",
+			Handler: handler.ListMenus,
+		},
+	}
+	common.RegisterRoutes(router, publicRoutes)
+
 	routes := []common.Route{
 		{
 			Method:      http.MethodPost,

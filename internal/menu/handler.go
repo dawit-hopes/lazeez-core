@@ -65,7 +65,9 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 				h.logger.Error("Image file is required", "error", err)
 				return req, nil, common.ErrMissingFile
 			}
-			h.parseFormFields(r, &req)
+			if err := h.parseFormFields(r, &req); err != nil {
+				return req, nil, err
+			}
 			if err := h.applyContextToRequest(&req, role, branchID, hasBranch, merchantID); err != nil {
 				return req, nil, err
 			}
@@ -77,7 +79,9 @@ func (h *menuHandler) parseRequest(r *http.Request, isRequired bool) (MenuReques
 
 	req.ImageHeader = *fileHeader
 	req.Image = file
-	h.parseFormFields(r, &req)
+	if err := h.parseFormFields(r, &req); err != nil {
+		return req, nil, err
+	}
 
 	if err := h.applyContextToRequest(&req, role, branchID, hasBranch, merchantID); err != nil {
 		return req, nil, err
@@ -112,7 +116,7 @@ func (h *menuHandler) applyContextToRequest(req *MenuRequest, role, branchID str
 	return common.ErrUnAuthorized
 }
 
-func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) {
+func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) error {
 	req.Name = r.FormValue("name")
 	req.Description = r.FormValue("description")
 	if p := r.FormValue("price"); p != "" {
@@ -142,10 +146,13 @@ func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) {
 	}
 
 	if mg := r.FormValue("modifier_groups"); mg != "" {
+		req.ModifiersSet = true
 		if err := json.Unmarshal([]byte(mg), &req.Modifiers); err != nil {
 			h.logger.Error("Failed to parse modifier_groups", "error", err)
+			return common.ErrInvalidRequest
 		}
 	}
+	return nil
 }
 
 func (h *menuHandler) parseScope(r *http.Request) ListScope {
@@ -416,7 +423,7 @@ func (h *menuHandler) ListMenus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
-		Data:       result.Data,
+		Data:       result,
 		Meta:       &result.Meta,
 		Message:    "Menus fetched successfully",
 		StatusCode: http.StatusOK,

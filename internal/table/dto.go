@@ -26,3 +26,11 @@ type TableRequest struct {
 type AttachOrderRequest struct {
 	OrderID string `json:"order_id"`
 }
+
+
+type TableResponseSimplified struct {
+	TableName     string `json:"table_name"`
+	Reference     string `json:"reference"`
+	Status        string `json:"status"`
+	ActiveOrderID string `json:"active_order_id,omitempty"`
+}

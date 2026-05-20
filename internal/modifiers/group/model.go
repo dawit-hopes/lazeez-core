@@ -46,8 +46,8 @@ func (s *ModifierGroup) ToDTO(options []option.ModifierOptionDTO) ModifierGroupD
 		Name:          s.Name,
 		SelectionType: SelectionType(s.SelectionType),
 		IsRequired:    s.IsRequired,
-		MinSelections: s.MinSelections,
-		MaxSelections: s.MaxSelections,
+		MinSelections: common.FlexInt(s.MinSelections),
+		MaxSelections: common.FlexInt(s.MaxSelections),
 		Options:       options,
 	}
 }

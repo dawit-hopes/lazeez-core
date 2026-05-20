@@ -12,3 +12,9 @@ type IngredientRequest struct {
 	Name string `json:"name"`
 	Icon string `json:"icon"`
 }
+
+
+type IngredientResponseSimplified struct {
+	Name string `json:"name"`
+	Icon string `json:"icon,omitempty"`
+}
