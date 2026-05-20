@@ -204,6 +204,9 @@ var defaultCORSOrigins = []string{
 	"http://172.19.0.1:8081",
 	"http://172.23.0.1:8081",
 	"http://172.24.0.1:8081",
+	"http://10.22.209.1:8082",
+	"http://172.18.0.1:8082",
+	"http://localhost:8082",
 }
 
 func getAllowedOrigins() []string {
