@@ -227,12 +227,13 @@ func getAllowedOrigins() []string {
 	origins := make([]string, 0, len(parts))
 	for _, p := range parts {
 		if o := strings.TrimSpace(p); o != "" {
+			fmt.Println("================================")
+			fmt.Println(o, "origin")
+			fmt.Println("================================")
 			origins = append(origins, o)
 		}
 	}
-	fmt.Println("raw", "================================")
-	fmt.Println("origins", origins)
-	fmt.Println("================================")
+
 	if len(origins) == 0 {
 		return defaultCORSOrigins
 	}
