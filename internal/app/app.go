@@ -28,7 +28,7 @@ func NewApp() (*App, error) {
 	logger.Info("Initializing application...")
 
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file")
 	} else {
 		log.Println("Successfully loaded .env file")
 	}
