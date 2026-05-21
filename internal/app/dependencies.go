@@ -8,6 +8,7 @@ import (
 	"lazeez-core/internal/auth"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/category"
+	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
@@ -41,6 +42,7 @@ type Dependencies struct {
 	ModifierOptionRepo modoption.ModifierOptionRepository
 	OrderRepo          order.OrderRepository
 	TableRepo          table.TableRepository
+	ClientSessionRepo  clientsession.ClientSessionRepository
 
 	// Services
 	AuthService           auth.AuthService
@@ -54,6 +56,7 @@ type Dependencies struct {
 	ModifierOptionService modoption.ModifierOptionService
 	OrderService          order.OrderService
 	TableService          table.TableService
+	ClientSessionService  clientsession.ClientSessionService
 
 	// Handlers
 	AuthHandler       auth.AuthHandler
@@ -63,8 +66,9 @@ type Dependencies struct {
 	MenuHandler       menu.MenuHandler
 	CategoryHandler   category.CategoryHandler
 	IngredientHandler ingredient.IngredientHandler
-	OrderHandler      order.OrderHandler
-	TableHandler      table.TableHandler
+	OrderHandler          order.OrderHandler
+	TableHandler          table.TableHandler
+	ClientSessionHandler  clientsession.ClientSessionHandler
 
 	Middleware middleware.Middleware
 }
@@ -91,6 +95,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	orderDAL := common.NewDAL(db, func() *order.Order { return &order.Order{} })
 	orderItemDAL := common.NewDAL(db, func() *item.OrderItem { return &item.OrderItem{} })
 	tableDAL := common.NewDAL(db, func() *table.Table { return &table.Table{} })
+	clientSessionDAL := common.NewDAL(db, func() *clientsession.ClientSession { return &clientsession.ClientSession{} })
 	joinDAL := common.NewJoinDAL(db)
 	cld, err := initCloudinary(logger)
 	if err != nil {
@@ -111,6 +116,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	orderRepo := order.NewOrderRepository(orderDAL, joinDAL, logger)
 	orderItemRepo := item.NewOrderItemRepository(orderItemDAL, logger)
 	tableRepo := table.NewTableRepository(tableDAL, logger)
+	clientSessionRepo := clientsession.NewClientSessionRepository(clientSessionDAL, joinDAL, logger)
 	// Initialize services
 	branchService := branch.NewBranchService(branchRepo, logger)
 	sessionService := session.NewSessionService(sessionRepo, logger)
@@ -123,7 +129,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	modifierOptionService := modoption.NewModifierOptionService(modifierOptionRepo, logger)
 	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, logger)
 	orderItemService := item.NewOrderItemService(orderItemRepo, menuService, modifierOptionService, branchService, logger)
-	orderService := order.NewOrderService(orderRepo, orderItemService, logger)
+	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
+	orderService := order.NewOrderService(orderRepo, orderItemService, clientSessionService, logger)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -135,6 +142,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	ingredientHandler := ingredient.NewIngredientHandler(ingredientService, logger)
 	orderHandler := order.NewOrderHandler(orderService, logger)
 	tableHandler := table.NewTableHandler(tableService, logger)
+	clientSessionHandler := clientsession.NewClientSessionHandler(clientSessionService, logger)
 
 	middleware := middleware.NewMiddleware(keyService, sessionService, logger)
 
@@ -151,6 +159,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		ModifierOptionRepo:    modifierOptionRepo,
 		OrderRepo:             orderRepo,
 		TableRepo:             tableRepo,
+		ClientSessionRepo:     clientSessionRepo,
 		AuthService:           authService,
 		UserService:           userService,
 		BranchService:         branchService,
@@ -162,6 +171,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		ModifierOptionService: modifierOptionService,
 		OrderService:          orderService,
 		TableService:          tableService,
+		ClientSessionService:  clientSessionService,
 		AuthHandler:           authHandler,
 		UserHandler:           userHandler,
 		BranchHandler:         branchHandler,
@@ -171,6 +181,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		IngredientHandler:     ingredientHandler,
 		OrderHandler:          orderHandler,
 		TableHandler:          tableHandler,
+		ClientSessionHandler:  clientSessionHandler,
 		Middleware:            middleware,
 	}, nil
 }
@@ -196,5 +207,6 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	category.NewCategoryRoutes(router, deps.CategoryHandler, deps.Middleware)
 	ingredient.NewIngredientRoutes(router, deps.IngredientHandler, deps.Middleware)
 	order.NewOrderRoutes(router, deps.OrderHandler, deps.Middleware)
+	clientsession.NewClientSessionRoutes(router, deps.ClientSessionHandler, deps.Middleware)
 	table.NewTableRoutes(router, deps.TableHandler, deps.Middleware)
 }

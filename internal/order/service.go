@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"lazeez-core/config"
+	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
 	item "lazeez-core/internal/order/Item"
 	"time"
@@ -28,16 +29,23 @@ type OrderService interface {
 }
 
 type orderService struct {
-	orderRepository  OrderRepository
-	orderItemService item.OrderItemService
-	logger           config.Logger
+	orderRepository       OrderRepository
+	orderItemService      item.OrderItemService
+	clientSessionService  clientsession.ClientSessionService
+	logger                config.Logger
 }
 
-func NewOrderService(orderRepository OrderRepository, orderItemService item.OrderItemService, logger config.Logger) OrderService {
+func NewOrderService(
+	orderRepository OrderRepository,
+	orderItemService item.OrderItemService,
+	clientSessionService clientsession.ClientSessionService,
+	logger config.Logger,
+) OrderService {
 	return &orderService{
-		orderRepository:  orderRepository,
-		orderItemService: orderItemService,
-		logger:           logger,
+		orderRepository:      orderRepository,
+		orderItemService:     orderItemService,
+		clientSessionService: clientSessionService,
+		logger:               logger,
 	}
 }
 
@@ -106,14 +114,22 @@ func (s *orderService) CreateClient(ctx context.Context, order OrderInput) (*Ord
 }
 
 func (s *orderService) resolveBranchID(ctx context.Context, branchID, sessionKey string) (string, error) {
-	if branchID != "" {
-		return branchID, nil
-	}
 	if sessionKey == "" {
-		s.logger.Error("branch id missing and no session key to resolve table")
+		s.logger.Error("session key is required for client orders")
 		return "", common.ErrInvalidRequest
 	}
-	return s.orderRepository.GetBranchIDByReference(ctx, sessionKey)
+
+	session, err := s.clientSessionService.GetValidForOrder(ctx, sessionKey)
+	if err != nil {
+		return "", err
+	}
+
+	if branchID != "" && branchID != session.BranchID {
+		s.logger.Error("branch id does not match client session", "branch_id", branchID, "session_branch_id", session.BranchID)
+		return "", common.ErrInvalidRequest
+	}
+
+	return session.BranchID, nil
 }
 
 func (s *orderService) GetClient(ctx context.Context, id string, sessionKey string) (*OrderDTO, error) {

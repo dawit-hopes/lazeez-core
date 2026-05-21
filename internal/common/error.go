@@ -68,5 +68,7 @@ var (
 	ErrTableNotFound                    = &Errors{Code: NotFound, Message: "table not found"}
 	ErrTableAlreadyExists               = &Errors{Code: BadRequest, Message: "table with this information already exists"}
 	ErrReferenceNotValid                = &Errors{Code: BadRequest, Message: "reference is not valid"}
+	ErrClientSessionNotFound            = &Errors{Code: NotFound, Message: "client session not found"}
+	ErrClientSessionExpired             = &Errors{Code: Unauthorized, Message: "client session has expired"}
 	ErrNotFound                         = &Errors{Code: NotFound, Message: "resource not found"}
 )
