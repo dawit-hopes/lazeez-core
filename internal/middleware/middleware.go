@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
@@ -229,6 +230,9 @@ func getAllowedOrigins() []string {
 			origins = append(origins, o)
 		}
 	}
+	fmt.Println("raw", "================================")
+	fmt.Println("origins", origins)
+	fmt.Println("================================")
 	if len(origins) == 0 {
 		return defaultCORSOrigins
 	}
