@@ -26,6 +26,8 @@ type MenuService interface {
 
 	// public services
 	ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
+
+	GetBranchMenuSnapshots(ctx context.Context, branchID string, menuIDs []string) (map[string]BranchMenuSnapshot, error)
 }
 
 type menuService struct {

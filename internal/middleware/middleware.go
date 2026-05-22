@@ -20,6 +20,7 @@ type Middleware interface {
 	RequireSessionKey(next http.Handler) http.Handler
 	RequireBranch(next http.Handler) http.Handler
 	RequireSuperAdmin(next http.Handler) http.Handler
+	RequireOrderListAccess(next http.Handler) http.Handler
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
 	MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request)
 	CORSHandler(next http.Handler) http.Handler
@@ -112,6 +113,29 @@ func (m *middleware) RequireSuperAdmin(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireOrderListAccess allows super_admin (all orders) or super_branch_admin (merchant-scoped).
+func (m *middleware) RequireOrderListAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		switch role {
+		case "super_admin":
+			next.ServeHTTP(w, r)
+		case "super_branch_admin":
+			if merchantID, ok := GetMerchantIDFromContext(r.Context()); !ok || merchantID == "" {
+				common.WriteErrorResponse(w, common.ErrUnAuthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		default:
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		}
 	})
 }
 

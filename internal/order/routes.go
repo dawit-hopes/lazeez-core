@@ -42,6 +42,12 @@ func NewOrderRoutes(router chi.Router, handler OrderHandler, mw middleware.Middl
 	branchRoutes := []common.Route{
 		{
 			Method:      http.MethodGet,
+			Path:        "/branch/orders/archive",
+			Handler:     handler.ArchiveBranch,
+			Middlewares: branchMw,
+		},
+		{
+			Method:      http.MethodGet,
 			Path:        "/branch/orders/{id}",
 			Handler:     handler.GetBranch,
 			Middlewares: branchMw,
@@ -73,7 +79,7 @@ func NewOrderRoutes(router chi.Router, handler OrderHandler, mw middleware.Middl
 			Method:      http.MethodGet,
 			Path:        "/admin/orders",
 			Handler:     handler.ListAdmin,
-			Middlewares: adminMw,
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken, mw.RequireOrderListAccess},
 		},
 		{
 			Method:      http.MethodPut,

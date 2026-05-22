@@ -37,7 +37,7 @@ type MenuRepository interface {
 	SetBranchExcluded(ctx context.Context, branchID, menuID string, excluded bool) error
 	RemoveBranchOverride(ctx context.Context, branchID, menuID string) error
 	AssignOrphanMasterMenus(ctx context.Context, merchantID string) error
-
+	GetBranchMenuSnapshots(ctx context.Context, branchID string, menuIDs []string) (map[string]BranchMenuSnapshot, error)
 
 	// public repository
 	ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)

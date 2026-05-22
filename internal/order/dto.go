@@ -7,10 +7,13 @@ import (
 
 type Status string
 
+// Order lifecycle values (see scripts/init.sql COMMENT ON orders.order_status).
 const (
-	StatusPending   Status = "pending"
-	StatusCompleted Status = "completed"
-	StatusCancelled Status = "cancelled"
+	StatusPending    Status = "pending"
+	StatusProcessing Status = "processing"
+	StatusReady      Status = "ready"
+	StatusCompleted  Status = "completed"
+	StatusCancelled  Status = "cancelled"
 )
 
 const (

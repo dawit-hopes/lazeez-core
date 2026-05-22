@@ -24,6 +24,7 @@ type OrderRepository interface {
 	UnDelete(ctx context.Context, id string) error
 	ListBySessionKey(ctx context.Context, filter OrderFilter, sessionKey string) (*common.PaginatedResponse[[]*OrderDTO], error)
 	ListByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error)
+	ListArchiveByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error)
 	ListAll(ctx context.Context, filter OrderFilter) (*common.PaginatedResponse[[]*OrderDTO], error)
 	CheckExists(ctx context.Context, tableNumber int, branchID string) error
 	GetBranchIDByReference(ctx context.Context, reference string) (string, error)
@@ -219,11 +220,24 @@ func (r *orderRepository) UnDelete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *orderRepository) listOrders(ctx context.Context, filter OrderFilter, baseCond string, baseArgs []any) (*common.PaginatedResponse[[]*OrderDTO], error) {
+func (r *orderRepository) ListByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	return r.listOrders(ctx, filter, " AND o.branch_id = $1 ", []any{branchID}, "o.created_at DESC")
+}
+
+func (r *orderRepository) ListArchiveByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	baseCond := " AND o.branch_id = $1 AND o.order_status <> '" + string(StatusPending) + "' "
+	return r.listOrdersWithCount(ctx, filter, baseCond, []any{branchID}, BuildArchiveOrderFilterClause, "o.updated_at DESC")
+}
+
+func (r *orderRepository) ListAll(ctx context.Context, filter OrderFilter) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	return r.listOrders(ctx, filter, " ", []any{}, "o.created_at DESC")
+}
+
+func (r *orderRepository) listOrders(ctx context.Context, filter OrderFilter, baseCond string, baseArgs []any, orderBy string) (*common.PaginatedResponse[[]*OrderDTO], error) {
 	filterCond, args := BuildOrderFilterClause(filter, baseArgs)
 	offset := (filter.Page - 1) * filter.Limit
 	argNum := len(args) + 1
-	query := orderWithRelations + baseCond + filterCond + " ORDER BY o.created_at DESC LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
+	query := orderWithRelations + baseCond + filterCond + " ORDER BY " + orderBy + " LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
 	args = append(args, filter.Limit, offset)
 
 	results, err := common.QueryRows(r.joinDAL, ctx, query, args, func(rows *sql.Rows) (*OrderDTO, error) {
@@ -243,16 +257,53 @@ func (r *orderRepository) listOrders(ctx context.Context, filter OrderFilter, ba
 	}, nil
 }
 
+type orderFilterClauseBuilder func(OrderFilter, []any) (string, []any)
+
+func (r *orderRepository) listOrdersWithCount(
+	ctx context.Context,
+	filter OrderFilter,
+	baseCond string,
+	baseArgs []any,
+	buildClause orderFilterClauseBuilder,
+	orderBy string,
+) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	filterCond, args := buildClause(filter, baseArgs)
+
+	countQuery := "SELECT COUNT(*) FROM orders o WHERE o.is_deleted = FALSE" + baseCond + filterCond
+	var total int64
+	err := r.joinDAL.QueryRow(ctx, countQuery, args, func(row *sql.Row) error {
+		return row.Scan(&total)
+	})
+	if err != nil {
+		r.logger.Error("failed to count orders", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
+	offset := (filter.Page - 1) * filter.Limit
+	argNum := len(args) + 1
+	query := orderWithRelations + baseCond + filterCond + " ORDER BY " + orderBy + " LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
+	listArgs := append(append([]any{}, args...), filter.Limit, offset)
+
+	results, err := common.QueryRows(r.joinDAL, ctx, query, listArgs, func(rows *sql.Rows) (*OrderDTO, error) {
+		var dto OrderDTO
+		if err := r.scanOrderWithRelationsFromRows(rows, &dto); err != nil {
+			return nil, err
+		}
+		return &dto, nil
+	})
+	if err != nil {
+		r.logger.Error("failed to list orders", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
+	return &common.PaginatedResponse[[]*OrderDTO]{
+		Data: results,
+		Meta: common.BuildPaginationMeta(total, filter.Page, filter.Limit),
+	}, nil
+}
+
 func (r *orderRepository) ListBySessionKey(ctx context.Context, filter OrderFilter, sessionKey string) (*common.PaginatedResponse[[]*OrderDTO], error) {
-	return r.listOrders(ctx, filter, " AND o.session_key = $1 ", []any{sessionKey})
-}
-
-func (r *orderRepository) ListByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error) {
-	return r.listOrders(ctx, filter, " AND o.branch_id = $1 ", []any{branchID})
-}
-
-func (r *orderRepository) ListAll(ctx context.Context, filter OrderFilter) (*common.PaginatedResponse[[]*OrderDTO], error) {
-	return r.listOrders(ctx, filter, " ", []any{})
+	return r.listOrders(ctx, filter, " AND o.session_key = $1 ", []any{sessionKey}, "o.created_at DESC")
 }
 
 func (r *orderRepository) OrderNumberExists(ctx context.Context, branchID string, orderNumber int) (bool, error) {

@@ -22,6 +22,11 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 		statusCode := http.StatusInternalServerError
 		message := "Internal Server Error"
 		var fieldErrors map[string][]string
+		var responseData any
+
+		if errWithData, ok := err.(ErrorWithData); ok {
+			responseData = errWithData.ErrorData()
+		}
 
 		// Check if it's a custom error type
 		if errors.As(err, &customerError) {
@@ -45,7 +50,7 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(Response{
-			Data:       nil,
+			Data:       responseData,
 			Message:    message,
 			StatusCode: statusCode,
 			Errors:     fieldErrors,

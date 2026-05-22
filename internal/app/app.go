@@ -50,6 +50,11 @@ func NewApp() (*App, error) {
 	webhookSecret := getEnv("CHAPA_WEBHOOK_SECRET", chapaSecretKey)
 	menuBaseURL := getEnv("LAZEEZ_MENU_BASE_URL", getEnv("LAZEEZ_TABLE_BASE_URL", "http://localhost:8082/"))
 	logger.Info("Chapa payment return base URL", "menu_base_url", menuBaseURL)
+
+	if callbackURL == "" || menuBaseURL == "" || verifyURL == "" || chapaSecretKey == "" || chapaInitialURL == "" || webhookSecret == "" {
+		return nil, fmt.Errorf("missing required Chapa environment variables")
+	}
+
 	deps, err := initializeDependencies(db, logger, callbackURL, menuBaseURL, verifyURL, chapaSecretKey, chapaInitialURL, webhookSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)

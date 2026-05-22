@@ -28,6 +28,12 @@ type Errors struct {
 	Err     error  `json:"err"`
 }
 
+// ErrorWithData allows domain errors to attach structured details in API responses.
+type ErrorWithData interface {
+	error
+	ErrorData() any
+}
+
 func (e *Errors) Error() string {
 	return fmt.Sprintf("code: %d, message: %s, error: %v", e.Code, e.Message, e.Err)
 }

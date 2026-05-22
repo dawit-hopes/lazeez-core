@@ -114,7 +114,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	ingredientRepo := ingredient.NewIngredientRepository(ingredientDAL, logger)
 	sessionRepo := session.NewSessionRepository(sessionDAL, logger)
 	modifierGroupRepo := modgroup.NewModifierGroupRepository(modifierGroupDAL, logger)
-	modifierOptionRepo := modoption.NewModifierOptionRepository(modifierOptionDAL, logger)
+	modifierOptionRepo := modoption.NewModifierOptionRepository(modifierOptionDAL, joinDAL, logger)
 	orderRepo := order.NewOrderRepository(orderDAL, joinDAL, logger)
 	orderItemRepo := item.NewOrderItemRepository(orderItemDAL, logger)
 	tableRepo := table.NewTableRepository(tableDAL, logger)
@@ -133,9 +133,9 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	modifierGroupService := modgroup.NewModifierGroupService(modifierGroupRepo, logger)
 	modifierOptionService := modoption.NewModifierOptionService(modifierOptionRepo, logger)
 	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, logger)
-	orderItemService := item.NewOrderItemService(orderItemRepo, menuService, modifierOptionService, branchService, logger)
+	orderItemService := item.NewOrderItemService(orderItemRepo, logger)
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
-	orderService := order.NewOrderService(orderRepo, orderItemService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
+	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
 
 

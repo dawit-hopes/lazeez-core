@@ -7,7 +7,9 @@ import (
 	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
 	item "lazeez-core/internal/order/Item"
+	"lazeez-core/internal/menu"
 	"lazeez-core/internal/payment"
+	option "lazeez-core/internal/modifiers/option"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,7 @@ type OrderService interface {
 	// Branch: get/list/update orders for branch (branch_id from token)
 	GetBranch(ctx context.Context, id string, branchID string) (*OrderDTO, error)
 	ListBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error)
+	ArchiveBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error)
 	UpdateBranch(ctx context.Context, id string, input OrderUpdateInput, branchID string) error
 
 	// Admin: get/list/update all orders
@@ -44,6 +47,8 @@ type OrderService interface {
 type orderService struct {
 	orderRepository      OrderRepository
 	orderItemService     item.OrderItemService
+	menuService          menu.MenuService
+	modifierOptionService option.ModifierOptionService
 	clientSessionService clientsession.ClientSessionService
 	paymentService       payment.PaymentService
 	logger               config.Logger
@@ -54,6 +59,8 @@ type orderService struct {
 func NewOrderService(
 	orderRepository OrderRepository,
 	orderItemService item.OrderItemService,
+	menuService menu.MenuService,
+	modifierOptionService option.ModifierOptionService,
 	clientSessionService clientsession.ClientSessionService,
 	paymentService payment.PaymentService,
 	logger config.Logger,
@@ -61,13 +68,15 @@ func NewOrderService(
 	menuBaseURL string,
 ) OrderService {
 	return &orderService{
-		orderRepository:      orderRepository,
-		orderItemService:     orderItemService,
-		clientSessionService: clientSessionService,
-		paymentService:       paymentService,
-		logger:               logger,
-		callbackURL:          callbackURL,
-		menuBaseURL:          menuBaseURL,
+		orderRepository:       orderRepository,
+		orderItemService:      orderItemService,
+		menuService:           menuService,
+		modifierOptionService: modifierOptionService,
+		clientSessionService:  clientSessionService,
+		paymentService:        paymentService,
+		logger:                logger,
+		callbackURL:           callbackURL,
+		menuBaseURL:           menuBaseURL,
 	}
 }
 
@@ -91,6 +100,10 @@ func (s *orderService) CreateClient(ctx context.Context, order OrderInput) (*Cre
 	if err != nil {
 		s.logger.Error("failed to resolve order context", "error", err)
 		return nil, common.ErrInvalidRequest
+	}
+
+	if err := s.validateOrderBeforeCreate(ctx, branchID, order.OrderItems); err != nil {
+		return nil, err
 	}
 
 	orderNumber, err := s.assignOrderNumber(ctx, branchID)
@@ -138,7 +151,7 @@ func (s *orderService) CreateClient(ctx context.Context, order OrderInput) (*Cre
 		if delErr := s.orderRepository.Delete(ctx, created.ID); delErr != nil {
 			s.logger.Error("failed to rollback order after item create failure", "order_id", created.ID, "error", delErr)
 		}
-		return nil, common.ErrInternalServerError
+		return nil, err
 	}
 
 	paymentPayload := payment.PaymentPayload{
@@ -338,10 +351,17 @@ func (s *orderService) ListBranch(ctx context.Context, filter OrderFilter, branc
 	return s.orderRepository.ListByBranch(ctx, filter, branchID)
 }
 
-func (s *orderService) UpdateBranch(ctx context.Context, id string, input OrderUpdateInput, branchID string) error {
-	if input.OrderStatus == "" {
-		return nil
+func (s *orderService) ArchiveBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	if err := ValidateArchiveDateRange(filter); err != nil {
+		return nil, err
 	}
+	if filter.DateFrom == nil || filter.DateTo == nil {
+		return nil, common.ErrInvalidRequest
+	}
+	return s.orderRepository.ListArchiveByBranch(ctx, filter, branchID)
+}
+
+func (s *orderService) UpdateBranch(ctx context.Context, id string, input OrderUpdateInput, branchID string) error {
 	order, err := s.orderRepository.Get(ctx, id)
 	if err != nil {
 		return err
@@ -349,7 +369,7 @@ func (s *orderService) UpdateBranch(ctx context.Context, id string, input OrderU
 	if order.BranchID != branchID {
 		return common.ErrOrderNotFound
 	}
-	return s.orderRepository.UpdateStatus(ctx, id, input.OrderStatus, input.CancellationReason, "")
+	return s.updateOrderStatus(ctx, id, input)
 }
 
 func (s *orderService) GetAdmin(ctx context.Context, id string) (*OrderDTO, error) {
@@ -361,8 +381,5 @@ func (s *orderService) ListAdmin(ctx context.Context, filter OrderFilter) (*comm
 }
 
 func (s *orderService) UpdateAdmin(ctx context.Context, id string, input OrderUpdateInput) error {
-	if input.OrderStatus == "" {
-		return nil
-	}
-	return s.orderRepository.UpdateStatus(ctx, id, input.OrderStatus, input.CancellationReason, "")
+	return s.updateOrderStatus(ctx, id, input)
 }

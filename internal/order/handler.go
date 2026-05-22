@@ -18,6 +18,7 @@ type OrderHandler interface {
 	// Branch handlers (JWT with branch_id)
 	GetBranch(w http.ResponseWriter, r *http.Request)
 	ListBranch(w http.ResponseWriter, r *http.Request)
+	ArchiveBranch(w http.ResponseWriter, r *http.Request)
 	UpdateBranch(w http.ResponseWriter, r *http.Request)
 
 	// Admin handlers (JWT super_admin)
@@ -183,6 +184,29 @@ func (h *orderHandler) ListBranch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *orderHandler) ArchiveBranch(w http.ResponseWriter, r *http.Request) {
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	filter := ParseArchiveOrderFilter(r)
+	result, err := h.orderService.ArchiveBranch(r.Context(), filter, branchID)
+	if err != nil {
+		h.logger.Error("Failed to list archived orders", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Archived orders fetched successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
 func (h *orderHandler) UpdateBranch(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
@@ -237,6 +261,14 @@ func (h *orderHandler) GetAdmin(w http.ResponseWriter, r *http.Request) {
 
 func (h *orderHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
 	filter := ParseOrderFilter(r)
+	if role, ok := middleware.GetRoleFromContext(r.Context()); ok && role == "super_branch_admin" {
+		merchantID, ok := middleware.GetMerchantIDFromContext(r.Context())
+		if !ok || merchantID == "" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		filter.MerchantID = merchantID
+	}
 	result, err := h.orderService.ListAdmin(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("Failed to list orders", "error", err)
