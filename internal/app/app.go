@@ -43,7 +43,14 @@ func NewApp() (*App, error) {
 	router := chi.NewRouter()
 
 	// Initialize all dependencies
-	deps, err := initializeDependencies(db, logger)
+	callbackURL := getEnv("CHAPA_CALLBACK_URL", "")
+	verifyURL := getEnv("CHAPA_VERIFY_URL", "https://api.chapa.co/v1/transaction/verify")
+	chapaSecretKey := getEnv("CHAPA_SECRET_KEY", getEnv("CHAPA_SECRET", ""))
+	chapaInitialURL := getEnv("CHAPA_INITIAL_URL", "https://api.chapa.co/v1/transaction/initialize")
+	webhookSecret := getEnv("CHAPA_WEBHOOK_SECRET", chapaSecretKey)
+	menuBaseURL := getEnv("LAZEEZ_MENU_BASE_URL", getEnv("LAZEEZ_TABLE_BASE_URL", "http://localhost:8082/"))
+	logger.Info("Chapa payment return base URL", "menu_base_url", menuBaseURL)
+	deps, err := initializeDependencies(db, logger, callbackURL, menuBaseURL, verifyURL, chapaSecretKey, chapaInitialURL, webhookSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
 	}

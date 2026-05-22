@@ -13,6 +13,7 @@ type OrderHandler interface {
 	CreateClient(w http.ResponseWriter, r *http.Request)
 	GetClient(w http.ResponseWriter, r *http.Request)
 	ListClient(w http.ResponseWriter, r *http.Request)
+	CancelPaymentClient(w http.ResponseWriter, r *http.Request)
 
 	// Branch handlers (JWT with branch_id)
 	GetBranch(w http.ResponseWriter, r *http.Request)
@@ -23,6 +24,9 @@ type OrderHandler interface {
 	GetAdmin(w http.ResponseWriter, r *http.Request)
 	ListAdmin(w http.ResponseWriter, r *http.Request)
 	UpdateAdmin(w http.ResponseWriter, r *http.Request)
+
+	// webhook handlers
+	ProcessPaymentWebHook(w http.ResponseWriter, r *http.Request)
 }
 
 type orderHandler struct {
@@ -108,6 +112,26 @@ func (h *orderHandler) ListClient(w http.ResponseWriter, r *http.Request) {
 		Data:       result.Data,
 		Meta:       &result.Meta,
 		Message:    "Orders fetched successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *orderHandler) CancelPaymentClient(w http.ResponseWriter, r *http.Request) {
+	id := common.ParseID(r, "id")
+	sessionKey := SessionKeyFromRequest(r)
+	if sessionKey == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	if err := h.orderService.CancelPaymentClient(r.Context(), id, sessionKey); err != nil {
+		h.logger.Error("Failed to cancel payment", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Message:    "Payment cancelled successfully",
 		StatusCode: http.StatusOK,
 	})
 }
@@ -252,6 +276,39 @@ func (h *orderHandler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 
 	common.WriteSuccessResponse(w, common.Response{
 		Message:    "Order updated successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *orderHandler) ProcessPaymentWebHook(w http.ResponseWriter, r *http.Request) {
+	rawBody, ok := r.Context().Value(middleware.WebhookBodyContextKey).([]byte)
+	if !ok || len(rawBody) == 0 {
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+
+	var req PaymentWebHookPayload
+	if err := json.Unmarshal(rawBody, &req); err != nil {
+		h.logger.Error("Failed to decode request", "error", err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+
+	chapaSignature, _ := r.Context().Value(middleware.ChapaSignatureContextKey).(string)
+	xSignature, _ := r.Context().Value(middleware.ChapaXSignatureContextKey).(string)
+	if chapaSignature == "" && xSignature == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	if err := h.orderService.ProcessPaymentWebHook(r.Context(), req, rawBody, chapaSignature, xSignature); err != nil {
+		h.logger.Error("Failed to process payment webhook", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Message:    "Payment webhook processed successfully",
 		StatusCode: http.StatusOK,
 	})
 }

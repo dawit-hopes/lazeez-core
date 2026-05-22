@@ -1,8 +1,9 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"io"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/key"
@@ -22,11 +23,15 @@ type Middleware interface {
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
 	MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request)
 	CORSHandler(next http.Handler) http.Handler
+	ValidateWebhook(next http.Handler) http.Handler
 }
 
 type contextKey string
 
 const claimsContextKey contextKey = "claims"
+const ChapaSignatureContextKey contextKey = "chapaSignature"
+const ChapaXSignatureContextKey contextKey = "chapaXSignature"
+const WebhookBodyContextKey contextKey = "webhookBody"
 
 type middleware struct {
 	keyService     key.KeyService
@@ -227,9 +232,6 @@ func getAllowedOrigins() []string {
 	origins := make([]string, 0, len(parts))
 	for _, p := range parts {
 		if o := strings.TrimSpace(p); o != "" {
-			fmt.Println("================================")
-			fmt.Println(o, "origin")
-			fmt.Println("================================")
 			origins = append(origins, o)
 		}
 	}
@@ -298,4 +300,29 @@ func GetMerchantIDFromContext(ctx context.Context) (string, bool) {
 		return "", false
 	}
 	return mid, true
+}
+
+func (m *middleware) ValidateWebhook(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		signature := r.Header.Get("chapa-signature")
+		xSignature := r.Header.Get("x-chapa-signature")
+
+		if signature == "" && xSignature == "" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			m.logger.Error("failed to read webhook body", "error", err)
+			common.WriteErrorResponse(w, common.ErrInternalServerError)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		ctx := context.WithValue(r.Context(), ChapaSignatureContextKey, signature)
+		ctx = context.WithValue(ctx, ChapaXSignatureContextKey, xSignature)
+		ctx = context.WithValue(ctx, WebhookBodyContextKey, body)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

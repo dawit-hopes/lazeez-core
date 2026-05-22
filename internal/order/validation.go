@@ -47,7 +47,7 @@ func (r *OrderUpdateInput) Validate() error {
 	return validation.ValidateStruct(r,
 		validation.Field(&r.OrderStatus,
 			validation.When(r.OrderStatus != "",
-				validation.In(string(OrderStatusPending), string(OrderStatusProcessing), string(OrderStatusReady), string(OrderStatusCompleted), string(OrderStatusCancelled)).Error("invalid order status"),
+				validation.In(string(StatusPending), string(StatusCompleted), string(StatusCancelled)).Error("invalid order status"),
 			),
 		),
 	)

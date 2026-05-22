@@ -5,14 +5,18 @@ import (
 	"time"
 )
 
-type OrderStatus string
+type Status string
 
 const (
-	OrderStatusPending    OrderStatus = "pending"
-	OrderStatusProcessing OrderStatus = "processing"
-	OrderStatusReady      OrderStatus = "ready"
-	OrderStatusCompleted  OrderStatus = "completed"
-	OrderStatusCancelled  OrderStatus = "cancelled"
+	StatusPending   Status = "pending"
+	StatusCompleted Status = "completed"
+	StatusCancelled Status = "cancelled"
+)
+
+const (
+	PaymentStatusPending = "pending"
+	PaymentStatusSuccess = "success"
+	PaymentStatusFailed  = "failed"
 )
 
 type OrderInput struct {
@@ -25,7 +29,7 @@ type OrderInput struct {
 }
 
 type OrderUpdateInput struct {
-	OrderStatus          string `json:"order_status"`
+	OrderStatus        string `json:"order_status"`
 	CancellationReason string `json:"cancellation_reason,omitempty"`
 }
 
@@ -47,4 +51,35 @@ type OrderDTO struct {
 	CreatedAt            time.Time           `json:"created_at"`
 	UpdatedAt            time.Time           `json:"updated_at"`
 	OrderItems           []item.OrderItemDTO `json:"order_items"`
+}
+
+type CreateOrderResponse struct {
+	ID            string  `json:"id"`
+	OrderNumber   int     `json:"order_number"`
+	Total         float64 `json:"total"`
+	OrderStatus   string  `json:"order_status"`
+	PaymentStatus string  `json:"payment_status"`
+	CheckoutURL   string  `json:"checkout_url"`
+}
+
+type PaymentWebHookPayload struct {
+	Status    string `json:"status"`
+	TRXRef    string `json:"trx_ref"`
+	TxRef     string `json:"tx_ref"`
+	RefID     string `json:"ref_id"`
+	Reference string `json:"reference"`
+}
+
+func (p PaymentWebHookPayload) TransactionRef() string {
+	if p.TxRef != "" {
+		return p.TxRef
+	}
+	return p.TRXRef
+}
+
+func (p PaymentWebHookPayload) ChapaReference() string {
+	if p.Reference != "" {
+		return p.Reference
+	}
+	return p.RefID
 }

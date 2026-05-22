@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"time"
 
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
@@ -17,7 +18,8 @@ type OrderRepository interface {
 	Get(ctx context.Context, id string) (*OrderDTO, error)
 	GetBySessionKey(ctx context.Context, id string, sessionKey string) (*OrderDTO, error)
 	Update(ctx context.Context, order Order) error
-	UpdateStatus(ctx context.Context, id string, status string, cancellationReason string) error
+	UpdateStatus(ctx context.Context, id string, status string, cancellationReason, paymentTransactionID string) error
+	UpdatePaymentStatus(ctx context.Context, id string, input PaymentStatusUpdate) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 	ListBySessionKey(ctx context.Context, filter OrderFilter, sessionKey string) (*common.PaginatedResponse[[]*OrderDTO], error)
@@ -128,11 +130,56 @@ func (r *orderRepository) Update(ctx context.Context, order Order) error {
 	return nil
 }
 
-func (r *orderRepository) UpdateStatus(ctx context.Context, id string, status string, cancellationReason string) error {
+type PaymentStatusUpdate struct {
+	PaymentStatus        string
+	PaymentTransactionID string
+	PaymentAmount        float64
+	PaymentCurrency      string
+	OrderStatus          string
+	CancellationReason   string
+}
+
+func (r *orderRepository) UpdatePaymentStatus(ctx context.Context, id string, input PaymentStatusUpdate) error {
+	filter := map[string]any{"id": id}
+	updates := map[string]any{
+		"payment_status": input.PaymentStatus,
+		"payment_date":   time.Now(),
+	}
+	if input.PaymentTransactionID != "" {
+		updates["payment_transaction_id"] = input.PaymentTransactionID
+	}
+	if input.PaymentAmount > 0 {
+		updates["payment_amount"] = input.PaymentAmount
+	}
+	if input.PaymentCurrency != "" {
+		updates["payment_currency"] = input.PaymentCurrency
+	}
+	if input.OrderStatus != "" {
+		updates["order_status"] = input.OrderStatus
+	}
+	if input.CancellationReason != "" {
+		updates["cancellation_reason"] = input.CancellationReason
+	}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error("order not found", "error", err)
+			return common.ErrOrderNotFound
+		}
+		r.logger.Error("failed to update payment status", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
+
+func (r *orderRepository) UpdateStatus(ctx context.Context, id string, status string, cancellationReason, paymentTransactionID string) error {
 	filter := map[string]any{"id": id}
 	updates := map[string]any{"order_status": status}
 	if cancellationReason != "" {
 		updates["cancellation_reason"] = cancellationReason
+	}
+	if paymentTransactionID != "" {
+		updates["payment_transaction_id"] = paymentTransactionID
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {

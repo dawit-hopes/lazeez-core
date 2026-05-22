@@ -18,3 +18,7 @@ type Filter struct {
 	Sort   string         `json:"sort"`
 	Order  string         `json:"order"`
 }
+
+type InitializationResponse struct {
+	CheckoutURL string `json:"checkout_url"`
+}

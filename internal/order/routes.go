@@ -29,6 +29,12 @@ func NewOrderRoutes(router chi.Router, handler OrderHandler, mw middleware.Middl
 			Handler:     handler.ListClient,
 			Middlewares: []func(next http.Handler) http.Handler{mw.RequireSessionKey},
 		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/client/orders/{id}/cancel-payment",
+			Handler:     handler.CancelPaymentClient,
+			Middlewares: []func(next http.Handler) http.Handler{mw.RequireSessionKey},
+		},
 	}
 
 	// Branch routes: JWT with branch_id (branch_manager)
@@ -77,7 +83,17 @@ func NewOrderRoutes(router chi.Router, handler OrderHandler, mw middleware.Middl
 		},
 	}
 
+	webhookRoutes := []common.Route{
+		{
+			Method:      http.MethodPost,
+			Path:        "/webhook/orders",
+			Handler:     handler.ProcessPaymentWebHook,
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateWebhook},
+		},
+	}
+
 	common.RegisterRoutes(router, clientRoutes)
 	common.RegisterRoutes(router, branchRoutes)
 	common.RegisterRoutes(router, adminRoutes)
+	common.RegisterRoutes(router, webhookRoutes)
 }

@@ -20,6 +20,7 @@ import (
 	modoption "lazeez-core/internal/modifiers/option"
 	"lazeez-core/internal/order"
 	item "lazeez-core/internal/order/Item"
+	"lazeez-core/internal/payment"
 	"lazeez-core/internal/session"
 	"lazeez-core/internal/table"
 	"lazeez-core/internal/users"
@@ -57,24 +58,25 @@ type Dependencies struct {
 	OrderService          order.OrderService
 	TableService          table.TableService
 	ClientSessionService  clientsession.ClientSessionService
+	PaymentService        payment.PaymentService
 
 	// Handlers
-	AuthHandler       auth.AuthHandler
-	UserHandler       users.UserHandler
-	BranchHandler     branch.BranchHandler
-	MerchantHandler   merchant.MerchantHandler
-	MenuHandler       menu.MenuHandler
-	CategoryHandler   category.CategoryHandler
-	IngredientHandler ingredient.IngredientHandler
-	OrderHandler          order.OrderHandler
-	TableHandler          table.TableHandler
-	ClientSessionHandler  clientsession.ClientSessionHandler
+	AuthHandler          auth.AuthHandler
+	UserHandler          users.UserHandler
+	BranchHandler        branch.BranchHandler
+	MerchantHandler      merchant.MerchantHandler
+	MenuHandler          menu.MenuHandler
+	CategoryHandler      category.CategoryHandler
+	IngredientHandler    ingredient.IngredientHandler
+	OrderHandler         order.OrderHandler
+	TableHandler         table.TableHandler
+	ClientSessionHandler clientsession.ClientSessionHandler
 
 	Middleware middleware.Middleware
 }
 
 // initializeDependencies initializes all dependencies in the correct order
-func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, error) {
+func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string, menuBaseURL string, verifyURL string, chapaSecretKey string, chapaInitialURL string, webhookSecret string) (*Dependencies, error) {
 	// Initialize shared services
 	secretKey, err := getSecretKey()
 	if err != nil {
@@ -117,7 +119,10 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	orderItemRepo := item.NewOrderItemRepository(orderItemDAL, logger)
 	tableRepo := table.NewTableRepository(tableDAL, logger)
 	clientSessionRepo := clientsession.NewClientSessionRepository(clientSessionDAL, joinDAL, logger)
+
+
 	// Initialize services
+	paymentService := payment.NewPaymentService(chapaSecretKey, chapaInitialURL, verifyURL, webhookSecret, logger)
 	branchService := branch.NewBranchService(branchRepo, logger)
 	sessionService := session.NewSessionService(sessionRepo, logger)
 	userService := users.NewUserService(userRepo, branchService, logger)
@@ -130,8 +135,10 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, logger)
 	orderItemService := item.NewOrderItemService(orderItemRepo, menuService, modifierOptionService, branchService, logger)
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
-	orderService := order.NewOrderService(orderRepo, orderItemService, clientSessionService, logger)
+	orderService := order.NewOrderService(orderRepo, orderItemService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
+
+
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
 	userHandler := users.NewUserHandler(userService, logger)
@@ -172,6 +179,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger) (*Dependencies, er
 		OrderService:          orderService,
 		TableService:          tableService,
 		ClientSessionService:  clientSessionService,
+		PaymentService:        paymentService,
 		AuthHandler:           authHandler,
 		UserHandler:           userHandler,
 		BranchHandler:         branchHandler,
