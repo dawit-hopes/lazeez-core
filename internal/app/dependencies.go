@@ -211,24 +211,30 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	// Chatbot Reverse Proxy Routing
 	// -------------------------------------------------------------
 	targetURL, err := url.Parse("http://chatbot-api:8000")
-	if err != nil {
-		panic(err) // Ensures configuration errors break early at startup
-	}
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+    if err != nil {
+        panic(err)
+    }
+    proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
-	// Route the POST request for chat messaging
-	router.Post("/api/v1/chat", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Accel-Buffering", "no") // Essential for streaming Gemini tokens
-		proxy.ServeHTTP(w, r)
-	})
+    // Mount an isolated sub-router specifically for the proxy paths
+    router.Route("/api/v1/chat", func(r chi.Router) {
+        r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+            w.Header().Set("X-Accel-Buffering", "no")
+            proxy.ServeHTTP(w, r)
+        })
+        // Handles browser CORS preflight requests explicitly at this path
+        r.Options("/", func(w http.ResponseWriter, r *http.Request) {
+            w.WriteHeader(http.StatusOK)
+        })
+    })
 
-	// Route the Swagger documentation paths cleanly
-	router.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
-	})
-	router.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
-	})
+    // Documentation routing
+    router.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+        proxy.ServeHTTP(w, r)
+    })
+    router.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+        proxy.ServeHTTP(w, r)
+    })
 	// -------------------------------------------------------------
 
 	auth.NewAuthRoutes(router, deps.AuthHandler, deps.Middleware)
