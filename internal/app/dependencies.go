@@ -3,8 +3,6 @@ package app
 import (
 	"database/sql"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 
 	"lazeez-core/config"
 	"lazeez-core/internal/auth"
@@ -122,6 +120,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	tableRepo := table.NewTableRepository(tableDAL, logger)
 	clientSessionRepo := clientsession.NewClientSessionRepository(clientSessionDAL, joinDAL, logger)
 
+
 	// Initialize services
 	paymentService := payment.NewPaymentService(chapaSecretKey, chapaInitialURL, verifyURL, webhookSecret, logger)
 	branchService := branch.NewBranchService(branchRepo, logger)
@@ -138,6 +137,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
 	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
+
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -206,36 +206,6 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-
-	// -------------------------------------------------------------
-	// Chatbot Reverse Proxy Routing
-	// -------------------------------------------------------------
-	targetURL, err := url.Parse("http://chatbot-api:8000")
-    if err != nil {
-        panic(err)
-    }
-    proxy := httputil.NewSingleHostReverseProxy(targetURL)
-
-    // Mount an isolated sub-router specifically for the proxy paths
-    router.Route("/api/v1/chat", func(r chi.Router) {
-        r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-            w.Header().Set("X-Accel-Buffering", "no")
-            proxy.ServeHTTP(w, r)
-        })
-        // Handles browser CORS preflight requests explicitly at this path
-        r.Options("/", func(w http.ResponseWriter, r *http.Request) {
-            w.WriteHeader(http.StatusOK)
-        })
-    })
-
-    // Documentation routing
-    router.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
-        proxy.ServeHTTP(w, r)
-    })
-    router.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
-        proxy.ServeHTTP(w, r)
-    })
-	// -------------------------------------------------------------
 
 	auth.NewAuthRoutes(router, deps.AuthHandler, deps.Middleware)
 	users.NewUserRoutes(router, deps.UserHandler, deps.Middleware)
