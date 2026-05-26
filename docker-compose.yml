@@ -1,3 +1,56 @@
+# services:
+#   # -------------------
+#   # PostgreSQL Service
+#   # -------------------
+#   db:
+#     image: postgres:15
+#     restart: always
+#     env_file: .env
+#     environment:
+#       - PGDATA=/var/lib/postgresql/data/pgdata
+#     volumes:
+#       - db-data:/var/lib/postgresql/data
+#       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+#     ports:
+#       - "5432:5432"
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+
+#   # -------------------
+#   # Go Backend Service
+#   # -------------------
+#   app:
+#     build: .
+#     restart: always
+#     env_file: .env
+#     environment:
+#       # Use individual DB_* vars (not DATABASE_URL) so special chars in password work
+#       - DB_HOST=db
+#       - DB_PORT=5432
+#       - DB_USER=${POSTGRES_USER:-lazeez}
+#       - DB_PASSWORD=${POSTGRES_PASSWORD}
+#       - DB_NAME=${POSTGRES_DB:-lazeez}
+#     depends_on:
+#       db:
+#         condition: service_healthy
+#     ports:
+#       - "8080:8080"
+#     command: sh -c "echo Waiting for DB... && ./main"
+#     healthcheck:
+#       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:${PORT:-8080}/health || exit 1"]
+#       interval: 30s
+#       timeout: 3s
+#       retries: 3
+
+# volumes:
+#   db-data:
+
+
+version: '3.8'
+
 services:
   # -------------------
   # PostgreSQL Service
@@ -27,7 +80,6 @@ services:
     restart: always
     env_file: .env
     environment:
-      # Use individual DB_* vars (not DATABASE_URL) so special chars in password work
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-lazeez}
@@ -44,6 +96,18 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+
+  # -------------------
+  # Python Chatbot Service (Added here)
+  # -------------------
+  chatbot-api:
+    build: ../maraton-ai  # Point this path to where your maraton-ai folder lives relative to this file
+    container_name: hotel_chatbot_api
+    restart: always
+    env_file: .env
+    volumes:
+      - ../maraton-ai/app/data:/app/app/data  # Persists hotel data inside the container
+    # No public ports mapped here because only the Go container needs to talk to it securely inside Docker
 
 volumes:
   db-data:
