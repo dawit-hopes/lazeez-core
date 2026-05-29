@@ -75,4 +75,8 @@ var (
 	ErrClientSessionNotFound            = &Errors{Code: NotFound, Message: "client session not found"}
 	ErrClientSessionExpired             = &Errors{Code: Unauthorized, Message: "client session has expired"}
 	ErrNotFound                         = &Errors{Code: NotFound, Message: "resource not found"}
+	ErrRoomNotFound                     = &Errors{Code: NotFound, Message: "room not found"}
+	ErrRoomAlreadyExists                = &Errors{Code: BadRequest, Message: "room with this information already exists"}
+	ErrRoomAlreadyDeleted               = &Errors{Code: BadRequest, Message: "room is already deleted"}
+	ErrRoomCloneAlreadyExists           = &Errors{Code: BadRequest, Message: "room type already cloned for this branch"}
 )
