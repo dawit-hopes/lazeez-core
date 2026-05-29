@@ -5,6 +5,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/users"
 )
 
@@ -12,54 +13,46 @@ type RoomService interface {
 	CreateRoom(ctx context.Context, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error)
 	GetRoom(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error)
 	ListRooms(ctx context.Context, filter common.Filter, role, branchID, merchantID string, scope ListScope) (*common.PaginatedResponse[[]*RoomDTO], error)
-	UpdateRoom(ctx context.Context, id string, req RoomRequestDTO, role, branchID, merchantID string) error
+	UpdateRoom(ctx context.Context, id string, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error)
 	DeleteRoom(ctx context.Context, id, role, branchID, merchantID string) error
 	CloneRoom(ctx context.Context, masterID string, req CloneRoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error)
 }
 
 type roomService struct {
-	roomRepository RoomRepository
-	branchService  branch.BranchService
-	logger         config.Logger
+	roomRepository  RoomRepository
+	branchService   branch.BranchService
+	merchantService merchant.MerchantService
+	logger          config.Logger
 }
 
-func NewRoomService(roomRepository RoomRepository, branchService branch.BranchService, logger config.Logger) RoomService {
+func NewRoomService(
+	roomRepository RoomRepository,
+	branchService branch.BranchService,
+	merchantService merchant.MerchantService,
+	logger config.Logger,
+) RoomService {
 	return &roomService{
-		roomRepository: roomRepository,
-		branchService:  branchService,
-		logger:         logger,
+		roomRepository:  roomRepository,
+		branchService:   branchService,
+		merchantService: merchantService,
+		logger:          logger,
 	}
-}
-
-func isSuperAdmin(role string) bool {
-	return role == string(users.RoleAdmin)
-}
-
-func isSuperBranchAdmin(role string) bool {
-	return role == string(users.RoleSuperBranchManager)
-}
-
-func isBranchManager(role string) bool {
-	return users.IsBranchStaffRoleString(role) && role == string(users.RoleBranchManager)
-}
-
-func canManageMaster(role, userMerchantID, roomMerchantID string) bool {
-	if isSuperAdmin(role) {
-		return true
-	}
-	return isSuperBranchAdmin(role) && userMerchantID != "" && userMerchantID == roomMerchantID
 }
 
 func (s *roomService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
-	isMaster := req.BranchID == "" && (isSuperBranchAdmin(role) || isSuperAdmin(role))
+	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
+		return nil, err
+	}
 
-	if isBranchManager(role) {
+	isMaster := req.BranchID == "" && (users.IsSuperBranchAdminRoleString(role) || users.IsSuperAdminRoleString(role))
+
+	if users.IsBranchManagerRoleString(role) {
 		if branchID == "" {
 			return nil, common.ErrUnAuthorized
 		}
 		req.BranchID = branchID
 		isMaster = false
-	} else if !isSuperAdmin(role) && !isSuperBranchAdmin(role) {
+	} else if !users.IsSuperAdminRoleString(role) && !users.IsSuperBranchAdminRoleString(role) {
 		return nil, common.ErrUnAuthorized
 	}
 
@@ -80,10 +73,10 @@ func (s *roomService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, 
 		if err != nil {
 			return nil, err
 		}
-		if isBranchManager(role) && targetBranchID != branchID {
+		if users.IsBranchManagerRoleString(role) && targetBranchID != branchID {
 			return nil, common.ErrUnAuthorized
 		}
-		if isSuperBranchAdmin(role) && merchantID != "" && br.MerchantID != merchantID {
+		if users.IsSuperBranchAdminRoleString(role) && merchantID != "" && br.MerchantID != merchantID {
 			return nil, common.ErrUnAuthorized
 		}
 		req.MerchantID = br.MerchantID
@@ -105,10 +98,15 @@ func (s *roomService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, 
 		s.logger.Error("failed to create room", "error", err)
 		return nil, err
 	}
-	return dto, nil
+	enriched := enrichRoomDTO(*dto, &room, role, branchID, merchantID)
+	return &enriched, nil
 }
 
 func (s *roomService) GetRoom(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error) {
+	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
+		return nil, err
+	}
+
 	room, err := s.roomRepository.GetRoom(ctx, id)
 	if err != nil {
 		return nil, err
@@ -116,24 +114,46 @@ func (s *roomService) GetRoom(ctx context.Context, id, role, branchID, merchantI
 	if err := s.authorizeRead(ctx, room, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
-	dto := room.ToDTO()
+	dto := enrichRoomDTO(room.ToDTO(), room, role, branchID, merchantID)
 	return &dto, nil
 }
 
-func (s *roomService) ListRooms(ctx context.Context, filter common.Filter, role, branchID, merchantID string, scope ListScope) (*common.PaginatedResponse[[]*RoomDTO], error) {
-	if scope == "" {
-		switch {
-		case isBranchManager(role):
-			scope = ScopeBranchManage
-		case isSuperBranchAdmin(role) || isSuperAdmin(role):
-			if branchID != "" || filterBranchID(filter) != "" {
-				scope = ScopeBranchManage
-			} else {
-				scope = ScopeMaster
-			}
-		default:
-			return nil, common.ErrUnAuthorized
+func (s *roomService) ListRooms(ctx context.Context, filter common.Filter, role, branchID, merchantID string, requestedScope ListScope) (*common.PaginatedResponse[[]*RoomDTO], error) {
+	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
+		return nil, err
+	}
+
+	if !users.IsBranchManagerRoleString(role) && !users.IsSuperBranchAdminRoleString(role) && !users.IsSuperAdminRoleString(role) {
+		return nil, common.ErrUnAuthorized
+	}
+
+	scope, listBranchID, err := s.resolveListScope(ctx, role, branchID, merchantID, requestedScope, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.roomRepository.ListScoped(ctx, filter, scope, listBranchID, merchantID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, dto := range result.Data {
+		if dto == nil {
+			continue
 		}
+		room := roomFromDTO(dto)
+		enriched := enrichRoomDTO(*dto, room, role, branchID, merchantID)
+		result.Data[i] = &enriched
+	}
+	return result, nil
+}
+
+func (s *roomService) resolveListScope(ctx context.Context, role, branchID, merchantID string, requestedScope ListScope, filter common.Filter) (ListScope, string, error) {
+	if users.IsBranchManagerRoleString(role) {
+		if branchID == "" {
+			return "", "", common.ErrUnAuthorized
+		}
+		return ScopeBranchManage, branchID, nil
 	}
 
 	listBranchID := branchID
@@ -141,17 +161,56 @@ func (s *roomService) ListRooms(ctx context.Context, filter common.Filter, role,
 		listBranchID = filterBranchID(filter)
 	}
 
-	if scope == ScopeMaster && merchantID == "" {
-		return nil, common.ErrBranchAdminMissingMerchant
-	}
-	if scope == ScopeBranchManage && listBranchID == "" {
-		return nil, common.ErrUnAuthorized
-	}
-	if !isBranchManager(role) && !isSuperBranchAdmin(role) && !isSuperAdmin(role) {
-		return nil, common.ErrUnAuthorized
+	if users.IsSuperBranchAdminRoleString(role) {
+		if requestedScope == ScopeBranchManage || listBranchID != "" {
+			if listBranchID == "" {
+				return "", "", common.ErrUnAuthorized
+			}
+			if err := s.ensureBranchInMerchant(ctx, listBranchID, merchantID); err != nil {
+				return "", "", err
+			}
+			return ScopeBranchManage, listBranchID, nil
+		}
+		if requestedScope != "" && requestedScope != ScopeMaster {
+			return "", "", common.ErrUnAuthorized
+		}
+		if merchantID == "" {
+			return "", "", common.ErrBranchAdminMissingMerchant
+		}
+		return ScopeMaster, "", nil
 	}
 
-	return s.roomRepository.ListScoped(ctx, filter, scope, listBranchID, merchantID)
+	if users.IsSuperAdminRoleString(role) {
+		if requestedScope == ScopeBranchManage || listBranchID != "" {
+			if listBranchID == "" {
+				return "", "", common.ErrUnAuthorized
+			}
+			return ScopeBranchManage, listBranchID, nil
+		}
+		if requestedScope != "" && requestedScope != ScopeMaster {
+			return "", "", common.ErrUnAuthorized
+		}
+		return ScopeMaster, "", nil
+	}
+
+	return "", "", common.ErrUnAuthorized
+}
+
+func roomFromDTO(dto *RoomDTO) *Room {
+	room := &Room{
+		Base:          common.Base{ID: dto.ID},
+		Name:          dto.Name,
+		Description:   dto.Description,
+		MerchantID:    dto.MerchantID,
+		PricePerNight: dto.PricePerNight,
+	}
+	if dto.BranchID != "" {
+		room.BranchID = common.ToNUllString(dto.BranchID)
+	}
+	if dto.ParentID != "" {
+		room.ParentID = common.ToNUllString(dto.ParentID)
+	}
+	return room
 }
 
 func filterBranchID(filter common.Filter) string {
@@ -164,23 +223,41 @@ func filterBranchID(filter common.Filter) string {
 	return ""
 }
 
-func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomRequestDTO, role, branchID, merchantID string) error {
+func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
+	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
+		return nil, err
+	}
+
 	existing, err := s.roomRepository.GetRoom(ctx, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.authorizeMutate(existing, role, branchID, merchantID); err != nil {
-		return err
+		return nil, err
+	}
+
+	if existing.IsClone() {
+		if req.Name != "" || req.Description != "" {
+			return nil, common.ErrRoomClonePriceOnly
+		}
+		if req.PricePerNight <= 0 {
+			return nil, common.ErrInvalidRequest
+		}
+		existing.PricePerNight = req.PricePerNight
+		if err := s.roomRepository.UpdateRoom(ctx, id, *existing); err != nil {
+			return nil, err
+		}
+		return s.GetRoom(ctx, id, role, branchID, merchantID)
 	}
 
 	if req.Name != "" && req.Name != existing.Name {
 		name := common.FormatText(req.Name)
 		if existing.IsMaster() {
 			if err := s.roomRepository.CheckMasterExists(ctx, name, existing.MerchantID); err != nil {
-				return err
+				return nil, err
 			}
 		} else if err := s.roomRepository.CheckBranchExists(ctx, name, existing.BranchIDString()); err != nil {
-			return err
+			return nil, err
 		}
 		existing.Name = name
 	}
@@ -191,10 +268,17 @@ func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomRequest
 		existing.PricePerNight = req.PricePerNight
 	}
 
-	return s.roomRepository.UpdateRoom(ctx, id, *existing)
+	if err := s.roomRepository.UpdateRoom(ctx, id, *existing); err != nil {
+		return nil, err
+	}
+	return s.GetRoom(ctx, id, role, branchID, merchantID)
 }
 
 func (s *roomService) DeleteRoom(ctx context.Context, id, role, branchID, merchantID string) error {
+	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
+		return err
+	}
+
 	existing, err := s.roomRepository.GetRoom(ctx, id)
 	if err != nil {
 		return err
@@ -206,7 +290,11 @@ func (s *roomService) DeleteRoom(ctx context.Context, id, role, branchID, mercha
 }
 
 func (s *roomService) CloneRoom(ctx context.Context, masterID string, req CloneRoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
-	if !isBranchManager(role) || branchID == "" {
+	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
+		return nil, err
+	}
+
+	if !users.IsBranchManagerRoleString(role) || branchID == "" {
 		return nil, common.ErrUnAuthorized
 	}
 
@@ -236,12 +324,6 @@ func (s *roomService) CloneRoom(ctx context.Context, masterID string, req CloneR
 		ParentID:      common.ToNUllString(masterID),
 		PricePerNight: master.PricePerNight,
 	}
-	if req.Name != "" {
-		clone.Name = common.FormatText(req.Name)
-	}
-	if req.Description != "" {
-		clone.Description = req.Description
-	}
 	if req.PricePerNight > 0 {
 		clone.PricePerNight = req.PricePerNight
 	}
@@ -252,21 +334,19 @@ func (s *roomService) CloneRoom(ctx context.Context, masterID string, req CloneR
 		s.logger.Error("failed to clone room", "error", err)
 		return nil, err
 	}
-	dto.IsMaster = false
-	dto.IsClone = true
-	dto.CanEdit = true
-	return dto, nil
+	enriched := enrichRoomDTO(*dto, &clone, role, branchID, merchantID)
+	return &enriched, nil
 }
 
 func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branchID, merchantID string) error {
-	if isSuperAdmin(role) {
+	if users.IsSuperAdminRoleString(role) {
 		return nil
 	}
 	if room.IsMaster() {
-		if canManageMaster(role, merchantID, room.MerchantID) {
+		if users.CanManageMerchantMaster(role, merchantID, room.MerchantID) {
 			return nil
 		}
-		if isBranchManager(role) && branchID != "" {
+		if users.IsBranchManagerRoleString(role) && branchID != "" {
 			br, err := s.branchService.Get(ctx, branchID)
 			if err != nil {
 				return err
@@ -277,10 +357,10 @@ func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branc
 		}
 		return common.ErrUnAuthorized
 	}
-	if isBranchManager(role) && room.BranchIDString() == branchID {
+	if users.IsBranchManagerRoleString(role) && room.BranchIDString() == branchID {
 		return nil
 	}
-	if canManageMaster(role, merchantID, room.MerchantID) {
+	if users.CanManageMerchantMaster(role, merchantID, room.MerchantID) {
 		return nil
 	}
 	return common.ErrUnAuthorized
@@ -288,21 +368,21 @@ func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branc
 
 func (s *roomService) authorizeMutate(room *Room, role, branchID, merchantID string) error {
 	if room.IsMaster() {
-		if isBranchManager(role) {
+		if users.IsBranchManagerRoleString(role) {
 			return common.ErrUnAuthorized
 		}
-		if !canManageMaster(role, merchantID, room.MerchantID) {
+		if !users.CanManageMerchantMaster(role, merchantID, room.MerchantID) {
 			return common.ErrUnAuthorized
 		}
 		return nil
 	}
-	if isBranchManager(role) {
+	if users.IsBranchManagerRoleString(role) {
 		if branchID == "" || room.BranchIDString() != branchID {
 			return common.ErrUnAuthorized
 		}
 		return nil
 	}
-	if canManageMaster(role, merchantID, room.MerchantID) {
+	if users.CanManageMerchantMaster(role, merchantID, room.MerchantID) {
 		return nil
 	}
 	return common.ErrUnAuthorized

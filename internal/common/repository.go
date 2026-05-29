@@ -14,7 +14,11 @@ type Repository[T Mappable] interface {
 	List(ctx context.Context, filters map[string]any, limit, offset int) ([]T, error)
 	Delete(ctx context.Context, id string) error
 	DeleteByFilters(ctx context.Context, filters map[string]any) error
+	HardDelete(ctx context.Context, id string) error
+	UnDelete(ctx context.Context, id string) error
+	UnDeleteByFilters(ctx context.Context, filters map[string]any) error
 	Count(ctx context.Context) (int, error)
+	CountFiltered(ctx context.Context, filters map[string]any) (int64, error)
 }
 
 type DAL[T Mappable] struct {
@@ -221,12 +225,25 @@ func (r *DAL[T]) Update(ctx context.Context, filters map[string]any, updates map
 	return nil
 }
 
-// Delete deletes a record
+// Delete soft-deletes a record by id (sets is_deleted and deleted_at).
 func (r *DAL[T]) Delete(ctx context.Context, id string) error {
 	temp := r.factory()
-	query := fmt.Sprintf("UPDATE %s SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW() WHERE id = $1", temp.Table())
-	_, err := r.db.ExecContext(ctx, query, id)
-	return err
+	query := fmt.Sprintf(
+		"UPDATE %s SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW() WHERE id = $1 AND is_deleted = FALSE",
+		temp.Table(),
+	)
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // SoftDeleteWhere performs a set-based soft delete on the table for T using
@@ -270,7 +287,7 @@ func (r *DAL[T]) SoftDeleteWhere(ctx context.Context, where string, args ...any)
 	return nil
 }
 
-// Count counts the number of records
+// Count counts the number of non-deleted records.
 func (r *DAL[T]) Count(ctx context.Context) (int, error) {
 	temp := r.factory()
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE is_deleted = FALSE", temp.Table())
@@ -278,6 +295,42 @@ func (r *DAL[T]) Count(ctx context.Context) (int, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx, query).Scan(&count)
 	return count, err
+}
+
+// CountFiltered counts records matching filters (defaults is_deleted = false when omitted).
+func (r *DAL[T]) CountFiltered(ctx context.Context, filters map[string]any) (int64, error) {
+	instance := r.factory()
+	if filters == nil {
+		filters = make(map[string]any)
+	}
+	if _, exists := filters["is_deleted"]; !exists {
+		filters["is_deleted"] = false
+	}
+
+	whereClause, args := r.buildWhereClause(filters, 0)
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s %s", instance.Table(), whereClause)
+
+	var count int64
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count, err
+}
+
+// HardDelete permanently removes a record by id.
+func (r *DAL[T]) HardDelete(ctx context.Context, id string) error {
+	temp := r.factory()
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = $1", temp.Table())
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // IsNull is a filter value that generates SQL "col IS NULL".
@@ -333,10 +386,75 @@ func (r *DAL[T]) DeleteByFilters(ctx context.Context, filters map[string]any) er
 		return nil
 	}
 
+	if filters == nil {
+		filters = make(map[string]any)
+	}
+	if _, exists := filters["is_deleted"]; !exists {
+		filters["is_deleted"] = false
+	}
+
 	instance := r.factory()
 	whereClause, args := r.buildWhereClause(filters, 0)
 	query := fmt.Sprintf(
 		"UPDATE %s SET is_deleted = TRUE, updated_at = NOW(), deleted_at = NOW() %s",
+		instance.Table(),
+		whereClause,
+	)
+
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// UnDelete restores a soft-deleted record by id (clears is_deleted and deleted_at).
+func (r *DAL[T]) UnDelete(ctx context.Context, id string) error {
+	temp := r.factory()
+	query := fmt.Sprintf(
+		"UPDATE %s SET is_deleted = FALSE, deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND is_deleted = TRUE",
+		temp.Table(),
+	)
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// UnDeleteByFilters restores soft-deleted records matching filters.
+func (r *DAL[T]) UnDeleteByFilters(ctx context.Context, filters map[string]any) error {
+	if len(filters) == 0 {
+		return nil
+	}
+
+	if filters == nil {
+		filters = make(map[string]any)
+	}
+	if _, exists := filters["is_deleted"]; !exists {
+		filters["is_deleted"] = true
+	}
+
+	instance := r.factory()
+	whereClause, args := r.buildWhereClause(filters, 0)
+	query := fmt.Sprintf(
+		"UPDATE %s SET is_deleted = FALSE, deleted_at = NULL, updated_at = NOW() %s",
 		instance.Table(),
 		whereClause,
 	)

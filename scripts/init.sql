@@ -427,7 +427,7 @@ CREATE INDEX IF NOT EXISTS idx_rooms_parent_id
 
 COMMENT ON TABLE rooms IS 'Hotel room types: merchant master (branch_id NULL) or branch-owned (specific type or clone of master via parent_id)';
 COMMENT ON COLUMN rooms.branch_id IS 'NULL for merchant master room types; set for branch-specific or cloned types';
-COMMENT ON COLUMN rooms.parent_id IS 'When set, this row is a branch clone of the master room type referenced by parent_id';
+COMMENT ON COLUMN rooms.parent_id IS 'When set, this row is a branch clone of the master room type referenced by parent_id. Deleting a master hard-deletes its clones via ON DELETE CASCADE.';
 
 CREATE TRIGGER update_rooms_updated_at
     BEFORE UPDATE ON rooms

@@ -49,7 +49,7 @@ func (r *roomRepository) CreateRoom(ctx context.Context, room Room) (*RoomDTO, e
 }
 
 func (r *roomRepository) GetRoom(ctx context.Context, id string) (*Room, error) {
-	filter := map[string]any{"id": id}
+	filter := map[string]any{"id": id, "is_deleted": false}
 	result, err := r.dal.Get(ctx, filter)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -116,6 +116,13 @@ func (r *roomRepository) listMaster(ctx context.Context, filter common.Filter, m
 	if page <= 0 {
 		page = 1
 	}
+
+	total, err := r.dal.CountFiltered(ctx, filters)
+	if err != nil {
+		r.logger.Error("failed to count master rooms", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
 	results, err := r.dal.List(ctx, filters, page, limit)
 	if err != nil {
 		r.logger.Error("failed to list master rooms", "error", err)
@@ -128,8 +135,21 @@ func (r *roomRepository) listMaster(ctx context.Context, filter common.Filter, m
 	}
 	return &common.PaginatedResponse[[]*RoomDTO]{
 		Data: dtos,
-		Meta: common.BuildPaginationMeta(int64(len(dtos)), page, limit),
+		Meta: common.BuildPaginationMeta(total, page, limit),
 	}, nil
+}
+
+func branchManageWhereSQL(searchClause string) string {
+	return fmt.Sprintf(`r.is_deleted = FALSE
+			AND (
+				(r.branch_id IS NULL AND r.parent_id IS NULL AND r.merchant_id = b.merchant_id
+					AND NOT EXISTS (
+						SELECT 1 FROM rooms c
+						WHERE c.parent_id = r.id AND c.branch_id = b.id AND c.is_deleted = FALSE
+					))
+				OR r.branch_id = b.id
+			)
+			%s`, searchClause)
 }
 
 func (r *roomRepository) listBranchManage(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*RoomDTO], error) {
@@ -149,9 +169,23 @@ func (r *roomRepository) listBranchManage(ctx context.Context, filter common.Fil
 		page = 1
 	}
 	offset := (page - 1) * limit
-	argN := len(args)
 
-	query := fmt.Sprintf(`
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM rooms r
+		INNER JOIN branches b ON b.id = $1 AND b.is_deleted = FALSE
+		WHERE %s`, branchManageWhereSQL(searchClause))
+
+	var total int64
+	if err := r.join.QueryRow(ctx, countQuery, args, func(row *sql.Row) error {
+		return row.Scan(&total)
+	}); err != nil {
+		r.logger.Error("failed to count branch rooms", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
+	argN := len(args)
+	listQuery := fmt.Sprintf(`
 		SELECT r.id, r.name, r.description, r.merchant_id, r.branch_id, r.parent_id,
 			r.price_per_night, r.deleted_at, r.is_deleted, r.created_at, r.updated_at,
 			(r.branch_id IS NULL AND r.parent_id IS NULL) AS is_master,
@@ -159,22 +193,13 @@ func (r *roomRepository) listBranchManage(ctx context.Context, filter common.Fil
 			(r.branch_id IS NOT NULL) AS can_edit
 		FROM rooms r
 		INNER JOIN branches b ON b.id = $1 AND b.is_deleted = FALSE
-		WHERE r.is_deleted = FALSE
-			AND (
-				(r.branch_id IS NULL AND r.parent_id IS NULL AND r.merchant_id = b.merchant_id
-					AND NOT EXISTS (
-						SELECT 1 FROM rooms c
-						WHERE c.parent_id = r.id AND c.branch_id = b.id AND c.is_deleted = FALSE
-					))
-				OR r.branch_id = b.id
-			)
-			%s
+		WHERE %s
 		ORDER BY is_master DESC, r.created_at DESC
-		LIMIT $%d OFFSET $%d`, searchClause, argN+1, argN+2)
+		LIMIT $%d OFFSET $%d`, branchManageWhereSQL(searchClause), argN+1, argN+2)
 
-	args = append(args, limit, offset)
+	listArgs := append(append([]any{}, args...), limit, offset)
 
-	rows, err := common.QueryRows(r.join, ctx, query, args, scanRoomListRow)
+	rows, err := common.QueryRows(r.join, ctx, listQuery, listArgs, scanRoomListRow)
 	if err != nil {
 		r.logger.Error("failed to list branch rooms", "error", err)
 		return nil, common.ErrInternalServerError
@@ -186,7 +211,7 @@ func (r *roomRepository) listBranchManage(ctx context.Context, filter common.Fil
 	}
 	return &common.PaginatedResponse[[]*RoomDTO]{
 		Data: dtos,
-		Meta: common.BuildPaginationMeta(int64(len(dtos)), page, limit),
+		Meta: common.BuildPaginationMeta(total, page, limit),
 	}, nil
 }
 
@@ -208,7 +233,7 @@ func scanRoomListRow(rows *sql.Rows) (RoomDTO, error) {
 }
 
 func (r *roomRepository) UpdateRoom(ctx context.Context, id string, room Room) error {
-	filter := map[string]any{"id": id}
+	filter := map[string]any{"id": id, "is_deleted": false}
 	updates := map[string]any{
 		"name":            room.Name,
 		"description":     room.Description,
@@ -225,11 +250,12 @@ func (r *roomRepository) UpdateRoom(ctx context.Context, id string, room Room) e
 	return nil
 }
 
+// DeleteRoom permanently deletes a room. Clones are removed via ON DELETE CASCADE when a master is deleted.
 func (r *roomRepository) DeleteRoom(ctx context.Context, id string) error {
-	filter := map[string]any{"id": id}
-	updates := map[string]any{"is_deleted": true}
-	err := r.dal.Update(ctx, filter, updates)
-	if err != nil {
+	if _, err := r.GetRoom(ctx, id); err != nil {
+		return err
+	}
+	if err := r.dal.HardDelete(ctx, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return common.ErrRoomNotFound
 		}

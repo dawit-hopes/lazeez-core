@@ -38,18 +38,10 @@ func (r *RoomRequestDTO) IsEmpty() bool {
 }
 
 func (r *CloneRoomRequestDTO) Validate() error {
-	rules := []*validation.FieldRules{}
-	if r.Name != "" {
-		rules = append(rules, validation.Field(&r.Name, validation.Length(3, 100).Error("name must be between 3 and 100 characters")))
-	}
-	if r.Description != "" {
-		rules = append(rules, validation.Field(&r.Description, validation.Length(3, 1000).Error("description must be between 3 and 1000 characters")))
-	}
-	if r.PricePerNight != 0 {
-		rules = append(rules, validation.Field(&r.PricePerNight, validation.Min(0.01).Error("price per night must be greater than 0")))
-	}
-	if len(rules) == 0 {
+	if r.PricePerNight == 0 {
 		return nil
 	}
-	return validation.ValidateStruct(r, rules...)
+	return validation.ValidateStruct(r,
+		validation.Field(&r.PricePerNight, validation.Min(0.01).Error("price per night must be greater than 0")),
+	)
 }

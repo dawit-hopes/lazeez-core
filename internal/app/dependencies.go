@@ -143,7 +143,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
 	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
-	roomService := rooms.NewRoomService(roomRepo, branchService, logger)
+	roomService := rooms.NewRoomService(roomRepo, branchService, merchantService, logger)
 
 
 	// Initialize handlers

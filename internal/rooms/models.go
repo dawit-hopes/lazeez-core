@@ -71,9 +71,8 @@ func (r *Room) ToDTO() RoomDTO {
 		BranchID:      r.BranchIDString(),
 		ParentID:      r.ParentIDString(),
 		PricePerNight: r.PricePerNight,
-		IsMaster:      r.IsMaster(),
-		IsClone:       r.IsClone(),
-		CanEdit:       !r.IsMaster(),
+		IsMaster: r.IsMaster(),
+		IsClone:  r.IsClone(),
 	}
 	return dto
 }

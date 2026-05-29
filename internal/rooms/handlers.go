@@ -58,7 +58,7 @@ func (h *roomHandler) Create(w http.ResponseWriter, r *http.Request) {
 	common.WriteSuccessResponse(w, common.Response{
 		Data:       room,
 		Message:    "Room created successfully",
-		StatusCode: http.StatusOK,
+		StatusCode: http.StatusCreated,
 	})
 }
 
@@ -122,13 +122,14 @@ func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	err := h.roomService.UpdateRoom(r.Context(), id, req, role, branchID, merchantID)
+	room, err := h.roomService.UpdateRoom(r.Context(), id, req, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to update room", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
+		Data:       room,
 		Message:    "Room updated successfully",
 		StatusCode: http.StatusOK,
 	})

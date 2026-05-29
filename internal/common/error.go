@@ -79,4 +79,6 @@ var (
 	ErrRoomAlreadyExists                = &Errors{Code: BadRequest, Message: "room with this information already exists"}
 	ErrRoomAlreadyDeleted               = &Errors{Code: BadRequest, Message: "room is already deleted"}
 	ErrRoomCloneAlreadyExists           = &Errors{Code: BadRequest, Message: "room type already cloned for this branch"}
+	ErrRoomsHotelOnly                   = &Errors{Code: BadRequest, Message: "room types are only available for hotel merchants"}
+	ErrRoomClonePriceOnly               = &Errors{Code: BadRequest, Message: "cloned room types can only customize price per night"}
 )

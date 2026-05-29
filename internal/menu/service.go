@@ -62,34 +62,8 @@ func NewMenuService(menuRepository MenuRepository,
 	}
 }
 
-func isSuperAdmin(role string) bool {
-	return role == "super_admin"
-}
-
-func isBranchUser(role string) bool {
-	return users.IsBranchStaffRoleString(role) || role == string(users.RoleSuperBranchManager)
-}
-
-func isSuperBranchAdmin(role string) bool {
-	return role == string(users.RoleSuperBranchManager)
-}
-
-func isBranchManager(role string) bool {
-	return users.IsBranchStaffRoleString(role)
-}
-
-func canManageMasterMenu(role, userMerchantID, menuMerchantID string) bool {
-	if isSuperAdmin(role) {
-		return true
-	}
-	if isSuperBranchAdmin(role) && userMerchantID != "" && userMerchantID == menuMerchantID {
-		return true
-	}
-	return false
-}
-
 func isMasterMenuCreate(role string, branchID string) bool {
-	return branchID == "" && (isSuperBranchAdmin(role) || isSuperAdmin(role))
+	return branchID == "" && (users.IsSuperBranchAdminRoleString(role) || users.IsSuperAdminRoleString(role))
 }
 
 func (s *menuService) validateMenu(ctx context.Context, req MenuRequest, isMaster bool) error {
@@ -149,15 +123,15 @@ func (s *menuService) validateMenu(ctx context.Context, req MenuRequest, isMaste
 
 func (s *menuService) Create(ctx context.Context, req MenuRequest, role string) (*MenuDTO, error) {
 	isMaster := isMasterMenuCreate(role, req.BranchID)
-	if isMaster && req.MerchantID == "" && !isSuperAdmin(role) {
+	if isMaster && req.MerchantID == "" && !users.IsSuperAdminRoleString(role) {
 		return nil, common.ErrBranchAdminMissingMerchant
 	}
-	if isBranchManager(role) && req.BranchID == "" {
+	if users.IsBranchStaffRoleString(role) && req.BranchID == "" {
 		return nil, common.ErrUnAuthorized
 	}
-	if isSuperBranchAdmin(role) && req.BranchID == "" {
+	if users.IsSuperBranchAdminRoleString(role) && req.BranchID == "" {
 		// Restaurant owner creates master menu for their merchant.
-	} else if !isSuperAdmin(role) && !isBranchManager(role) {
+	} else if !users.IsSuperAdminRoleString(role) && !users.IsBranchStaffRoleString(role) {
 		return nil, common.ErrUnAuthorized
 	}
 
@@ -211,17 +185,17 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest, ro
 	}
 
 	if existingMenu.IsMaster() {
-		if isBranchManager(role) {
+		if users.IsBranchStaffRoleString(role) {
 			return s.updateMasterFromBranch(ctx, id, branchID, req)
 		}
-		if !canManageMasterMenu(role, req.MerchantID, existingMenu.MerchantIDString()) {
+		if !users.CanManageMerchantMaster(role, req.MerchantID, existingMenu.MerchantIDString()) {
 			return common.ErrUnAuthorized
 		}
-	} else if isBranchManager(role) {
+	} else if users.IsBranchStaffRoleString(role) {
 		if existingMenu.BranchIDString() != branchID {
 			return common.ErrUnAuthorized
 		}
-	} else if !canManageMasterMenu(role, req.MerchantID, existingMenu.MerchantIDString()) && !isSuperAdmin(role) {
+	} else if !users.CanManageMerchantMaster(role, req.MerchantID, existingMenu.MerchantIDString()) && !users.IsSuperAdminRoleString(role) {
 		return common.ErrUnAuthorized
 	}
 
@@ -460,19 +434,19 @@ func (s *menuService) Delete(ctx context.Context, id string, branchID, merchantI
 	}
 
 	if existing.IsMaster() {
-		if isBranchManager(role) {
+		if users.IsBranchStaffRoleString(role) {
 			if branchID == "" {
 				return common.ErrUnAuthorized
 			}
 			return s.menuRepository.SetBranchExcluded(ctx, branchID, id, true)
 		}
-		if !canManageMasterMenu(role, merchantID, existing.MerchantIDString()) {
+		if !users.CanManageMerchantMaster(role, merchantID, existing.MerchantIDString()) {
 			return common.ErrUnAuthorized
 		}
 		return s.menuRepository.Delete(ctx, id, "")
 	}
 
-	if isBranchManager(role) && existing.BranchIDString() != branchID {
+	if users.IsBranchStaffRoleString(role) && existing.BranchIDString() != branchID {
 		return common.ErrUnAuthorized
 	}
 
@@ -490,7 +464,7 @@ func (s *menuService) loadMenuForAction(ctx context.Context, id, branchID, merch
 }
 
 func (s *menuService) UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error {
-	if isBranchManager(role) {
+	if users.IsBranchStaffRoleString(role) {
 		if branchID == "" {
 			return common.ErrUnAuthorized
 		}
@@ -524,13 +498,13 @@ func (s *menuService) UnDelete(ctx context.Context, id string, branchID, merchan
 func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, merchantID string, role string, scope ListScope) (*common.PaginatedResponse[[]*MenuDTO], error) {
 	if scope == "" {
 		switch {
-		case isSuperBranchAdmin(role) && branchID == "":
+		case users.IsSuperBranchAdminRoleString(role) && branchID == "":
 			scope = ScopeMaster
-		case isSuperAdmin(role) && branchID == "":
+		case users.IsSuperAdminRoleString(role) && branchID == "":
 			scope = ScopeAllBranches
-		case isSuperBranchAdmin(role):
+		case users.IsSuperBranchAdminRoleString(role):
 			scope = ScopeAllBranches
-		case isBranchManager(role):
+		case users.IsBranchStaffRoleString(role):
 			scope = ScopeBranchManage
 		default:
 			scope = ScopeBranchEffective
@@ -549,7 +523,7 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, 
 		return nil, common.ErrUnAuthorized
 	}
 
-	if scope == ScopeAllBranches && isSuperBranchAdmin(role) && merchantID == "" {
+	if scope == ScopeAllBranches && users.IsSuperBranchAdminRoleString(role) && merchantID == "" {
 		return nil, common.ErrBranchAdminMissingMerchant
 	}
 

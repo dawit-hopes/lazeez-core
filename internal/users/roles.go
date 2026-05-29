@@ -24,6 +24,35 @@ func IsBranchStaffRoleString(role string) bool {
 	return IsBranchStaffRole(Role(role))
 }
 
+// IsSuperAdminRoleString reports platform super_admin from a JWT role string.
+func IsSuperAdminRoleString(role string) bool {
+	return Role(role) == RoleAdmin
+}
+
+// IsSuperBranchAdminRoleString reports super_branch_admin from a JWT role string.
+func IsSuperBranchAdminRoleString(role string) bool {
+	return Role(role) == RoleSuperBranchManager
+}
+
+// IsBranchManagerRoleString reports branch_manager only (not other branch staff roles).
+func IsBranchManagerRoleString(role string) bool {
+	return Role(role) == RoleBranchManager
+}
+
+// IsBranchUserRoleString reports super_branch_admin or any branch-scoped staff role.
+func IsBranchUserRoleString(role string) bool {
+	return IsSuperBranchAdminRoleString(role) || IsBranchStaffRoleString(role)
+}
+
+// CanManageMerchantMaster reports whether role may mutate merchant-level master resources
+// (e.g. master menu items, master room types) for the given merchant.
+func CanManageMerchantMaster(role, userMerchantID, resourceMerchantID string) bool {
+	if IsSuperAdminRoleString(role) {
+		return true
+	}
+	return IsSuperBranchAdminRoleString(role) && userMerchantID != "" && userMerchantID == resourceMerchantID
+}
+
 // CreatableRoles returns roles the creator may assign when creating a user.
 // branchType is only relevant when creator is branch_manager (hotel vs restaurant).
 func CreatableRoles(creator Role, branchType BranchType) []Role {
