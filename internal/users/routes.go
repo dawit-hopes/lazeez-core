@@ -20,7 +20,7 @@ func NewUserRoutes(router chi.Router, handler UserHandler, mw middleware.Middlew
 			Method:      http.MethodPost,
 			Path:        "/users/super-branch-manager",
 			Handler:     handler.CreateSuperAdminUser,
-			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken},
+			Middlewares: []func(next http.Handler) http.Handler{mw.ValidateToken, mw.RequireSuperAdmin},
 		},
 		{
 			Method:      http.MethodGet,

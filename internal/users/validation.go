@@ -22,8 +22,8 @@ func (u *UserRequest) Validate(isUpdate bool) error {
 			validation.When(!isUpdate, validation.Required.Error("merchant id is required")),
 			validation.Match(regexp.MustCompile(`^[0-9a-f-]+$`)).Error("merchant id must be a valid UUID")),
 		validation.Field(&u.Role,
-			// validate only the roles that are allowed to be created don't have to be required
-			validation.In(RoleAdmin, RoleBranchManager, RoleSuperBranchManager, RoleFrontDeskAgent, RoleRoomServiceStaff).Error("role must be a valid role")),
+			validation.When(!isUpdate, validation.Required.Error("role is required")),
+			validation.In(RoleBranchManager, RoleFrontDeskAgent, RoleRoomServiceStaff).Error("role must be a valid role")),
 	)
 }
 

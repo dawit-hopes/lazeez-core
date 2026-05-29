@@ -47,6 +47,10 @@ func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return err
 	}
+	if err := s.validateCreateUserAccess(ctx, req); err != nil {
+		s.logger.Error("Failed to authorize user creation", "error", err)
+		return err
+	}
 	if err := s.validateBranch(ctx, req.BranchID, req.MerchantID); err != nil {
 		s.logger.Error("Failed to validate branch", "error", err)
 		return err
@@ -62,6 +66,10 @@ func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
 
 func (s *userService) CreateSuperAdminUser(ctx context.Context, req SuperAdminUserRequest) error {
 	// req.PhoneNumber is already validated and normalized by the handler
+	if err := s.validateCreateSuperAdminAccess(ctx); err != nil {
+		s.logger.Error("Failed to authorize super branch admin creation", "error", err)
+		return err
+	}
 	if err := s.userRepository.CheckUserExistsByPhoneNumber(ctx, req.PhoneNumber); err != nil {
 		s.logger.Error("Failed to check user exists by phone number", "error", err)
 		return err
@@ -81,6 +89,10 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (UserDTO, erro
 	user, err := s.userRepository.GetUserByID(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get user by ID", "error", err)
+		return UserDTO{}, err
+	}
+	if err := s.validateUserViewAccess(ctx, &user); err != nil {
+		s.logger.Error("Failed to authorize user view", "error", err)
 		return UserDTO{}, err
 	}
 	result := user.ToDTO()
@@ -138,6 +150,10 @@ func (s *userService) GetUserByBranchID(ctx context.Context, branchID string) (U
 	user, err := s.userRepository.GetUserByBranchID(ctx, branchID)
 	if err != nil {
 		s.logger.Error("Failed to get user by branch ID", "error", err)
+		return UserDTO{}, err
+	}
+	if err := s.validateUserViewAccess(ctx, &user); err != nil {
+		s.logger.Error("Failed to authorize user view", "error", err)
 		return UserDTO{}, err
 	}
 	result := user.ToDTO()

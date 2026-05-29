@@ -68,6 +68,7 @@ var (
 	ErrInvalidOrderStatusTransition     = &Errors{Code: BadRequest, Message: "invalid order status transition"}
 	ErrOrderPaymentRequired             = &Errors{Code: BadRequest, Message: "order payment must be completed before accepting"}
 	ErrBranchAdminMissingMerchant       = &Errors{Code: BadRequest, Message: "account must be linked to a restaurant (merchant). Sign out and sign in again, or contact support."}
+	ErrRoleNotAllowedForCreation        = &Errors{Code: BadRequest, Message: "you are not allowed to create a user with this role"}
 	ErrTableNotFound                    = &Errors{Code: NotFound, Message: "table not found"}
 	ErrTableAlreadyExists               = &Errors{Code: BadRequest, Message: "table with this information already exists"}
 	ErrReferenceNotValid                = &Errors{Code: BadRequest, Message: "reference is not valid"}
