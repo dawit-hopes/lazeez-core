@@ -154,20 +154,30 @@ func (s *userService) GetUserByPhoneNumber(ctx context.Context, phoneNumber stri
 }
 
 // GetUserDTOWithMerchant returns UserDTO with MerchantID populated from branch or from user's stored merchant_id.
-// For super_branch_admin and branch_manager, merchant_id is required; returns ErrBranchAdminMissingMerchant if missing.
+// For super_branch_admin and branch-scoped staff roles, merchant_id is required; returns ErrBranchAdminMissingMerchant if missing.
 func (s *userService) GetUserDTOWithMerchant(ctx context.Context, user *User) (UserDTO, error) {
 	dto := user.ToDTO()
-	if user.BranchID.Valid && user.BranchID.String != "" {
-		branch, err := s.branchService.Get(ctx, user.BranchID.String)
-		if err == nil {
-			dto.MerchantID = branch.MerchantID
-		}
+
+	storedMerchantID := ""
+	if user.MerchantID.Valid {
+		storedMerchantID = user.MerchantID.String
 	}
-	if dto.MerchantID == "" && user.MerchantID.Valid && user.MerchantID.String != "" {
-		dto.MerchantID = user.MerchantID.String
+	branchID := ""
+	if user.BranchID.Valid {
+		branchID = user.BranchID.String
 	}
-	// super_branch_admin and branch_manager must have a merchant (via branch or stored); block login if not set
-	if (user.Role == RoleBranchManager || user.Role == RoleSuperBranchManager) && dto.MerchantID == "" {
+
+	merchantID, branchType, err := s.userRepository.ResolveMerchantContext(ctx, branchID, storedMerchantID)
+	if err != nil {
+		s.logger.Error("Failed to resolve merchant context", "error", err)
+		return UserDTO{}, err
+	}
+	dto.MerchantID = merchantID
+	if branchType != "" {
+		dto.BranchType = BranchType(branchType)
+	}
+
+	if (user.Role == RoleSuperBranchManager || IsBranchStaffRole(user.Role)) && dto.MerchantID == "" {
 		return UserDTO{}, common.ErrBranchAdminMissingMerchant
 	}
 	return dto, nil

@@ -8,20 +8,29 @@ import (
 	"mime/multipart"
 )
 
+type BranchType string
+
+const (
+	BranchTypeRestaurant BranchType = "restaurant"
+	BranchTypeHotel      BranchType = "hotel"
+)
+
 type MerchantRequest struct {
 	Name       string               `json:"name"`
 	Logo       multipart.File       `json:"logo"`
 	LogoHeader multipart.FileHeader `json:"-"`
+	BranchType BranchType           `json:"branch_type"`
 }
 
 type MerchantDTO struct {
 	common.BaseDTO
 	Name          string                   `json:"name"`
 	Logo          string                   `json:"logo"`
-	Branches      []*branch.BranchResponse `json:"branches"`
-	Users         []*users.UserDTO         `json:"users"`
+	Branches      []*branch.BranchResponse `json:"branches,omitempty"`
+	Users         []*users.UserDTO         `json:"users,omitempty"`
 	TotalBranches int                      `json:"total_branches"`
 	TotalUsers    int                      `json:"total_users"`
+	BranchType    BranchType               `json:"branch_type"`
 }
 
 func (m *MerchantDTO) ToModel() Merchant {
@@ -37,13 +46,14 @@ func (m *MerchantDTO) ToModel() Merchant {
 			UpdatedAt: m.UpdatedAt,
 			DeletedAt: deletedAt,
 		},
-		Name: m.Name,
-		Logo: m.Logo,
+		Name:       m.Name,
+		BranchType: m.BranchType,
+		Logo:       m.Logo,
 	}
 }
 
-
 type MerchantResponseSimplified struct {
-	Name string `json:"name"`
-	Logo string `json:"logo,omitempty"`
+	Name       string     `json:"name"`
+	BranchType BranchType `json:"branch_type"`
+	Logo       string     `json:"logo,omitempty"`
 }

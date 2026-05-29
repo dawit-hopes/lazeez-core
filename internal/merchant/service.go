@@ -5,6 +5,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
+	"strings"
 )
 
 type MerchantService interface {
@@ -32,10 +33,11 @@ func NewMerchantService(merchantRepository MerchantRepository, fileService files
 
 func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error) {
 	merchant := Merchant{
-		Name: common.FormatText(req.Name),
+		Name:       common.FormatText(req.Name),
+		BranchType: req.BranchType,
 	}
 	merchant.ID = common.GenerateUUID()
-	err := s.merchantRepository.CheckExists(ctx, merchant.Name)
+	err := s.merchantRepository.CheckExists(ctx, merchant.Name, "")
 	if err != nil {
 		s.logger.Error("Failed to check if merchant exists", "error", err)
 		return nil, err
@@ -82,8 +84,8 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 	}
 
 	// If name is provided and changed, ensure it's not taken by another merchant
-	if req.Name != "" && req.Name != existingMerchant.Name {
-		if err := s.merchantRepository.CheckExists(ctx, req.Name); err != nil {
+	if req.Name != "" && !strings.EqualFold(req.Name, existingMerchant.Name) {
+		if err := s.merchantRepository.CheckExists(ctx, req.Name, id); err != nil {
 			s.logger.Error("Failed to check if merchant exists", "error", err)
 			return err
 		}
@@ -98,6 +100,10 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 		}
 		s.logger.Info("Uploaded logo", "imageURL", imageURL)
 		existingMerchant.Logo = imageURL
+	}
+
+	if req.BranchType != "" {
+		existingMerchant.BranchType = req.BranchType
 	}
 
 	err = s.merchantRepository.Update(ctx, existingMerchant.ToModel())

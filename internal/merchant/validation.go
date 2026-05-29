@@ -9,9 +9,11 @@ func (m *MerchantRequest) Validate() error {
 		validation.Field(&m.Name, validation.Required.Error("name is required"), validation.Length(3, 100).Error("name must be between 3 and 100 characters")),
 		validation.Field(&m.Logo, validation.Required.Error("logo is required")),
 		validation.Field(&m.LogoHeader, validation.Required.Error("logo header is required")),
+		validation.Field(&m.BranchType, validation.Required.Error("branch type is required")),
+		validation.Field(&m.BranchType, validation.In(BranchTypeRestaurant, BranchTypeHotel).Error("branch type must be restaurant or hotel")),
 	)
 }
 
 func IsEmpty(m *MerchantRequest) bool {
-	return m.Name == "" && m.Logo == nil
+	return m.Name == "" && m.Logo == nil && m.BranchType == ""
 }

@@ -11,6 +11,8 @@ const (
 	RoleAdmin              Role = "super_admin"
 	RoleBranchManager      Role = "branch_manager"
 	RoleSuperBranchManager Role = "super_branch_admin"
+	RoleFrontDeskAgent     Role = "front_desk_agent"
+	RoleRoomServiceStaff   Role = "room_service_staff"
 )
 
 type User struct {

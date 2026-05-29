@@ -29,16 +29,16 @@ func NewBranchService(branchRepository BranchRepository, logger config.Logger) B
 }
 
 func (s *branchService) Create(ctx context.Context, req CreateBranchRequest) error {
-	err := s.branchRepository.CheckExists(ctx, req.MerchantID, req.BranchName, req.PhoneNumber)
+	branchName := common.FormatText(req.BranchName)
+	err := s.branchRepository.CheckExists(ctx, req.MerchantID, branchName, req.PhoneNumber, "")
 	if err != nil {
 		s.logger.Error("Failed to check if branch exists", "error", err)
 		return err
 	}
 
-	// req.PhoneNumber is already validated and normalized by the handler
 	branch := Branch{
 		MerchantID:  req.MerchantID,
-		BranchName:  req.BranchName,
+		BranchName:  branchName,
 		Address:     req.Address,
 		PhoneNumber: req.PhoneNumber,
 	}
@@ -76,18 +76,20 @@ func (s *branchService) Update(ctx context.Context, id string, req UpdateBranchR
 	}
 
 	if req.BranchName != "" {
-		if err := s.branchRepository.CheckExists(ctx, existingBranch.MerchantID, req.BranchName, existingBranch.PhoneNumber); err != nil {
-			s.logger.Error("Failed to check if branch exists", "error", err)
-			return err
-		}
-			existingBranch.BranchName = common.FormatText(req.BranchName)
+		existingBranch.BranchName = common.FormatText(req.BranchName)
 	}
 	if req.Address != "" {
 		existingBranch.Address = req.Address
 	}
 	if req.PhoneNumber != "" {
-		// req.PhoneNumber is already validated and normalized by the handler
 		existingBranch.PhoneNumber = req.PhoneNumber
+	}
+
+	if req.BranchName != "" || req.PhoneNumber != "" {
+		if err := s.branchRepository.CheckExists(ctx, existingBranch.MerchantID, existingBranch.BranchName, existingBranch.PhoneNumber, id); err != nil {
+			s.logger.Error("Failed to check if branch exists", "error", err)
+			return err
+		}
 	}
 
 	err = s.branchRepository.Update(ctx, existingBranch)

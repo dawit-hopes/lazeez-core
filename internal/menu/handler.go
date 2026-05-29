@@ -20,8 +20,6 @@ type MenuHandler interface {
 	Delete(w http.ResponseWriter, r *http.Request)
 	UnDelete(w http.ResponseWriter, r *http.Request)
 	List(w http.ResponseWriter, r *http.Request)
-
-
 	// public handlers
 	ListMenus(w http.ResponseWriter, r *http.Request)
 }
@@ -368,7 +366,7 @@ func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 	scope := h.parseScope(r)
 
 	branchID := ""
-	if role == "branch_manager" || role == "branch_staff" {
+	if users.IsBranchStaffRoleString(role) {
 		var err error
 		branchID, err = h.resolveBranchID(r)
 		if err != nil {
@@ -405,7 +403,6 @@ func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 		StatusCode: http.StatusOK,
 	})
 }
-
 
 func (h *menuHandler) ListMenus(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)

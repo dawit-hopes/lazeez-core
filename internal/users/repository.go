@@ -25,6 +25,7 @@ type UserRepository interface {
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
 	UnDeleteUser(ctx context.Context, id string) error
+	ResolveMerchantContext(ctx context.Context, branchID, storedMerchantID string) (merchantID, branchType string, err error)
 }
 
 type userRepository struct {
@@ -294,4 +295,45 @@ func (r *userRepository) UnDeleteUser(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
+}
+
+func (r *userRepository) ResolveMerchantContext(ctx context.Context, branchID, storedMerchantID string) (string, string, error) {
+	if storedMerchantID != "" {
+		const query = `SELECT branch_type FROM merchants WHERE id = $1 AND is_deleted = FALSE LIMIT 1`
+		var branchType string
+		err := r.joinDAL.QueryRow(ctx, query, []any{storedMerchantID}, func(row *sql.Row) error {
+			return row.Scan(&branchType)
+		})
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return "", "", common.ErrMerchantNotFound
+			}
+			r.logger.Error("failed to resolve merchant context", "merchant_id", storedMerchantID, "error", err)
+			return "", "", err
+		}
+		return storedMerchantID, branchType, nil
+	}
+
+	if branchID != "" {
+		const query = `
+			SELECT b.merchant_id, m.branch_type
+			FROM branches b
+			INNER JOIN merchants m ON m.id = b.merchant_id AND m.is_deleted = FALSE
+			WHERE b.id = $1 AND b.is_deleted = FALSE
+			LIMIT 1`
+		var merchantID, branchType string
+		err := r.joinDAL.QueryRow(ctx, query, []any{branchID}, func(row *sql.Row) error {
+			return row.Scan(&merchantID, &branchType)
+		})
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return "", "", common.ErrBranchNotFound
+			}
+			r.logger.Error("failed to resolve merchant context from branch", "branch_id", branchID, "error", err)
+			return "", "", err
+		}
+		return merchantID, branchType, nil
+	}
+
+	return "", "", nil
 }

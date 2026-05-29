@@ -92,7 +92,7 @@ func (m *middleware) RequireSessionKey(next http.Handler) http.Handler {
 	})
 }
 
-// RequireBranch ensures user has branch_id (branch_manager). Use after ValidateToken.
+// RequireBranch ensures user has branch_id (branch_manager, front_desk_agent, room_service_staff). Use after ValidateToken.
 func (m *middleware) RequireBranch(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		branchID, ok := GetBranchIDFromContext(r.Context())

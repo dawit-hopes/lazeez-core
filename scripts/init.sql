@@ -10,6 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS merchants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
+    branch_type VARCHAR(50) NOT NULL DEFAULT 'restaurant',
     logo TEXT,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -62,7 +63,13 @@ CREATE TABLE IF NOT EXISTS users (
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_users_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
     CONSTRAINT fk_users_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE SET NULL,
-    CONSTRAINT chk_users_role CHECK (role IN ('super_admin', 'branch_manager', 'super_branch_admin'))
+    CONSTRAINT chk_users_role CHECK (role IN (
+        'super_admin',
+        'branch_manager',
+        'super_branch_admin',
+        'front_desk_agent',
+        'room_service_staff'
+    ))
 );
 
 -- Create indexes for faster lookups
@@ -215,7 +222,7 @@ COMMENT ON TABLE branch_menu_overrides IS 'Per-branch availability overrides for
 COMMENT ON TABLE categories IS 'Stores category information with name and icon';
 COMMENT ON TABLE ingredients IS 'Stores ingredient names and icon';
 
-COMMENT ON COLUMN users.role IS 'User role: super admin or branch_manager';
+COMMENT ON COLUMN users.role IS 'User role: super_admin, branch_manager, super_branch_admin, front_desk_agent, or room_service_staff';
 COMMENT ON COLUMN users.is_locked IS 'Indicates if user account is locked';
 COMMENT ON COLUMN users.is_first_login IS 'Indicates if this is the user''s first login';
 COMMENT ON COLUMN users.logging_attempts IS 'Number of failed login attempts';

@@ -46,6 +46,7 @@ func (h *merchantHandler) parseRequest(r *http.Request, isRequired bool) (Mercha
 			}
 			// If not required, allow name-only updates
 			req.Name = r.FormValue("name")
+			req.BranchType = BranchType(r.FormValue("branch_type"))
 			return req, nil, nil
 		}
 		h.logger.Error("Failed to get logo file", "error", err)
@@ -55,6 +56,7 @@ func (h *merchantHandler) parseRequest(r *http.Request, isRequired bool) (Mercha
 	req.LogoHeader = *fileHeader
 	req.Logo = file
 	req.Name = r.FormValue("name")
+	req.BranchType = BranchType(r.FormValue("branch_type"))
 
 	return req, file, nil
 }

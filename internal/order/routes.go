@@ -37,7 +37,7 @@ func NewOrderRoutes(router chi.Router, handler OrderHandler, mw middleware.Middl
 		},
 	}
 
-	// Branch routes: JWT with branch_id (branch_manager)
+	// Branch routes: JWT with branch_id (branch_manager, front_desk_agent, room_service_staff)
 	branchMw := []func(next http.Handler) http.Handler{mw.ValidateToken, mw.RequireBranch}
 	branchRoutes := []common.Route{
 		{

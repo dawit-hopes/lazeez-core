@@ -9,6 +9,7 @@ import (
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
+	"lazeez-core/internal/users"
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
 
@@ -66,15 +67,15 @@ func isSuperAdmin(role string) bool {
 }
 
 func isBranchUser(role string) bool {
-	return role == "branch_manager" || role == "super_branch_admin" || role == "branch_staff"
+	return users.IsBranchStaffRoleString(role) || role == string(users.RoleSuperBranchManager)
 }
 
 func isSuperBranchAdmin(role string) bool {
-	return role == "super_branch_admin"
+	return role == string(users.RoleSuperBranchManager)
 }
 
 func isBranchManager(role string) bool {
-	return role == "branch_manager" || role == "branch_staff"
+	return users.IsBranchStaffRoleString(role)
 }
 
 func canManageMasterMenu(role, userMerchantID, menuMerchantID string) bool {

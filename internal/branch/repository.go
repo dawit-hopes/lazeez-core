@@ -14,7 +14,7 @@ type BranchRepository interface {
 	Get(ctx context.Context, id string) (Branch, error)
 	Update(ctx context.Context, branch Branch) error
 	Delete(ctx context.Context, id string) error
-	CheckExists(ctx context.Context, merchantID string, branchName, phoneNumber string) error
+	CheckExists(ctx context.Context, merchantID, branchName, phoneNumber, excludeBranchID string) error
 	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error)
 	ListByMerchantID(ctx context.Context, merchantID string, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error)
 	UnDelete(ctx context.Context, id string) error
@@ -118,9 +118,22 @@ WHERE b.id = $1 AND b.is_deleted = FALSE;
 	return nil
 }
 
-func (r *branchRepository) CheckExists(ctx context.Context, merchantID string, branchName, phoneNumber string) error {
-	filter := map[string]any{"merchant_id": merchantID, "branch_name": branchName, "phone_number": phoneNumber}
-	_, err := r.dal.Get(ctx, filter)
+func (r *branchRepository) CheckExists(ctx context.Context, merchantID, branchName, phoneNumber, excludeBranchID string) error {
+	query := `
+		SELECT id FROM branches
+		WHERE merchant_id = $1 AND is_deleted = FALSE
+		AND (LOWER(branch_name) = LOWER($2) OR phone_number = $3)`
+	args := []any{merchantID, branchName, phoneNumber}
+	if excludeBranchID != "" {
+		query += ` AND id != $4`
+		args = append(args, excludeBranchID)
+	}
+	query += ` LIMIT 1`
+
+	var id string
+	err := r.joinDAL.QueryRow(ctx, query, args, func(row *sql.Row) error {
+		return row.Scan(&id)
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
