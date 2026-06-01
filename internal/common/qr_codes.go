@@ -12,16 +12,27 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
+const (
+	menuPathTable = "tbl"
+	menuPathRoom  = "rm"
+)
+
+// buildMenuURL builds a guest-menu deep link: {base}/tbl/{ref} or {base}/rm/{ref}.
+// The base may already end with /tbl or /rm; those suffixes are normalized away first.
 func buildMenuURL(baseURL, reference, serviceType string) string {
 	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	switch serviceType {
-	case "table":
-		base = strings.TrimSuffix(base, "/tbl")
-	case "room":
-		base = strings.TrimSuffix(base, "/rm")
-	}
+	base = strings.TrimSuffix(base, "/"+menuPathTable)
+	base = strings.TrimSuffix(base, "/"+menuPathRoom)
+
 	ref := strings.TrimLeft(strings.TrimSpace(reference), "/")
-	return fmt.Sprintf("%s/%s", base, ref)
+	pathPrefix := menuPathTable
+	switch serviceType {
+	case "room":
+		pathPrefix = menuPathRoom
+	case "table":
+		// default
+	}
+	return fmt.Sprintf("%s/%s/%s", base, pathPrefix, ref)
 }
 
 func menuBaseURLFromEnv() string {

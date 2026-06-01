@@ -35,7 +35,7 @@ func NewTableService(repository TableRepository, fileService files.FileService, 
 }
 
 func (s *tableService) generateQRCode(ctx context.Context, reference string) (string, error) {
-	file, err := common.GenerateQRCodeHeader(reference, "table"	)
+	file, err := common.GenerateQRCodeHeader(reference, "table")
 	if err != nil {
 		s.logger.Error("Failed to generate QR code", "error", err)
 		return "", err
