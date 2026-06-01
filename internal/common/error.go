@@ -81,4 +81,16 @@ var (
 	ErrRoomCloneAlreadyExists           = &Errors{Code: BadRequest, Message: "room type already cloned for this branch"}
 	ErrRoomsHotelOnly                   = &Errors{Code: BadRequest, Message: "room types are only available for hotel merchants"}
 	ErrRoomClonePriceOnly               = &Errors{Code: BadRequest, Message: "cloned room types can only customize price per night"}
+	ErrRoomNumberExists                 = &Errors{Code: BadRequest, Message: "a room with this number already exists in the branch"}
+	ErrRoomOccupied                     = &Errors{Code: BadRequest, Message: "this room already has an active booking"}
+	ErrRoomNotOccupied                  = &Errors{Code: BadRequest, Message: "this room has no active booking"}
+	ErrBookingNotFound                  = &Errors{Code: NotFound, Message: "booking not found"}
+	ErrBookingNotActive                 = &Errors{Code: BadRequest, Message: "booking is not active"}
+	ErrPasscodeLocked                   = &Errors{Code: TooManyRequests, Message: "too many incorrect passcode attempts; please try again later"}
+	ErrInvalidPasscode                  = &Errors{Code: Unauthorized, Message: "incorrect passcode"}
+	ErrRoomSessionNotFound              = &Errors{Code: NotFound, Message: "room session not found"}
+	ErrRoomSessionExpired               = &Errors{Code: Unauthorized, Message: "room session has expired"}
+	ErrBillNotFound                     = &Errors{Code: NotFound, Message: "room bill not found"}
+	ErrBillAlreadySettled               = &Errors{Code: BadRequest, Message: "room bill is already settled"}
+	ErrBillUnsettled                    = &Errors{Code: BadRequest, Message: "room bill must be settled before checkout"}
 )

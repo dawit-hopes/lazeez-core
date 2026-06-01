@@ -107,7 +107,7 @@ func (s *orderService) validateOrderBeforeCreate(ctx context.Context, branchID s
 		logOrderValidationFailure(s.logger, branchID, err)
 		return err
 	}
-	if err := s.validateOrderModifierOptions(ctx, orderItems, modifierOptionIDs); err != nil {
+	if err := s.validateOrderModifierOptions(ctx, modifierOptionIDs); err != nil {
 		logOrderValidationFailure(s.logger, branchID, err)
 		return err
 	}
@@ -152,7 +152,7 @@ func logOrderValidationFailure(logger config.Logger, branchID string, err error)
 	}
 }
 
-func (s *orderService) validateOrderModifierOptions(ctx context.Context, orderItems []item.OrderItemRequest, modifierOptionIDs []string) error {
+func (s *orderService) validateOrderModifierOptions(ctx context.Context, modifierOptionIDs []string) error {
 	if len(modifierOptionIDs) == 0 {
 		s.logger.Debug("modifier option validation skipped", "reason", "no modifiers in order")
 		return nil

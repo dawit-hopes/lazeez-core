@@ -20,6 +20,8 @@ type Middleware interface {
 	RequireSessionKey(next http.Handler) http.Handler
 	RequireBranch(next http.Handler) http.Handler
 	RequireSuperAdmin(next http.Handler) http.Handler
+	RequireRoomManagement(next http.Handler) http.Handler
+	RequireFrontDesk(next http.Handler) http.Handler
 	RequireOrderListAccess(next http.Handler) http.Handler
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
 	MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request)
@@ -109,6 +111,37 @@ func (m *middleware) RequireSuperAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		role, ok := GetRoleFromContext(r.Context())
 		if !ok || role != "super_admin" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireRoomManagement allows managing physical rooms: super_admin, branch_manager,
+// or front_desk_agent. super_branch_admin (read-only) and others are rejected. Use after ValidateToken.
+func (m *middleware) RequireRoomManagement(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		switch role {
+		case "super_admin", "branch_manager", "front_desk_agent":
+			next.ServeHTTP(w, r)
+		default:
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		}
+	})
+}
+
+// RequireFrontDesk allows only front_desk_agent to mutate bookings (check-in/check-out/cancel).
+// Other roles (including branch_manager and super_admin) are rejected. Use after ValidateToken.
+func (m *middleware) RequireFrontDesk(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok || role != "front_desk_agent" {
 			common.WriteErrorResponse(w, common.ErrUnAuthorized)
 			return
 		}

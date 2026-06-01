@@ -1,4 +1,4 @@
-package rooms
+package room
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ type RoomHandler interface {
 	List(w http.ResponseWriter, r *http.Request)
 	Update(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
-	Clone(w http.ResponseWriter, r *http.Request)
+	RegenerateQRCode(w http.ResponseWriter, r *http.Request)
 }
 
 type roomHandler struct {
@@ -37,18 +37,16 @@ func (h *roomHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req RoomRequestDTO
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
-
-	role, branchID, merchantID := h.contextValues(r)
-	req.MerchantID = merchantID
-	if err := req.Validate(false); err != nil {
+	if err := req.Validate(); err != nil {
 		h.logger.Error("failed to validate request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
+	role, branchID, merchantID := h.contextValues(r)
 	room, err := h.roomService.CreateRoom(r.Context(), req, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to create room", "error", err)
@@ -86,9 +84,8 @@ func (h *roomHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *roomHandler) List(w http.ResponseWriter, r *http.Request) {
 	filter := common.ParseFilter(r)
 	role, branchID, merchantID := h.contextValues(r)
-	scope := ListScope(r.URL.Query().Get("scope"))
 
-	result, err := h.roomService.ListRooms(r.Context(), filter, role, branchID, merchantID, scope)
+	result, err := h.roomService.ListRooms(r.Context(), filter, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to list rooms", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -109,13 +106,13 @@ func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req RoomRequestDTO
+	var req RoomUpdateRequestDTO
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode request body", "error", err)
-		common.WriteErrorResponse(w, err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
-	if err := req.ValidateUpdate(); err != nil {
+	if err := req.Validate(); err != nil {
 		h.logger.Error("failed to validate request", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
@@ -143,8 +140,7 @@ func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	err := h.roomService.DeleteRoom(r.Context(), id, role, branchID, merchantID)
-	if err != nil {
+	if err := h.roomService.DeleteRoom(r.Context(), id, role, branchID, merchantID); err != nil {
 		h.logger.Error("failed to delete room", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
@@ -155,37 +151,23 @@ func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *roomHandler) Clone(w http.ResponseWriter, r *http.Request) {
+func (h *roomHandler) RegenerateQRCode(w http.ResponseWriter, r *http.Request) {
 	id := common.ParseID(r, "id")
 	if id == "" {
 		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
 
-	var req CloneRoomRequestDTO
-	if r.Body != nil && r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			h.logger.Error("failed to decode clone request body", "error", err)
-			common.WriteErrorResponse(w, err)
-			return
-		}
-	}
-	if err := req.Validate(); err != nil {
-		h.logger.Error("failed to validate clone request", "error", err)
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
 	role, branchID, merchantID := h.contextValues(r)
-	room, err := h.roomService.CloneRoom(r.Context(), id, req, role, branchID, merchantID)
+	room, err := h.roomService.RegenerateQRCode(r.Context(), id, role, branchID, merchantID)
 	if err != nil {
-		h.logger.Error("failed to clone room", "error", err)
+		h.logger.Error("failed to regenerate room QR code", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
 	common.WriteSuccessResponse(w, common.Response{
 		Data:       room,
-		Message:    "Room cloned successfully",
+		Message:    "QR code regenerated successfully",
 		StatusCode: http.StatusOK,
 	})
 }

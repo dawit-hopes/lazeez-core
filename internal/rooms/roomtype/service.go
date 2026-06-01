@@ -5,6 +5,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/files"
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/users"
 )
@@ -22,6 +23,7 @@ type roomService struct {
 	roomRepository  RoomRepository
 	branchService   branch.BranchService
 	merchantService merchant.MerchantService
+	fileService     files.FileService
 	logger          config.Logger
 }
 
@@ -29,12 +31,14 @@ func NewRoomService(
 	roomRepository RoomRepository,
 	branchService branch.BranchService,
 	merchantService merchant.MerchantService,
+	fileService files.FileService,
 	logger config.Logger,
 ) RoomService {
 	return &roomService{
 		roomRepository:  roomRepository,
 		branchService:   branchService,
 		merchantService: merchantService,
+		fileService:     fileService,
 		logger:          logger,
 	}
 }
@@ -340,6 +344,7 @@ func (s *roomService) CloneRoom(ctx context.Context, masterID string, req CloneR
 
 func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branchID, merchantID string) error {
 	if users.IsSuperAdminRoleString(role) {
+		s.logger.Info("super admin access to room", "role", role, "branch_id", branchID, "merchant_id", merchantID)
 		return nil
 	}
 	if room.IsMaster() {
@@ -349,12 +354,14 @@ func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branc
 		if users.IsBranchManagerRoleString(role) && branchID != "" {
 			br, err := s.branchService.Get(ctx, branchID)
 			if err != nil {
+				s.logger.Error("failed to get branch", "error", err)
 				return err
 			}
 			if br.MerchantID == room.MerchantID {
 				return nil
 			}
 		}
+		s.logger.Error("unauthorized access to master room", "role", role, "branch_id", branchID, "merchant_id", merchantID)
 		return common.ErrUnAuthorized
 	}
 	if users.IsBranchManagerRoleString(role) && room.BranchIDString() == branchID {
@@ -369,15 +376,18 @@ func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branc
 func (s *roomService) authorizeMutate(room *Room, role, branchID, merchantID string) error {
 	if room.IsMaster() {
 		if users.IsBranchManagerRoleString(role) {
+			s.logger.Error("unauthorized access to master room", "role", role, "branch_id", branchID, "merchant_id", merchantID)
 			return common.ErrUnAuthorized
 		}
 		if !users.CanManageMerchantMaster(role, merchantID, room.MerchantID) {
+			s.logger.Error("unauthorized access to master room", "role", role, "branch_id", branchID, "merchant_id", merchantID)
 			return common.ErrUnAuthorized
 		}
 		return nil
 	}
 	if users.IsBranchManagerRoleString(role) {
 		if branchID == "" || room.BranchIDString() != branchID {
+			s.logger.Error("unauthorized access to branch room", "role", role, "branch_id", branchID, "merchant_id", merchantID)
 			return common.ErrUnAuthorized
 		}
 		return nil

@@ -36,3 +36,4 @@ func (r *RoomRequestDTO) ToModel() Room {
 		PricePerNight: r.PricePerNight,
 	}
 }
+

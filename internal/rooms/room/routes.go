@@ -1,4 +1,4 @@
-package rooms
+package room
 
 import (
 	"lazeez-core/internal/common"
@@ -10,13 +10,19 @@ import (
 
 func NewRoomRoutes(router chi.Router, handler RoomHandler, mw middleware.Middleware) {
 	tokenMw := []func(next http.Handler) http.Handler{mw.ValidateToken}
-	branchMw := []func(next http.Handler) http.Handler{mw.ValidateToken, mw.RequireBranch}
+	manageMw := []func(next http.Handler) http.Handler{mw.ValidateToken, mw.RequireRoomManagement}
 
 	routes := []common.Route{
 		{
 			Method:      http.MethodPost,
 			Path:        "/rooms",
 			Handler:     handler.Create,
+			Middlewares: manageMw,
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/rooms",
+			Handler:     handler.List,
 			Middlewares: tokenMw,
 		},
 		{
@@ -26,28 +32,22 @@ func NewRoomRoutes(router chi.Router, handler RoomHandler, mw middleware.Middlew
 			Middlewares: tokenMw,
 		},
 		{
-			Method:      http.MethodGet,
-			Path:        "/rooms",
-			Handler:     handler.List,
-			Middlewares: tokenMw,
-		},
-		{
 			Method:      http.MethodPut,
 			Path:        "/rooms/{id}",
 			Handler:     handler.Update,
-			Middlewares: tokenMw,
+			Middlewares: manageMw,
 		},
 		{
 			Method:      http.MethodDelete,
 			Path:        "/rooms/{id}",
 			Handler:     handler.Delete,
-			Middlewares: tokenMw,
+			Middlewares: manageMw,
 		},
 		{
 			Method:      http.MethodPost,
-			Path:        "/rooms/{id}/clone",
-			Handler:     handler.Clone,
-			Middlewares: branchMw,
+			Path:        "/rooms/{id}/regenerate-qr-code",
+			Handler:     handler.RegenerateQRCode,
+			Middlewares: manageMw,
 		},
 	}
 	common.RegisterRoutes(router, routes)

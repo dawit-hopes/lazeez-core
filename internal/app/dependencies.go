@@ -18,10 +18,15 @@ import (
 	"lazeez-core/internal/middleware"
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
-	"lazeez-core/internal/order"
+	"lazeez-core/internal/order/table"
 	item "lazeez-core/internal/order/Item"
+	roomorder "lazeez-core/internal/order/room"
 	"lazeez-core/internal/payment"
-	"lazeez-core/internal/rooms"
+	"lazeez-core/internal/rooms/booking"
+	"lazeez-core/internal/rooms/folio"
+	"lazeez-core/internal/rooms/room"
+	"lazeez-core/internal/rooms/roomtype"
+	"lazeez-core/internal/roomsession"
 	"lazeez-core/internal/session"
 	"lazeez-core/internal/table"
 	"lazeez-core/internal/users"
@@ -45,7 +50,12 @@ type Dependencies struct {
 	OrderRepo          order.OrderRepository
 	TableRepo          table.TableRepository
 	RoomRepo           rooms.RoomRepository
+	SingleRoomRepo     room.RoomRepository
+	BookingRepo        booking.BookingRepository
 	ClientSessionRepo  clientsession.ClientSessionRepository
+	FolioRepo          folio.FolioRepository
+	RoomSessionRepo    roomsession.RoomSessionRepository
+	RoomOrderRepo      roomorder.RoomOrderRepository
 
 	// Services
 	AuthService           auth.AuthService
@@ -60,7 +70,12 @@ type Dependencies struct {
 	OrderService          order.OrderService
 	TableService          table.TableService
 	RoomService           rooms.RoomService
+	SingleRoomService     room.RoomService
+	BookingService        booking.BookingService
 	ClientSessionService  clientsession.ClientSessionService
+	FolioService          folio.FolioService
+	RoomSessionService    roomsession.RoomSessionService
+	RoomOrderService      roomorder.RoomOrderService
 	PaymentService        payment.PaymentService
 
 	// Handlers
@@ -74,7 +89,12 @@ type Dependencies struct {
 	OrderHandler         order.OrderHandler
 	TableHandler         table.TableHandler
 	RoomHandler          rooms.RoomHandler
+	SingleRoomHandler    room.RoomHandler
+	BookingHandler       booking.BookingHandler
 	ClientSessionHandler clientsession.ClientSessionHandler
+	FolioHandler         folio.FolioHandler
+	RoomSessionHandler   roomsession.RoomSessionHandler
+	RoomOrderHandler     roomorder.RoomOrderHandler
 
 	Middleware middleware.Middleware
 }
@@ -102,7 +122,13 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	orderItemDAL := common.NewDAL(db, func() *item.OrderItem { return &item.OrderItem{} })
 	tableDAL := common.NewDAL(db, func() *table.Table { return &table.Table{} })
 	roomDAL := common.NewDAL(db, func() *rooms.Room { return &rooms.Room{} })
+	singleRoomDAL := common.NewDAL(db, func() *room.Room { return &room.Room{} })
+	bookingDAL := common.NewDAL(db, func() *booking.Booking { return &booking.Booking{} })
 	clientSessionDAL := common.NewDAL(db, func() *clientsession.ClientSession { return &clientsession.ClientSession{} })
+	roomBillDAL := common.NewDAL(db, func() *folio.Bill { return &folio.Bill{} })
+	roomSessionDAL := common.NewDAL(db, func() *roomsession.RoomSession { return &roomsession.RoomSession{} })
+	roomOrderDAL := common.NewDAL(db, func() *roomorder.RoomOrder { return &roomorder.RoomOrder{} })
+	roomOrderItemDAL := common.NewDAL(db, func() *roomorder.RoomOrderItem { return &roomorder.RoomOrderItem{} })
 	joinDAL := common.NewJoinDAL(db)
 	cld, err := initCloudinary(logger)
 	if err != nil {
@@ -124,7 +150,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	orderItemRepo := item.NewOrderItemRepository(orderItemDAL, logger)
 	tableRepo := table.NewTableRepository(tableDAL, logger)
 	roomRepo := rooms.NewRoomRepository(roomDAL, joinDAL, logger)
+	singleRoomRepo := room.NewRoomRepository(singleRoomDAL, joinDAL, logger)
+	bookingRepo := booking.NewBookingRepository(bookingDAL, joinDAL, logger)
 	clientSessionRepo := clientsession.NewClientSessionRepository(clientSessionDAL, joinDAL, logger)
+	folioRepo := folio.NewFolioRepository(roomBillDAL, logger)
+	roomSessionRepo := roomsession.NewRoomSessionRepository(roomSessionDAL, joinDAL, logger)
+	roomOrderRepo := roomorder.NewRoomOrderRepository(roomOrderDAL, roomOrderItemDAL, joinDAL, logger)
 
 
 	// Initialize services
@@ -143,7 +174,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
 	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
-	roomService := rooms.NewRoomService(roomRepo, branchService, merchantService, logger)
+	roomService := rooms.NewRoomService(roomRepo, branchService, merchantService, fileService, logger)
+	singleRoomService := room.NewRoomService(singleRoomRepo, roomRepo, branchService, merchantService, fileService, logger)
+	folioService := folio.NewFolioService(folioRepo, logger)
+	bookingService := booking.NewBookingService(bookingRepo, singleRoomRepo, branchService, merchantService, keyService, folioService, logger)
+	roomSessionService := roomsession.NewRoomSessionService(roomSessionRepo, singleRoomRepo, bookingRepo, keyService, logger)
+	roomOrderService := roomorder.NewRoomOrderService(roomOrderRepo, menuService, modifierOptionService, roomSessionService, bookingRepo, folioService, logger)
 
 
 	// Initialize handlers
@@ -157,7 +193,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	orderHandler := order.NewOrderHandler(orderService, logger)
 	tableHandler := table.NewTableHandler(tableService, logger)
 	roomHandler := rooms.NewRoomHandler(roomService, logger)
+	singleRoomHandler := room.NewRoomHandler(singleRoomService, logger)
+	bookingHandler := booking.NewBookingHandler(bookingService, logger)
 	clientSessionHandler := clientsession.NewClientSessionHandler(clientSessionService, logger)
+	folioHandler := folio.NewFolioHandler(folioService, logger)
+	roomSessionHandler := roomsession.NewRoomSessionHandler(roomSessionService, logger)
+	roomOrderHandler := roomorder.NewRoomOrderHandler(roomOrderService, logger)
 
 	middleware := middleware.NewMiddleware(keyService, sessionService, logger)
 
@@ -175,7 +216,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		OrderRepo:             orderRepo,
 		TableRepo:             tableRepo,
 		RoomRepo:              roomRepo,
+		SingleRoomRepo:        singleRoomRepo,
+		BookingRepo:           bookingRepo,
 		ClientSessionRepo:     clientSessionRepo,
+		FolioRepo:             folioRepo,
+		RoomSessionRepo:       roomSessionRepo,
+		RoomOrderRepo:         roomOrderRepo,
 		AuthService:           authService,
 		UserService:           userService,
 		BranchService:         branchService,
@@ -188,7 +234,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		OrderService:          orderService,
 		TableService:          tableService,
 		RoomService:           roomService,
+		SingleRoomService:     singleRoomService,
+		BookingService:        bookingService,
 		ClientSessionService:  clientSessionService,
+		FolioService:          folioService,
+		RoomSessionService:    roomSessionService,
+		RoomOrderService:      roomOrderService,
 		PaymentService:        paymentService,
 		AuthHandler:           authHandler,
 		UserHandler:           userHandler,
@@ -200,7 +251,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		OrderHandler:          orderHandler,
 		TableHandler:          tableHandler,
 		RoomHandler:           roomHandler,
+		SingleRoomHandler:     singleRoomHandler,
+		BookingHandler:        bookingHandler,
 		ClientSessionHandler:  clientSessionHandler,
+		FolioHandler:          folioHandler,
+		RoomSessionHandler:    roomSessionHandler,
+		RoomOrderHandler:      roomOrderHandler,
 		Middleware:            middleware,
 	}, nil
 }
@@ -229,4 +285,9 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	clientsession.NewClientSessionRoutes(router, deps.ClientSessionHandler, deps.Middleware)
 	table.NewTableRoutes(router, deps.TableHandler, deps.Middleware)
 	rooms.NewRoomRoutes(router, deps.RoomHandler, deps.Middleware)
+	room.NewRoomRoutes(router, deps.SingleRoomHandler, deps.Middleware)
+	booking.NewBookingRoutes(router, deps.BookingHandler, deps.Middleware)
+	folio.NewFolioRoutes(router, deps.FolioHandler, deps.Middleware)
+	roomsession.NewRoomSessionRoutes(router, deps.RoomSessionHandler, deps.Middleware)
+	roomorder.NewRoomOrderRoutes(router, deps.RoomOrderHandler, deps.Middleware)
 }
