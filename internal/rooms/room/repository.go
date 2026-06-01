@@ -11,6 +11,7 @@ import (
 
 type RoomRepository interface {
 	Create(ctx context.Context, room *Room) error
+	UpdateStatus(ctx context.Context, id, status string) error
 	Get(ctx context.Context, id string) (*RoomWithType, error)
 	GetByReference(ctx context.Context, reference string) (*Room, error)
 	Update(ctx context.Context, room Room) error
@@ -32,6 +33,20 @@ func NewRoomRepository(dal *common.DAL[*Room], join *common.JoinDAL, logger conf
 func (r *roomRepository) Create(ctx context.Context, room *Room) error {
 	if _, err := r.dal.Create(ctx, room); err != nil {
 		r.logger.Error("failed to create single room", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
+
+func (r *roomRepository) UpdateStatus(ctx context.Context, id, status string) error {
+	filter := map[string]any{"id": id, "is_deleted": false}
+	updates := map[string]any{"status": status}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return common.ErrRoomNotFound
+		}
+		r.logger.Error("failed to update single room status", "room_id", id, "status", status, "error", err)
 		return common.ErrInternalServerError
 	}
 	return nil

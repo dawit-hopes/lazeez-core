@@ -9,7 +9,7 @@ import (
 )
 
 func NewRoomOrderRoutes(router chi.Router, handler RoomOrderHandler, mw middleware.Middleware) {
-	// Client routes: no JWT, room session key in body or X-Session-Key header.
+	// Client routes: no JWT; create uses JSON body, reads use reference + pass_code query params.
 	clientRoutes := []common.Route{
 		{
 			Method:  http.MethodPost,
@@ -17,16 +17,14 @@ func NewRoomOrderRoutes(router chi.Router, handler RoomOrderHandler, mw middlewa
 			Handler: handler.CreateClient,
 		},
 		{
-			Method:      http.MethodGet,
-			Path:        "/client/room-orders/{id}",
-			Handler:     handler.GetClient,
-			Middlewares: []func(next http.Handler) http.Handler{mw.RequireSessionKey},
+			Method:  http.MethodGet,
+			Path:    "/client/room-orders/{id}",
+			Handler: handler.GetClient,
 		},
 		{
-			Method:      http.MethodGet,
-			Path:        "/client/room-orders",
-			Handler:     handler.ListClient,
-			Middlewares: []func(next http.Handler) http.Handler{mw.RequireSessionKey},
+			Method:  http.MethodGet,
+			Path:    "/client/room-orders",
+			Handler: handler.ListClient,
 		},
 	}
 

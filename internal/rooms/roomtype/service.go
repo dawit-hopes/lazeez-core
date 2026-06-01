@@ -10,7 +10,7 @@ import (
 	"lazeez-core/internal/users"
 )
 
-type RoomService interface {
+type RoomTypesService interface {
 	CreateRoom(ctx context.Context, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error)
 	GetRoom(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error)
 	ListRooms(ctx context.Context, filter common.Filter, role, branchID, merchantID string, scope ListScope) (*common.PaginatedResponse[[]*RoomDTO], error)
@@ -19,7 +19,7 @@ type RoomService interface {
 	CloneRoom(ctx context.Context, masterID string, req CloneRoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error)
 }
 
-type roomService struct {
+type roomTypesService struct {
 	roomRepository  RoomRepository
 	branchService   branch.BranchService
 	merchantService merchant.MerchantService
@@ -27,14 +27,14 @@ type roomService struct {
 	logger          config.Logger
 }
 
-func NewRoomService(
+func NewRoomTypeService(
 	roomRepository RoomRepository,
 	branchService branch.BranchService,
 	merchantService merchant.MerchantService,
 	fileService files.FileService,
 	logger config.Logger,
-) RoomService {
-	return &roomService{
+) RoomTypesService {
+	return &roomTypesService{
 		roomRepository:  roomRepository,
 		branchService:   branchService,
 		merchantService: merchantService,
@@ -43,7 +43,7 @@ func NewRoomService(
 	}
 }
 
-func (s *roomService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
+func (s *roomTypesService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
 	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (s *roomService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, 
 	return &enriched, nil
 }
 
-func (s *roomService) GetRoom(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error) {
+func (s *roomTypesService) GetRoom(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error) {
 	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (s *roomService) GetRoom(ctx context.Context, id, role, branchID, merchantI
 	return &dto, nil
 }
 
-func (s *roomService) ListRooms(ctx context.Context, filter common.Filter, role, branchID, merchantID string, requestedScope ListScope) (*common.PaginatedResponse[[]*RoomDTO], error) {
+func (s *roomTypesService) ListRooms(ctx context.Context, filter common.Filter, role, branchID, merchantID string, requestedScope ListScope) (*common.PaginatedResponse[[]*RoomDTO], error) {
 	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (s *roomService) ListRooms(ctx context.Context, filter common.Filter, role,
 	return result, nil
 }
 
-func (s *roomService) resolveListScope(ctx context.Context, role, branchID, merchantID string, requestedScope ListScope, filter common.Filter) (ListScope, string, error) {
+func (s *roomTypesService) resolveListScope(ctx context.Context, role, branchID, merchantID string, requestedScope ListScope, filter common.Filter) (ListScope, string, error) {
 	if users.IsBranchManagerRoleString(role) {
 		if branchID == "" {
 			return "", "", common.ErrUnAuthorized
@@ -227,7 +227,7 @@ func filterBranchID(filter common.Filter) string {
 	return ""
 }
 
-func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
+func (s *roomTypesService) UpdateRoom(ctx context.Context, id string, req RoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
 	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomRequest
 	return s.GetRoom(ctx, id, role, branchID, merchantID)
 }
 
-func (s *roomService) DeleteRoom(ctx context.Context, id, role, branchID, merchantID string) error {
+func (s *roomTypesService) DeleteRoom(ctx context.Context, id, role, branchID, merchantID string) error {
 	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func (s *roomService) DeleteRoom(ctx context.Context, id, role, branchID, mercha
 	return s.roomRepository.DeleteRoom(ctx, id)
 }
 
-func (s *roomService) CloneRoom(ctx context.Context, masterID string, req CloneRoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
+func (s *roomTypesService) CloneRoom(ctx context.Context, masterID string, req CloneRoomRequestDTO, role, branchID, merchantID string) (*RoomDTO, error) {
 	if err := s.ensureHotelAccess(ctx, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (s *roomService) CloneRoom(ctx context.Context, masterID string, req CloneR
 	return &enriched, nil
 }
 
-func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branchID, merchantID string) error {
+func (s *roomTypesService) authorizeRead(ctx context.Context, room *Room, role, branchID, merchantID string) error {
 	if users.IsSuperAdminRoleString(role) {
 		s.logger.Info("super admin access to room", "role", role, "branch_id", branchID, "merchant_id", merchantID)
 		return nil
@@ -373,7 +373,7 @@ func (s *roomService) authorizeRead(ctx context.Context, room *Room, role, branc
 	return common.ErrUnAuthorized
 }
 
-func (s *roomService) authorizeMutate(room *Room, role, branchID, merchantID string) error {
+func (s *roomTypesService) authorizeMutate(room *Room, role, branchID, merchantID string) error {
 	if room.IsMaster() {
 		if users.IsBranchManagerRoleString(role) {
 			s.logger.Error("unauthorized access to master room", "role", role, "branch_id", branchID, "merchant_id", merchantID)

@@ -18,9 +18,10 @@ const (
 )
 
 type RoomOrderInput struct {
-	SessionKey string                  `json:"session_key"`
 	OrderItems []item.OrderItemRequest `json:"order_items"`
 	Total      float64                 `json:"total"`
+	PassCode   string                  `json:"pass_code"`
+	Reference  string                  `json:"reference"`
 }
 
 type RoomOrderUpdateInput struct {

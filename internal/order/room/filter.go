@@ -79,12 +79,20 @@ func ValidateArchiveDateRange(filter RoomOrderFilter) error {
 	return nil
 }
 
-// SessionKeyFromRequest returns session key from X-Session-Key header or session_key query param.
-func SessionKeyFromRequest(r *http.Request) string {
-	if k := r.Header.Get("X-Session-Key"); k != "" {
-		return strings.TrimSpace(k)
+// GuestAuthFromRequest returns room reference and passcode from query params or headers.
+func GuestAuthFromRequest(r *http.Request) (reference, passCode string, err error) {
+	reference = strings.TrimSpace(r.URL.Query().Get("reference"))
+	if reference == "" {
+		reference = strings.TrimSpace(r.Header.Get("X-Room-Reference"))
 	}
-	return strings.TrimSpace(r.URL.Query().Get("session_key"))
+	passCode = strings.TrimSpace(r.URL.Query().Get("pass_code"))
+	if passCode == "" {
+		passCode = strings.TrimSpace(r.Header.Get("X-Pass-Code"))
+	}
+	if reference == "" || passCode == "" {
+		return "", "", common.ErrInvalidRequest
+	}
+	return reference, passCode, nil
 }
 
 func BuildRoomOrderFilterClause(filter RoomOrderFilter, baseArgs []any) (string, []any) {

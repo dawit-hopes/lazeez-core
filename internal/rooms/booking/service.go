@@ -2,6 +2,7 @@ package booking
 
 import (
 	"context"
+	"database/sql"
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
@@ -24,6 +25,9 @@ type BookingService interface {
 	Cancel(ctx context.Context, id, role, branchID, merchantID string) (*BookingDTO, error)
 	DeleteBooking(ctx context.Context, id, role, branchID, merchantID string) error
 	ReGeneratePassCode(ctx context.Context, id, role, branchID, merchantID string) (*string, error)
+	GetBookingById(ctx context.Context, id string) (*BookingDTO, error)
+	GetBookingByRoom(ctx context.Context, roomID string) (*Booking, error)
+	VerifyGuestPasscode(ctx context.Context, b *Booking, passcode string) error
 }
 
 type bookingService struct {
@@ -76,7 +80,7 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 		return nil, common.ErrUnAuthorized
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, ctxg := errgroup.WithContext(ctx)
 	rm := &room.RoomWithType{}
 	var (
 		plainPasscode  string
@@ -85,7 +89,7 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 
 	g.Go(func() error {
 		var err error
-		rm, err = s.roomRepo.Get(ctx, req.RoomID)
+		rm, err = s.roomRepo.Get(ctxg, req.RoomID)
 		if err != nil {
 			return err
 		}
@@ -94,7 +98,7 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 	})
 
 	g.Go(func() error {
-		occupied, err := s.repository.HasActiveBooking(ctx, req.RoomID)
+		occupied, err := s.repository.HasActiveBooking(ctxg, req.RoomID)
 		if err != nil {
 			return err
 		}
@@ -136,6 +140,15 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 		s.logger.Error("failed to open folio for booking", "booking_id", b.ID, "error", err)
 		if delErr := s.repository.Delete(ctx, b.ID); delErr != nil {
 			s.logger.Error("failed to roll back booking after folio failure", "booking_id", b.ID, "error", delErr)
+		}
+		return nil, common.ErrInternalServerError
+	}
+
+	// make the room status occupied
+	if err := s.roomRepo.UpdateStatus(ctx, b.RoomID, string(room.RoomStatusOccupied)); err != nil {
+		s.logger.Error("failed to update room status", "room_id", b.RoomID, "error", err)
+		if delErr := s.repository.Delete(ctx, b.ID); delErr != nil {
+			s.logger.Error("failed to roll back booking after room status update failure", "booking_id", b.ID, "error", delErr)
 		}
 		return nil, common.ErrInternalServerError
 	}
@@ -237,6 +250,12 @@ func (s *bookingService) transition(ctx context.Context, id, role, branchID stri
 	if err := s.repository.Update(ctx, *b); err != nil {
 		return nil, err
 	}
+	if target == BookingCheckedOut {
+		if err := s.roomRepo.UpdateStatus(ctx, b.RoomID, string(room.RoomStatusOccupied)); err != nil {
+			s.logger.Error("failed to update room status", "room_id", b.RoomID, "error", err)
+			return nil, err
+		}
+	}
 	dto := b.ToDTO()
 	return &dto, nil
 }
@@ -266,9 +285,12 @@ func (s *bookingService) ReGeneratePassCode(ctx context.Context, id, role, branc
 	if err != nil {
 		return nil, err
 	}
-	b.PasscodeHash = hashedPasscode
-	if err := s.repository.Update(ctx, *b); err != nil {
-		s.logger.Error("failed to update booking", "error", err)
+	if err := s.repository.SetPasscodeAttempts(ctx, b.ID, 0, sql.NullTime{}); err != nil {
+		s.logger.Error("failed to reset passcode security on regenerate", "booking_id", b.ID, "error", err)
+		return nil, err
+	}
+	if err := s.repository.UpdatePasscode(ctx, b.ID, hashedPasscode); err != nil {
+		s.logger.Error("failed to update passcode hash on regenerate", "booking_id", b.ID, "error", err)
 		return nil, err
 	}
 	return &plainPasscode, nil
@@ -282,4 +304,21 @@ func (s *bookingService) generatePasscode() (string, string, error) {
 		return "", "", common.ErrInternalServerError
 	}
 	return plainPasscode, hashedPasscode, nil
+}
+
+func (s *bookingService) GetBookingById(ctx context.Context, id string) (*BookingDTO, error) {
+	b, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	dto := b.ToDTO()
+	return &dto, nil
+}
+
+func (s *bookingService) GetBookingByRoom(ctx context.Context, roomID string) (*Booking, error) {
+	b, err := s.repository.GetActiveByRoomID(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }

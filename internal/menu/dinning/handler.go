@@ -21,7 +21,8 @@ type MenuHandler interface {
 	UnDelete(w http.ResponseWriter, r *http.Request)
 	List(w http.ResponseWriter, r *http.Request)
 	// public handlers
-	ListMenus(w http.ResponseWriter, r *http.Request)
+	ListMenusForTables(w http.ResponseWriter, r *http.Request)
+	ListMenusForRooms(w http.ResponseWriter, r *http.Request)
 }
 
 type menuHandler struct {
@@ -420,21 +421,28 @@ func (h *menuHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *menuHandler) ListMenus(w http.ResponseWriter, r *http.Request) {
-	filter := common.ParseFilter(r)
-	reference := r.URL.Query().Get("reference")
+func (h *menuHandler) ListMenusForTables(w http.ResponseWriter, r *http.Request) {
+	h.listMenusForReference(w, r, "table")
+}
 
-	if reference == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+func (h *menuHandler) ListMenusForRooms(w http.ResponseWriter, r *http.Request) {
+	h.listMenusForReference(w, r, "room")
+}
+
+func (h *menuHandler) listMenusForReference(w http.ResponseWriter, r *http.Request, referenceType string) {
+	reference, err := common.ParseID(r, "reference")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
-
-	result, err := h.menuService.ListMenus(r.Context(), filter, reference)
+	filter := common.ParseFilter(r)
+	result, err := h.menuService.ListMenus(r.Context(), filter, reference, referenceType)
 	if err != nil {
 		h.logger.Error("Failed to list menus", "error", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
 	common.WriteSuccessResponse(w, common.Response{
 		Data:       result,
 		Meta:       &result.Meta,

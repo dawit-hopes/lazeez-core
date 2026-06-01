@@ -86,7 +86,7 @@ var (
 	ErrRoomNotOccupied                  = &Errors{Code: BadRequest, Message: "this room has no active booking"}
 	ErrBookingNotFound                  = &Errors{Code: NotFound, Message: "booking not found"}
 	ErrBookingNotActive                 = &Errors{Code: BadRequest, Message: "booking is not active"}
-	ErrPasscodeLocked                   = &Errors{Code: TooManyRequests, Message: "too many incorrect passcode attempts; please try again later"}
+	ErrPasscodeLocked                   = &Errors{Code: TooManyRequests, Message: "Your room access has been locked after too many incorrect passcode attempts. Please contact the front desk for a new passcode."}
 	ErrInvalidPasscode                  = &Errors{Code: Unauthorized, Message: "incorrect passcode"}
 	ErrRoomSessionNotFound              = &Errors{Code: NotFound, Message: "room session not found"}
 	ErrRoomSessionExpired               = &Errors{Code: Unauthorized, Message: "room session has expired"}

@@ -13,19 +13,19 @@ import (
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
 	"lazeez-core/internal/key"
-	"lazeez-core/internal/menu"
+	menu "lazeez-core/internal/menu/dinning"
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/middleware"
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
-	"lazeez-core/internal/order/table"
 	item "lazeez-core/internal/order/Item"
 	roomorder "lazeez-core/internal/order/room"
+	order "lazeez-core/internal/order/table"
 	"lazeez-core/internal/payment"
 	"lazeez-core/internal/rooms/booking"
 	"lazeez-core/internal/rooms/folio"
 	"lazeez-core/internal/rooms/room"
-	"lazeez-core/internal/rooms/roomtype"
+	rooms "lazeez-core/internal/rooms/roomtype"
 	"lazeez-core/internal/roomsession"
 	"lazeez-core/internal/session"
 	"lazeez-core/internal/table"
@@ -69,7 +69,7 @@ type Dependencies struct {
 	ModifierOptionService modoption.ModifierOptionService
 	OrderService          order.OrderService
 	TableService          table.TableService
-	RoomService           rooms.RoomService
+	RoomTypeService       rooms.RoomTypesService
 	SingleRoomService     room.RoomService
 	BookingService        booking.BookingService
 	ClientSessionService  clientsession.ClientSessionService
@@ -157,7 +157,6 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	roomSessionRepo := roomsession.NewRoomSessionRepository(roomSessionDAL, joinDAL, logger)
 	roomOrderRepo := roomorder.NewRoomOrderRepository(roomOrderDAL, roomOrderItemDAL, joinDAL, logger)
 
-
 	// Initialize services
 	paymentService := payment.NewPaymentService(chapaSecretKey, chapaInitialURL, verifyURL, webhookSecret, logger)
 	branchService := branch.NewBranchService(branchRepo, logger)
@@ -165,22 +164,21 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	userService := users.NewUserService(userRepo, branchService, logger)
 	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
+	roomTypeService := rooms.NewRoomTypeService(roomRepo, branchService, merchantService, fileService, logger)
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	ingredientService := ingredient.NewIngredientService(ingredientRepo, logger)
 	modifierGroupService := modgroup.NewModifierGroupService(modifierGroupRepo, logger)
 	modifierOptionService := modoption.NewModifierOptionService(modifierOptionRepo, logger)
-	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, logger)
+	singleRoomService := room.NewRoomService(singleRoomRepo, roomRepo, branchService, merchantService, fileService, logger)
+	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, singleRoomService, logger)
 	orderItemService := item.NewOrderItemService(orderItemRepo, logger)
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
 	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
-	roomService := rooms.NewRoomService(roomRepo, branchService, merchantService, fileService, logger)
-	singleRoomService := room.NewRoomService(singleRoomRepo, roomRepo, branchService, merchantService, fileService, logger)
 	folioService := folio.NewFolioService(folioRepo, logger)
 	bookingService := booking.NewBookingService(bookingRepo, singleRoomRepo, branchService, merchantService, keyService, folioService, logger)
-	roomSessionService := roomsession.NewRoomSessionService(roomSessionRepo, singleRoomRepo, bookingRepo, keyService, logger)
-	roomOrderService := roomorder.NewRoomOrderService(roomOrderRepo, menuService, modifierOptionService, roomSessionService, bookingRepo, folioService, logger)
-
+	roomSessionService := roomsession.NewRoomSessionService(roomSessionRepo, singleRoomRepo, bookingService, logger)
+	roomOrderService := roomorder.NewRoomOrderService(roomOrderRepo, menuService, modifierOptionService, folioService, singleRoomService, bookingService, logger)
 
 	// Initialize handlers
 	authHandler := auth.NewAuthHandler(authService, logger)
@@ -192,7 +190,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	ingredientHandler := ingredient.NewIngredientHandler(ingredientService, logger)
 	orderHandler := order.NewOrderHandler(orderService, logger)
 	tableHandler := table.NewTableHandler(tableService, logger)
-	roomHandler := rooms.NewRoomHandler(roomService, logger)
+	roomHandler := rooms.NewRoomHandler(roomTypeService, logger)
 	singleRoomHandler := room.NewRoomHandler(singleRoomService, logger)
 	bookingHandler := booking.NewBookingHandler(bookingService, logger)
 	clientSessionHandler := clientsession.NewClientSessionHandler(clientSessionService, logger)
@@ -233,7 +231,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		ModifierOptionService: modifierOptionService,
 		OrderService:          orderService,
 		TableService:          tableService,
-		RoomService:           roomService,
+		RoomTypeService:       roomTypeService,
 		SingleRoomService:     singleRoomService,
 		BookingService:        bookingService,
 		ClientSessionService:  clientSessionService,

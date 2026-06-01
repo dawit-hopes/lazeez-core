@@ -305,7 +305,10 @@ func (m *middleware) CORSHandler(next http.Handler) http.Handler {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders: []string{
 			"Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token",
-			"Origin", "Accept", "X-Session-Key",
+			"Origin", "Accept",
+			"X-Session-Key",
+			"X-Room-Reference",
+			"X-Pass-Code",
 		},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,

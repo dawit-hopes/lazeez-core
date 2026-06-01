@@ -40,7 +40,8 @@ type MenuRepository interface {
 	GetBranchMenuSnapshots(ctx context.Context, branchID string, menuIDs []string) (map[string]BranchMenuSnapshot, error)
 
 	// public repository
-	ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
+	ListMenusForTables(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
+	ListMenusForRooms(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
 }
 
 type menuRepository struct {
@@ -521,7 +522,6 @@ func (r *menuRepository) RemoveBranchOverride(ctx context.Context, branchID, men
 	return nil
 }
 
-
 // menuPublicContextByReference resolves simplified table, branch, and merchant from a QR reference.
 const menuPublicContextByReference = `
 SELECT
@@ -624,6 +624,108 @@ WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
 	AND COALESCE(o.is_available, m.is_available) = TRUE
 ORDER BY c.name`
 
+// menuPublicContextByRoomReference resolves simplified room, branch, and merchant from a room QR reference.
+const menuPublicContextByRoomReference = `
+SELECT
+	json_strip_nulls(json_build_object(
+		'room_number', sr.room_number,
+		'reference', sr.reference,
+		'status', sr.status,
+		'floor', NULLIF(sr.floor, 0),
+		'room_type_name', rt.name
+	)) AS room,
+	json_strip_nulls(json_build_object(
+		'id', b.id::text,
+		'branch_name', b.branch_name,
+		'address', NULLIF(b.address, ''),
+		'phone_number', NULLIF(b.phone_number, '')
+	)) AS branch,
+	json_strip_nulls(json_build_object('name', mer.name, 'logo', NULLIF(mer.logo, ''))) AS merchant
+FROM single_rooms sr
+INNER JOIN rooms rt ON rt.id = sr.room_type_id AND rt.is_deleted = FALSE
+INNER JOIN branches b ON b.id = sr.branch_id AND b.is_deleted = FALSE
+INNER JOIN merchants mer ON mer.id = b.merchant_id AND mer.is_deleted = FALSE
+WHERE sr.reference = $1 AND sr.is_deleted = FALSE`
+
+const menuPublicListBaseForRooms = `
+WITH ctx AS (
+	SELECT sr.branch_id, b.merchant_id
+	FROM single_rooms sr
+	INNER JOIN branches b ON b.id = sr.branch_id AND b.is_deleted = FALSE
+	WHERE sr.reference = $1 AND sr.is_deleted = FALSE
+)
+SELECT
+	m.id,
+	m.name,
+	m.image,
+	m.is_fasting,
+	COALESCE(o.is_available, m.is_available) AS is_available,
+	m.description,
+	m.price,
+	m.preparation_time,
+	CASE WHEN c.id IS NOT NULL THEN json_strip_nulls(json_build_object('name', c.name, 'icon', NULLIF(c.icon, ''))) END AS category,
+	COALESCE(ing.ingredients, '[]'::json) AS ingredients,
+	COALESCE(mods.modifier_groups, '[]'::json) AS modifier_groups
+FROM ctx
+INNER JOIN menus m ON m.is_deleted = FALSE
+	AND (m.branch_id = ctx.branch_id OR (m.branch_id IS NULL AND m.merchant_id = ctx.merchant_id))
+LEFT JOIN branch_menu_overrides o
+	ON o.menu_id = m.id AND o.branch_id = ctx.branch_id AND o.is_deleted = FALSE
+LEFT JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
+LEFT JOIN LATERAL (
+	SELECT json_agg(json_strip_nulls(json_build_object('name', i.name, 'icon', NULLIF(i.icon, ''))) ORDER BY u.ord) AS ingredients
+	FROM unnest(m.ingredients) WITH ORDINALITY AS u(ing_id, ord)
+	INNER JOIN ingredients i ON i.id::text = u.ing_id AND i.is_deleted = FALSE
+) ing ON TRUE
+LEFT JOIN LATERAL (
+	SELECT json_agg(
+		json_strip_nulls(json_build_object(
+			'id', mg.id,
+			'name', mg.name,
+			'selection_type', mg.selection_type,
+			'is_required', mg.is_required,
+			'min_selections', NULLIF(mg.min_selections, 0),
+			'max_selections', NULLIF(mg.max_selections, 0),
+			'options', COALESCE(opts.options, '[]'::json)
+		)) ORDER BY g.ord
+	) AS modifier_groups
+	FROM unnest(m.modifiers) WITH ORDINALITY AS g(mg_id, ord)
+	INNER JOIN modifier_groups mg ON mg.id::text = g.mg_id AND mg.is_deleted = FALSE
+	LEFT JOIN LATERAL (
+		SELECT json_agg(
+			json_strip_nulls(json_build_object(
+				'id', mo.id,
+				'name', mo.name,
+				'price_adjustment', mo.price_adjustment,
+				'is_default', CASE WHEN mo.is_default THEN TRUE END,
+				'is_available', mo.is_available
+			)) ORDER BY o.ord
+		) AS options
+		FROM unnest(mg.options) WITH ORDINALITY AS o(opt_id, ord)
+		INNER JOIN modifier_options mo ON mo.id::text = o.opt_id AND mo.is_deleted = FALSE
+	) opts ON TRUE
+) mods ON TRUE
+WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
+	AND COALESCE(o.is_available, m.is_available) = TRUE`
+
+const menuPublicCategoriesByRoomReference = `
+WITH ctx AS (
+	SELECT sr.branch_id, b.merchant_id
+	FROM single_rooms sr
+	INNER JOIN branches b ON b.id = sr.branch_id AND b.is_deleted = FALSE
+	WHERE sr.reference = $1 AND sr.is_deleted = FALSE
+)
+SELECT DISTINCT c.name, c.icon
+FROM ctx
+INNER JOIN menus m ON m.is_deleted = FALSE
+	AND (m.branch_id = ctx.branch_id OR (m.branch_id IS NULL AND m.merchant_id = ctx.merchant_id))
+LEFT JOIN branch_menu_overrides o
+	ON o.menu_id = m.id AND o.branch_id = ctx.branch_id AND o.is_deleted = FALSE
+INNER JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
+WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
+	AND COALESCE(o.is_available, m.is_available) = TRUE
+ORDER BY c.name`
+
 func (r *menuRepository) listPublicCategories(ctx context.Context, reference string) ([]*category.CategoryResponseSimplified, error) {
 	rows, err := common.QueryRows(r.join, ctx, menuPublicCategoriesByReference, []any{reference}, func(rows *sql.Rows) (*category.CategoryResponseSimplified, error) {
 		var cat category.CategoryResponseSimplified
@@ -659,6 +761,52 @@ func (r *menuRepository) getPublicMenuContext(ctx context.Context, reference str
 
 	var catalog PublicMenuCatalogResponse
 	if err := json.Unmarshal(tableJSON, &catalog.Table); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(branchJSON, &catalog.Branch); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(merchantJSON, &catalog.Merchant); err != nil {
+		return nil, err
+	}
+	return &catalog, nil
+}
+
+func (r *menuRepository) listPublicCategoriesForRoom(ctx context.Context, reference string) ([]*category.CategoryResponseSimplified, error) {
+	rows, err := common.QueryRows(r.join, ctx, menuPublicCategoriesByRoomReference, []any{reference}, func(rows *sql.Rows) (*category.CategoryResponseSimplified, error) {
+		var cat category.CategoryResponseSimplified
+		var icon sql.NullString
+		if err := rows.Scan(&cat.Name, &icon); err != nil {
+			return nil, err
+		}
+		if icon.Valid && icon.String != "" {
+			cat.Icon = icon.String
+		}
+		return &cat, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return []*category.CategoryResponseSimplified{}, nil
+	}
+	return rows, nil
+}
+
+func (r *menuRepository) getPublicMenuContextForRoom(ctx context.Context, reference string) (*PublicMenuCatalogResponse, error) {
+	var roomJSON, branchJSON, merchantJSON []byte
+	err := r.join.QueryRow(ctx, menuPublicContextByRoomReference, []any{reference}, func(row *sql.Row) error {
+		return row.Scan(&roomJSON, &branchJSON, &merchantJSON)
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, common.ErrReferenceNotValid
+		}
+		return nil, err
+	}
+
+	var catalog PublicMenuCatalogResponse
+	if err := json.Unmarshal(roomJSON, &catalog.Room); err != nil {
 		return nil, err
 	}
 	if err := json.Unmarshal(branchJSON, &catalog.Branch); err != nil {
@@ -722,7 +870,7 @@ func (r *menuRepository) unmarshalMenuPublicRelations(
 	return nil
 }
 
-func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error) {
+func (r *menuRepository) ListMenusForTables(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error) {
 	catalog, err := r.getPublicMenuContext(ctx, reference)
 	if err != nil {
 		if errors.Is(err, common.ErrReferenceNotValid) {
@@ -765,6 +913,57 @@ func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, re
 	})
 	if err != nil {
 		r.logger.Error("failed to list public menus", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
+	catalog.Menus = menus
+	catalog.Meta = common.BuildPaginationMeta(int64(len(menus)), page, limit)
+	return catalog, nil
+}
+
+func (r *menuRepository) ListMenusForRooms(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error) {
+	catalog, err := r.getPublicMenuContextForRoom(ctx, reference)
+	if err != nil {
+		if errors.Is(err, common.ErrReferenceNotValid) {
+			return nil, err
+		}
+		r.logger.Error("failed to resolve room reference", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+
+	categories, err := r.listPublicCategoriesForRoom(ctx, reference)
+	if err != nil {
+		r.logger.Error("failed to list public categories for room", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+	catalog.Categories = categories
+
+	common.NormalizeFilter(&filter)
+	page, limit := filter.PageLimit()
+	offset := (page - 1) * limit
+
+	searchClause := ""
+	args := []any{reference}
+	if filter.Search != "" {
+		searchClause = " AND m.name ILIKE $2 ESCAPE '\\'"
+		args = append(args, "%"+filter.Search+"%")
+	}
+	argN := len(args)
+	query := fmt.Sprintf(
+		menuPublicListBaseForRooms+searchClause+` ORDER BY (m.branch_id IS NULL) DESC, m.created_at DESC LIMIT $%d OFFSET $%d`,
+		argN+1, argN+2,
+	)
+	args = append(args, limit, offset)
+
+	menus, err := common.QueryRows(r.join, ctx, query, args, func(rows *sql.Rows) (*MenuDTOPublic, error) {
+		var dto MenuDTOPublic
+		if err := r.scanMenuPublicFromRows(rows, &dto); err != nil {
+			return nil, err
+		}
+		return &dto, nil
+	})
+	if err != nil {
+		r.logger.Error("failed to list public menus for room", "error", err)
 		return nil, common.ErrInternalServerError
 	}
 

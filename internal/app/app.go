@@ -29,8 +29,6 @@ func NewApp() (*App, error) {
 
 	if err := godotenv.Load(); err != nil {
 		log.Println("Error loading .env file")
-	} else {
-		log.Println("Successfully loaded .env file")
 	}
 
 	// Initialize database connection

@@ -7,7 +7,7 @@ import (
 	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
 	item "lazeez-core/internal/order/Item"
-	"lazeez-core/internal/menu"
+	"lazeez-core/internal/menu/dinning"
 	"lazeez-core/internal/payment"
 	option "lazeez-core/internal/modifiers/option"
 	"strconv"

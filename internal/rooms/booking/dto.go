@@ -17,10 +17,10 @@ const (
 // set server-side: branch is derived from the room, passcode is generated, and
 // status is always "active" on check-in.
 type BookingRequestDTO struct {
-	RoomID         string    `json:"room_id"`
-	GuestName      string    `json:"guest_name"`
-	GuestPhone     string    `json:"guest_phone"`
-	NumberOfNights int       `json:"number_of_nights"`
+	RoomID         string      `json:"room_id"`
+	GuestName      string      `json:"guest_name"`
+	GuestPhone     string      `json:"guest_phone"`
+	NumberOfNights int         `json:"number_of_nights"`
 	CheckInDate    common.Date `json:"check_in_date"`
 }
 
@@ -46,15 +46,15 @@ func (b *BookingUpdateRequestDTO) IsEmpty() bool {
 
 type BookingDTO struct {
 	common.BaseDTO
-	RoomID         string        `json:"room_id"`
-	BranchID       string        `json:"branch_id"`
-	GuestName      string        `json:"guest_name"`
-	GuestPhone     string        `json:"guest_phone"`
-	NumberOfNights int           `json:"number_of_nights"`
-	CheckInDate    time.Time     `json:"check_in_date"`
-	CheckOutDate   time.Time     `json:"check_out_date"`
+	RoomID         string    `json:"room_id"`
+	BranchID       string    `json:"branch_id"`
+	GuestName      string    `json:"guest_name"`
+	GuestPhone     string    `json:"guest_phone"`
+	NumberOfNights int       `json:"number_of_nights"`
+	CheckInDate    time.Time `json:"check_in_date"`
+	CheckOutDate   time.Time `json:"check_out_date"`
 	// Passcode is the plaintext guest passcode, returned only once in the
 	// check-in response. Reads (Get/List) never include it.
-	Passcode string        `json:"passcode,omitempty"`
 	Status   BookingStatus `json:"status"`
+	Passcode string        `json:"passcode,omitempty"`
 }

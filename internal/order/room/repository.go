@@ -17,9 +17,11 @@ type RoomOrderRepository interface {
 	CreateItem(ctx context.Context, orderItem RoomOrderItem) error
 	Get(ctx context.Context, id string) (*RoomOrderDTO, error)
 	GetBySessionKey(ctx context.Context, id, sessionKey string) (*RoomOrderDTO, error)
+	GetByBookingID(ctx context.Context, id, bookingID string) (*RoomOrderDTO, error)
 	UpdateStatus(ctx context.Context, id, status, cancellationReason string) error
 	Delete(ctx context.Context, id string) error
 	ListBySessionKey(ctx context.Context, filter RoomOrderFilter, sessionKey string) (*common.PaginatedResponse[[]*RoomOrderDTO], error)
+	ListByBookingID(ctx context.Context, filter RoomOrderFilter, bookingID string) (*common.PaginatedResponse[[]*RoomOrderDTO], error)
 	ListByBranch(ctx context.Context, filter RoomOrderFilter, branchID string) (*common.PaginatedResponse[[]*RoomOrderDTO], error)
 	ListArchiveByBranch(ctx context.Context, filter RoomOrderFilter, branchID string) (*common.PaginatedResponse[[]*RoomOrderDTO], error)
 	ListAll(ctx context.Context, filter RoomOrderFilter) (*common.PaginatedResponse[[]*RoomOrderDTO], error)
@@ -109,6 +111,22 @@ func (r *roomOrderRepository) GetBySessionKey(ctx context.Context, id, sessionKe
 	return &dto, nil
 }
 
+func (r *roomOrderRepository) GetByBookingID(ctx context.Context, id, bookingID string) (*RoomOrderDTO, error) {
+	query := roomOrderWithRelations + " AND o.id = $1 AND o.booking_id = $2"
+	var dto RoomOrderDTO
+	err := r.joinDAL.QueryRow(ctx, query, []any{id, bookingID}, func(row *sql.Row) error {
+		return r.scanOrderRow(row, &dto)
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, common.ErrOrderNotFound
+		}
+		r.logger.Error("failed to get room order by booking id", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+	return &dto, nil
+}
+
 func (r *roomOrderRepository) UpdateStatus(ctx context.Context, id, status, cancellationReason string) error {
 	filter := map[string]any{"id": id}
 	updates := map[string]any{"order_status": status}
@@ -138,6 +156,10 @@ func (r *roomOrderRepository) Delete(ctx context.Context, id string) error {
 
 func (r *roomOrderRepository) ListBySessionKey(ctx context.Context, filter RoomOrderFilter, sessionKey string) (*common.PaginatedResponse[[]*RoomOrderDTO], error) {
 	return r.listOrders(ctx, filter, " AND o.session_key = $1 ", []any{sessionKey}, "o.created_at DESC")
+}
+
+func (r *roomOrderRepository) ListByBookingID(ctx context.Context, filter RoomOrderFilter, bookingID string) (*common.PaginatedResponse[[]*RoomOrderDTO], error) {
+	return r.listOrders(ctx, filter, " AND o.booking_id = $1 ", []any{bookingID}, "o.created_at DESC")
 }
 
 func (r *roomOrderRepository) ListByBranch(ctx context.Context, filter RoomOrderFilter, branchID string) (*common.PaginatedResponse[[]*RoomOrderDTO], error) {

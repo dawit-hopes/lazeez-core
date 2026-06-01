@@ -12,8 +12,13 @@ func NewMenuRoutes(router chi.Router, handler MenuHandler, middleware middleware
 	publicRoutes := []common.Route{
 		{
 			Method:  http.MethodGet,
-			Path:    "/client/menus",
-			Handler: handler.ListMenus,
+			Path:    "/client/menus/tables/{reference}",
+			Handler: handler.ListMenusForTables,
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/client/menus/rooms/{reference}",
+			Handler: handler.ListMenusForRooms,	
 		},
 	}
 	common.RegisterRoutes(router, publicRoutes)

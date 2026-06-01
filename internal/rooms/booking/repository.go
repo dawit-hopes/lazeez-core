@@ -18,6 +18,7 @@ type BookingRepository interface {
 	HasActiveBooking(ctx context.Context, roomID string) (bool, error)
 	GetActiveByRoomID(ctx context.Context, roomID string) (*Booking, error)
 	SetPasscodeAttempts(ctx context.Context, id string, attempts int, lockedUntil sql.NullTime) error
+	UpdatePasscode(ctx context.Context, id, passcodeHash string) error
 }
 
 type bookingRepository struct {
@@ -116,6 +117,20 @@ func (r *bookingRepository) SetPasscodeAttempts(ctx context.Context, id string, 
 			return common.ErrBookingNotFound
 		}
 		r.logger.Error("failed to update passcode attempts", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
+
+func (r *bookingRepository) UpdatePasscode(ctx context.Context, id, passcodeHash string) error {
+	filter := map[string]any{"id": id, "is_deleted": false}
+	updates := map[string]any{"passcode_hash": passcodeHash}
+	err := r.dal.Update(ctx, filter, updates)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return common.ErrBookingNotFound
+		}
+		r.logger.Error("failed to update passcode hash", "error", err)
 		return common.ErrInternalServerError
 	}
 	return nil

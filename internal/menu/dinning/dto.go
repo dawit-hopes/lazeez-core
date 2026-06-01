@@ -7,6 +7,8 @@ import (
 	"lazeez-core/internal/ingredient"
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/modifiers/group"
+	"lazeez-core/internal/rooms/booking"
+	"lazeez-core/internal/rooms/room"
 	"lazeez-core/internal/table"
 	"mime/multipart"
 
@@ -105,26 +107,28 @@ type ModifierGroupPublic struct {
 
 // MenuDTOPublic is a single menu item for the guest-facing catalog.
 type MenuDTOPublic struct {
-	ID              string                                `json:"id"`
-	Name            string                                `json:"name"`
-	Image           string                                `json:"image,omitempty"`
-	Description     string                                `json:"description,omitempty"`
-	Price           float64                               `json:"price"`
-	Category        *category.CategoryResponseSimplified    `json:"category,omitempty"`
+	ID              string                                    `json:"id"`
+	Name            string                                    `json:"name"`
+	Image           string                                    `json:"image,omitempty"`
+	Description     string                                    `json:"description,omitempty"`
+	Price           float64                                   `json:"price"`
+	Category        *category.CategoryResponseSimplified      `json:"category,omitempty"`
 	Ingredients     []ingredient.IngredientResponseSimplified `json:"ingredients"`
-	IsFasting       bool                                  `json:"is_fasting,omitempty"`
-	IsAvailable     bool                                  `json:"is_available"`
-	PreparationTime float64                               `json:"preparation_time,omitempty"`
-	Modifiers       []ModifierGroupPublic                 `json:"modifier_groups,omitempty"`
+	IsFasting       bool                                      `json:"is_fasting,omitempty"`
+	IsAvailable     bool                                      `json:"is_available"`
+	PreparationTime float64                                   `json:"preparation_time,omitempty"`
+	Modifiers       []ModifierGroupPublic                     `json:"modifier_groups,omitempty"`
 }
 
-// PublicMenuCatalogResponse is returned when a guest scans a table QR (reference).
-// Table, branch, and merchant are resolved once from the reference; menus are paginated.
+// PublicMenuCatalogResponse is returned when a guest scans a table or room QR (reference).
+// Table or room (by endpoint), branch, and merchant are resolved once from the reference; menus are paginated.
 type PublicMenuCatalogResponse struct {
-	Table    *table.TableResponseSimplified     `json:"table"`
-	Branch   *branch.BranchResponseSimplified   `json:"branch"`
-	Merchant *merchant.MerchantResponseSimplified `json:"merchant"`
-	Menus    []*MenuDTOPublic                   `json:"menus"`
-	Meta     common.PaginationMeta              `json:"meta"`
+	Table      *table.TableResponseSimplified         `json:"table,omitempty"`
+	Room       *room.RoomResponseSimplified           `json:"room,omitempty"`
+	Guest      *booking.BookingDTO                    `json:"guest,omitempty"`
+	Branch     *branch.BranchResponseSimplified       `json:"branch"`
+	Merchant   *merchant.MerchantResponseSimplified   `json:"merchant"`
+	Menus      []*MenuDTOPublic                       `json:"menus"`
+	Meta       common.PaginationMeta                  `json:"meta"`
 	Categories []*category.CategoryResponseSimplified `json:"categories"`
 }

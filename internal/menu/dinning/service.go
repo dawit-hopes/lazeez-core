@@ -9,9 +9,10 @@ import (
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
-	"lazeez-core/internal/users"
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
+	"lazeez-core/internal/rooms/room"
+	"lazeez-core/internal/users"
 
 	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
@@ -26,7 +27,7 @@ type MenuService interface {
 	UnDelete(ctx context.Context, id string, branchID, merchantID string, role string) error
 
 	// public services
-	ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error)
+	ListMenus(ctx context.Context, filter common.Filter, reference, referenceType string) (*PublicMenuCatalogResponse, error)
 
 	GetBranchMenuSnapshots(ctx context.Context, branchID string, menuIDs []string) (map[string]BranchMenuSnapshot, error)
 }
@@ -38,6 +39,7 @@ type menuService struct {
 	ingredientService     ingredient.IngredientService
 	modifierGroupService  modgroup.ModifierGroupService
 	modifierOptionService modoption.ModifierOptionService
+	roomService           room.RoomService
 	fileService           files.FileService
 	logger                config.Logger
 }
@@ -49,6 +51,7 @@ func NewMenuService(menuRepository MenuRepository,
 	ingredientService ingredient.IngredientService,
 	modifierGroupService modgroup.ModifierGroupService,
 	modifierOptionService modoption.ModifierOptionService,
+	roomService room.RoomService,
 	logger config.Logger) MenuService {
 	return &menuService{
 		menuRepository:        menuRepository,
@@ -59,6 +62,7 @@ func NewMenuService(menuRepository MenuRepository,
 		ingredientService:     ingredientService,
 		modifierGroupService:  modifierGroupService,
 		modifierOptionService: modifierOptionService,
+		roomService:           roomService,
 	}
 }
 
@@ -592,11 +596,23 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, 
 	}, nil
 }
 
-func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, reference string) (*PublicMenuCatalogResponse, error) {
-	result, err := s.menuRepository.ListMenus(ctx, filter, reference)
-	if err != nil {
-		s.logger.Error("Failed to list menus", "error", err)
-		return nil, err
+func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, reference, referenceType string) (*PublicMenuCatalogResponse, error) {
+	switch referenceType {
+	case "table":
+		return s.menuRepository.ListMenusForTables(ctx, filter, reference)
+	case "room":
+		rm, err := s.roomService.GetRoomByReference(ctx, reference)
+		if err != nil {
+			return nil, err
+		}
+
+		if rm.Status != room.RoomStatusOccupied {
+			s.logger.Error("Room is not occupied", "room_id", rm.ID, "status", rm.Status)
+			return nil, common.ErrRoomNotOccupied
+		}
+		return s.menuRepository.ListMenusForRooms(ctx, filter, reference)
+	default:
+		s.logger.Error("Invalid reference type", "reference_type", referenceType)
+		return nil, common.ErrInvalidRequest
 	}
-	return result, nil
 }

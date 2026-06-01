@@ -15,6 +15,7 @@ type KeyService interface {
 	GenerateJWTToken(payload map[string]any, expirationMinutes int) (string, error)
 	HashPassword(password string) (string, error)
 	VerifyPassword(password string, hashedPassword string) (bool, error)
+	ComparePassword(hashedPassword string, password string) error
 }
 
 type keyService struct {
@@ -76,4 +77,13 @@ func (s *keyService) VerifyPassword(password string, hashedPassword string) (boo
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *keyService) ComparePassword(hashedPassword string, password string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	if err != nil {
+		s.logger.Error("failed to compare password", "error", err)
+		return err
+	}
+	return nil
 }

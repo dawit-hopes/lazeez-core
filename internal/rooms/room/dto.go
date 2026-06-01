@@ -48,6 +48,15 @@ type RoomTypeInfo struct {
 	IsClone       bool    `json:"is_clone"`
 }
 
+// RoomResponseSimplified is the guest-facing physical room payload (e.g. public menu catalog).
+type RoomResponseSimplified struct {
+	RoomNumber    string `json:"room_number"`
+	Reference     string `json:"reference"`
+	Status        string `json:"status"`
+	Floor         int    `json:"floor,omitempty"`
+	RoomTypeName  string `json:"room_type_name,omitempty"`
+}
+
 type RoomDTO struct {
 	common.BaseDTO
 	RoomNumber string     `json:"room_number"`

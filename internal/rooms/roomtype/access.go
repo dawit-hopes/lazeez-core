@@ -24,7 +24,7 @@ func enrichRoomDTO(dto RoomDTO, room *Room, role, branchID, merchantID string) R
 	return dto
 }
 
-func (s *roomService) ensureHotelAccess(ctx context.Context, role, branchID, merchantID string) error {
+func (s *roomTypesService) ensureHotelAccess(ctx context.Context, role, branchID, merchantID string) error {
 	if users.IsSuperAdminRoleString(role) {
 		return nil
 	}
@@ -67,7 +67,7 @@ func (s *roomService) ensureHotelAccess(ctx context.Context, role, branchID, mer
 	return nil
 }
 
-func (s *roomService) ensureBranchInMerchant(ctx context.Context, branchID, merchantID string) error {
+func (s *roomTypesService) ensureBranchInMerchant(ctx context.Context, branchID, merchantID string) error {
 	br, err := s.branchService.Get(ctx, branchID)
 	if err != nil {
 		return err

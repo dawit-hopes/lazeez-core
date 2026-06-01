@@ -9,7 +9,7 @@ import (
 )
 
 type RoomOrderHandler interface {
-	// Client (room session key)
+	// Client (room reference + passcode)
 	CreateClient(w http.ResponseWriter, r *http.Request)
 	GetClient(w http.ResponseWriter, r *http.Request)
 	ListClient(w http.ResponseWriter, r *http.Request)
@@ -68,13 +68,13 @@ func (h *roomOrderHandler) GetClient(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	sessionKey := SessionKeyFromRequest(r)
-	if sessionKey == "" {
-		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+	reference, passCode, err := GuestAuthFromRequest(r)
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	order, err := h.service.GetClient(r.Context(), id, sessionKey)
+	order, err := h.service.GetClient(r.Context(), id, reference, passCode)
 	if err != nil {
 		h.logger.Error("failed to get room order", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -88,14 +88,14 @@ func (h *roomOrderHandler) GetClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomOrderHandler) ListClient(w http.ResponseWriter, r *http.Request) {
-	sessionKey := SessionKeyFromRequest(r)
-	if sessionKey == "" {
-		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+	reference, passCode, err := GuestAuthFromRequest(r)
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	filter := ParseRoomOrderFilter(r)
-	result, err := h.service.ListClient(r.Context(), filter, sessionKey)
+	result, err := h.service.ListClient(r.Context(), filter, reference, passCode)
 	if err != nil {
 		h.logger.Error("failed to list room orders", "error", err)
 		common.WriteErrorResponse(w, err)

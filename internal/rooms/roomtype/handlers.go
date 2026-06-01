@@ -18,12 +18,12 @@ type RoomHandler interface {
 }
 
 type roomHandler struct {
-	roomService RoomService
+	roomTypeService RoomTypesService
 	logger      config.Logger
 }
 
-func NewRoomHandler(roomService RoomService, logger config.Logger) RoomHandler {
-	return &roomHandler{roomService: roomService, logger: logger}
+func NewRoomHandler(roomTypeService RoomTypesService, logger config.Logger) RoomHandler {
+	return &roomHandler{roomTypeService: roomTypeService, logger: logger}
 }
 
 func (h *roomHandler) contextValues(r *http.Request) (role, branchID, merchantID string) {
@@ -49,7 +49,7 @@ func (h *roomHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room, err := h.roomService.CreateRoom(r.Context(), req, role, branchID, merchantID)
+	room, err := h.roomTypeService.CreateRoom(r.Context(), req, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to create room", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -70,7 +70,7 @@ func (h *roomHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	room, err := h.roomService.GetRoom(r.Context(), id, role, branchID, merchantID)
+	room, err := h.roomTypeService.GetRoom(r.Context(), id, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to get room", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -88,7 +88,7 @@ func (h *roomHandler) List(w http.ResponseWriter, r *http.Request) {
 	role, branchID, merchantID := h.contextValues(r)
 	scope := ListScope(r.URL.Query().Get("scope"))
 
-	result, err := h.roomService.ListRooms(r.Context(), filter, role, branchID, merchantID, scope)
+	result, err := h.roomTypeService.ListRooms(r.Context(), filter, role, branchID, merchantID, scope)
 	if err != nil {
 		h.logger.Error("failed to list room types", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -122,7 +122,7 @@ func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	room, err := h.roomService.UpdateRoom(r.Context(), id, req, role, branchID, merchantID)
+	room, err := h.roomTypeService.UpdateRoom(r.Context(), id, req, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to update room", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -143,7 +143,7 @@ func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	err = h.roomService.DeleteRoom(r.Context(), id, role, branchID, merchantID)
+	err = h.roomTypeService.DeleteRoom(r.Context(), id, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to delete room", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -177,7 +177,7 @@ func (h *roomHandler) Clone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	room, err := h.roomService.CloneRoom(r.Context(), id, req, role, branchID, merchantID)
+	room, err := h.roomTypeService.CloneRoom(r.Context(), id, req, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to clone room", "error", err)
 		common.WriteErrorResponse(w, err)

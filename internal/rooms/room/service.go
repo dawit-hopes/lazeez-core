@@ -18,6 +18,9 @@ type RoomService interface {
 	UpdateRoom(ctx context.Context, id string, req RoomUpdateRequestDTO, role, branchID, merchantID string) (*RoomDTO, error)
 	DeleteRoom(ctx context.Context, id, role, branchID, merchantID string) error
 	RegenerateQRCode(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error)
+	GetRoomByReference(ctx context.Context, reference string) (*RoomDTO, error)
+	UpdateRoomStatus(ctx context.Context, id, status string) error
+	GetRoomById(ctx context.Context, id string) (*RoomDTO, error)
 }
 
 type roomService struct {
@@ -268,4 +271,25 @@ func (s *roomService) RegenerateQRCode(ctx context.Context, id, role, branchID, 
 		return nil, err
 	}
 	return s.roomDTO(ctx, id)
+}
+
+func (s *roomService) GetRoomByReference(ctx context.Context, reference string) (*RoomDTO, error) {
+	rm, err := s.repository.GetByReference(ctx, reference)
+	if err != nil {
+		return nil, err
+	}
+	return s.roomDTO(ctx, rm.ID)
+}
+
+func (s *roomService) UpdateRoomStatus(ctx context.Context, id, status string) error {
+	return s.repository.UpdateStatus(ctx, id, status)
+}
+
+func (s *roomService) GetRoomById(ctx context.Context, id string) (*RoomDTO, error) {
+	rm, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	dto := rm.ToDTO()
+	return &dto, nil
 }
