@@ -63,9 +63,9 @@ func (h *roomHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -103,9 +103,9 @@ func (h *roomHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -136,14 +136,14 @@ func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	role, branchID, merchantID := h.contextValues(r)
-	err := h.roomService.DeleteRoom(r.Context(), id, role, branchID, merchantID)
+	err = h.roomService.DeleteRoom(r.Context(), id, role, branchID, merchantID)
 	if err != nil {
 		h.logger.Error("failed to delete room", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -156,9 +156,9 @@ func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Clone(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 

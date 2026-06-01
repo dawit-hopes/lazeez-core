@@ -55,6 +55,12 @@ func NewBookingRoutes(router chi.Router, handler BookingHandler, mw middleware.M
 			Handler:     handler.Delete,
 			Middlewares: mutateMw,
 		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/bookings/{id}/regenerate-passcode",
+			Handler:     handler.ReGeneratePassCode,
+			Middlewares: mutateMw,
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }

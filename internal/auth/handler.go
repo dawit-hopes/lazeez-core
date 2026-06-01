@@ -62,8 +62,12 @@ func (h *authHandler) FirstTimeLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *authHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.authService.Logout(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.authService.Logout(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to logout", "error", err)
 		common.WriteErrorResponse(w, err)

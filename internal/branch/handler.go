@@ -63,7 +63,11 @@ func (h *branchHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *branchHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	branchDTO, err := h.branchService.Get(r.Context(), id)
 	if err != nil {
@@ -80,7 +84,11 @@ func (h *branchHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	var req UpdateBranchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode update branch request body", "error", err)
@@ -102,7 +110,7 @@ func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		req.PhoneNumber = normalized
 	}
-	err := h.branchService.Update(r.Context(), id, req)
+	err = h.branchService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update branch", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -116,7 +124,11 @@ func (h *branchHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *branchHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	if err := h.branchService.Delete(r.Context(), id); err != nil {
 		h.logger.Error("Failed to delete branch", "error", err)
@@ -131,7 +143,11 @@ func (h *branchHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *branchHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	if err := h.branchService.UnDelete(r.Context(), id); err != nil {
 		h.logger.Error("Failed to undelete branch", "error", err)
@@ -162,7 +178,11 @@ func (h *branchHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *branchHandler) ListByMerchantID(w http.ResponseWriter, r *http.Request) {
-	merchantID := common.ParseID(r, "merchantID")
+	merchantID, err := common.ParseID(r, "merchantID")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	filter := common.ParseFilter(r)
 	h.logger.Info("Listing branches by merchant ID", "merchantID", merchantID)
 	result, err := h.branchService.ListByMerchantID(r.Context(), merchantID, filter)

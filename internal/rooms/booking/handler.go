@@ -16,6 +16,7 @@ type BookingHandler interface {
 	CheckOut(w http.ResponseWriter, r *http.Request)
 	Cancel(w http.ResponseWriter, r *http.Request)
 	Delete(w http.ResponseWriter, r *http.Request)
+	ReGeneratePassCode(w http.ResponseWriter, r *http.Request)
 }
 
 type bookingHandler struct {
@@ -62,9 +63,9 @@ func (h *bookingHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bookingHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -101,9 +102,9 @@ func (h *bookingHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bookingHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -134,9 +135,9 @@ func (h *bookingHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bookingHandler) CheckOut(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -155,9 +156,9 @@ func (h *bookingHandler) CheckOut(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bookingHandler) Cancel(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -176,9 +177,9 @@ func (h *bookingHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bookingHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -190,6 +191,29 @@ func (h *bookingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteSuccessResponse(w, common.Response{
 		Message:    "Booking deleted successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *bookingHandler) ReGeneratePassCode(w http.ResponseWriter, r *http.Request) {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	role, branchID, merchantID := h.contextValues(r)
+	passcode, err := h.bookingService.ReGeneratePassCode(r.Context(), id, role, branchID, merchantID)
+	if err != nil {
+		h.logger.Error("failed to re-generate passcode", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       map[string]string{
+			"passcode": *passcode,
+		},
+		Message:    "Passcode re-generated successfully",
 		StatusCode: http.StatusOK,
 	})
 }

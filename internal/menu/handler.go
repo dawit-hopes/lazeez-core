@@ -254,7 +254,11 @@ func (h *menuHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 	merchantID, err := h.resolveMerchantID(r)
 	if err != nil {
@@ -277,7 +281,11 @@ func (h *menuHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	if err := h.parseMultipart(r, 32<<20); err != nil {
 		common.WriteErrorResponse(w, err)
 		return
@@ -320,7 +328,11 @@ func (h *menuHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 	merchantID, err := h.resolveMerchantID(r)
 	if err != nil {
@@ -342,7 +354,11 @@ func (h *menuHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *menuHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 	merchantID, err := h.resolveMerchantID(r)
 	if err != nil {

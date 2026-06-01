@@ -101,7 +101,11 @@ func (h *merchantHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	merchant, err := h.merchantService.Get(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get merchant", "error", err)
@@ -112,7 +116,11 @@ func (h *merchantHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	if err := h.parseMultipart(r, 32<<20); err != nil {
 		h.logger.Error("Failed to parse multipart form", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -154,8 +162,12 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.merchantService.Delete(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.merchantService.Delete(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to delete merchant", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -181,8 +193,12 @@ func (h *merchantHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *merchantHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.merchantService.UnDelete(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.merchantService.UnDelete(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to undelete merchant", "error", err)
 		common.WriteErrorResponse(w, err)

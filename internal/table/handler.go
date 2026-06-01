@@ -62,10 +62,10 @@ func (h *tableHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *tableHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
 		h.logger.Error("Table ID is required")
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
@@ -85,15 +85,15 @@ func (h *tableHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *tableHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
 		h.logger.Error("Table ID is required")
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 
-	err := h.tableService.Delete(r.Context(), id, branchID)
+	err = h.tableService.Delete(r.Context(), id, branchID)
 	if err != nil {
 		h.logger.Error("Failed to delete table", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -126,15 +126,15 @@ func (h *tableHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *tableHandler) RegenerateQRCode(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
 		h.logger.Error("Table ID is required")
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 
-	err := h.tableService.RegenerateQRCode(r.Context(), id, branchID)
+	err = h.tableService.RegenerateQRCode(r.Context(), id, branchID)
 	if err != nil {
 		h.logger.Error("Failed to regenerate QR code", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -148,10 +148,10 @@ func (h *tableHandler) RegenerateQRCode(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *tableHandler) AttachOrder(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
 		h.logger.Error("Table ID is required")
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
@@ -168,7 +168,7 @@ func (h *tableHandler) AttachOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.tableService.AttachOrder(r.Context(), id, req.OrderID, branchID)
+	err = h.tableService.AttachOrder(r.Context(), id, req.OrderID, branchID)
 	if err != nil {
 		h.logger.Error("Failed to attach order", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -182,15 +182,15 @@ func (h *tableHandler) AttachOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *tableHandler) DetachOrder(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
 		h.logger.Error("Table ID is required")
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, _ := middleware.GetBranchIDFromContext(r.Context())
 
-	err := h.tableService.DetachOrder(r.Context(), id, branchID)
+	err = h.tableService.DetachOrder(r.Context(), id, branchID)
 	if err != nil {
 		h.logger.Error("Failed to detach order", "error", err)
 		common.WriteErrorResponse(w, err)

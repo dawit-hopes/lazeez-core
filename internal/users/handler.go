@@ -86,7 +86,11 @@ func (h *userHandler) CreateSuperAdminUser(w http.ResponseWriter, r *http.Reques
 	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "Super admin user created successfully", StatusCode: http.StatusOK})
 }
 func (h *userHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	user, err := h.userService.GetUserByID(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get user by ID", "error", err)
@@ -97,9 +101,13 @@ func (h *userHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *userHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	var req UserRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		h.logger.Error("Failed to decode request body", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -130,8 +138,12 @@ func (h *userHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *userHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.userService.DeleteUser(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.userService.DeleteUser(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to delete user", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -185,7 +197,11 @@ func (h *userHandler) GetAllUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *userHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) {
-	branchID := common.ParseID(r, "branchID")
+	branchID, err := common.ParseID(r, "branchID")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	user, err := h.userService.GetUserByBranchID(r.Context(), branchID)
 	if err != nil {
 		h.logger.Error("Failed to get user by branch ID", "error", err)
@@ -196,8 +212,12 @@ func (h *userHandler) GetUserByBranchID(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *userHandler) UnDeleteUser(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.userService.UnDeleteUser(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.userService.UnDeleteUser(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to undelete user", "error", err)
 		common.WriteErrorResponse(w, err)

@@ -61,9 +61,9 @@ func (h *roomHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -100,9 +100,9 @@ func (h *roomHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -133,9 +133,9 @@ func (h *roomHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -152,9 +152,9 @@ func (h *roomHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *roomHandler) RegenerateQRCode(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	if id == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 

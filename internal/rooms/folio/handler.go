@@ -23,9 +23,9 @@ func NewFolioHandler(service FolioService, logger config.Logger) FolioHandler {
 }
 
 func (h *folioHandler) GetByBooking(w http.ResponseWriter, r *http.Request) {
-	bookingID := common.ParseID(r, "id")
-	if bookingID == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	bookingID, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
@@ -48,9 +48,9 @@ func (h *folioHandler) GetByBooking(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *folioHandler) Settle(w http.ResponseWriter, r *http.Request) {
-	bookingID := common.ParseID(r, "id")
-	if bookingID == "" {
-		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+	bookingID, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())

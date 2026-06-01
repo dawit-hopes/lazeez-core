@@ -63,7 +63,11 @@ func (h *roomOrderHandler) CreateClient(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *roomOrderHandler) GetClient(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	sessionKey := SessionKeyFromRequest(r)
 	if sessionKey == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -108,7 +112,11 @@ func (h *roomOrderHandler) ListClient(w http.ResponseWriter, r *http.Request) {
 // --- Branch ---
 
 func (h *roomOrderHandler) GetBranch(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
 	if !ok || branchID == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -173,7 +181,11 @@ func (h *roomOrderHandler) ArchiveBranch(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *roomOrderHandler) UpdateBranch(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
 	if !ok || branchID == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -207,7 +219,11 @@ func (h *roomOrderHandler) UpdateBranch(w http.ResponseWriter, r *http.Request) 
 // --- Admin ---
 
 func (h *roomOrderHandler) GetAdmin(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	order, err := h.service.GetAdmin(r.Context(), id)
 	if err != nil {
 		h.logger.Error("failed to get room order", "error", err)

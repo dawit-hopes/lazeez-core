@@ -21,7 +21,7 @@ type BookingRequestDTO struct {
 	GuestName      string    `json:"guest_name"`
 	GuestPhone     string    `json:"guest_phone"`
 	NumberOfNights int       `json:"number_of_nights"`
-	CheckInDate    time.Time `json:"check_in_date"`
+	CheckInDate    common.Date `json:"check_in_date"`
 }
 
 func (b *BookingRequestDTO) ToModel() Booking {
@@ -30,7 +30,7 @@ func (b *BookingRequestDTO) ToModel() Booking {
 		GuestName:      b.GuestName,
 		GuestPhone:     b.GuestPhone,
 		NumberOfNights: b.NumberOfNights,
-		CheckInDate:    b.CheckInDate,
+		CheckInDate:    b.CheckInDate.Time(),
 	}
 }
 

@@ -73,7 +73,11 @@ func (h *orderHandler) CreateClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *orderHandler) GetClient(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	sessionKey := SessionKeyFromRequest(r)
 	if sessionKey == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -118,7 +122,11 @@ func (h *orderHandler) ListClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *orderHandler) CancelPaymentClient(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	sessionKey := SessionKeyFromRequest(r)
 	if sessionKey == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -140,7 +148,11 @@ func (h *orderHandler) CancelPaymentClient(w http.ResponseWriter, r *http.Reques
 // --- Branch ---
 
 func (h *orderHandler) GetBranch(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
 	if !ok || branchID == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -208,7 +220,11 @@ func (h *orderHandler) ArchiveBranch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *orderHandler) UpdateBranch(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
 	if !ok || branchID == "" {
 		common.WriteErrorResponse(w, common.ErrUnAuthorized)
@@ -243,7 +259,11 @@ func (h *orderHandler) UpdateBranch(w http.ResponseWriter, r *http.Request) {
 // --- Admin ---
 
 func (h *orderHandler) GetAdmin(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	order, err := h.orderService.GetAdmin(r.Context(), id)
 	if err != nil {
@@ -285,7 +305,11 @@ func (h *orderHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *orderHandler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	var req OrderUpdateInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

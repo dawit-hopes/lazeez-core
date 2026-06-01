@@ -53,7 +53,11 @@ func (h *ingredientHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ingredientHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	ingredientDTO, err := h.ingredientService.Get(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get ingredient", "error", err)
@@ -68,7 +72,11 @@ func (h *ingredientHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ingredientHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	var req IngredientRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode request body", "error", err)
@@ -81,7 +89,7 @@ func (h *ingredientHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.ingredientService.Update(r.Context(), id, req)
+	err = h.ingredientService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update ingredient", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -110,8 +118,12 @@ func (h *ingredientHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ingredientHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.ingredientService.Delete(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.ingredientService.Delete(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to delete ingredient", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -124,8 +136,12 @@ func (h *ingredientHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ingredientHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.ingredientService.UnDelete(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.ingredientService.UnDelete(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to undelete ingredient", "error", err)
 		common.WriteErrorResponse(w, err)

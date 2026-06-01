@@ -57,7 +57,11 @@ func (h *categoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *categoryHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	category, err := h.categoryService.Get(r.Context(), id)
 	if err != nil {
@@ -74,7 +78,11 @@ func (h *categoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *categoryHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 	var req CategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode request", "error", err)
@@ -88,7 +96,7 @@ func (h *categoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.categoryService.Update(r.Context(), id, req)
+	err = h.categoryService.Update(r.Context(), id, req)
 	if err != nil {
 		h.logger.Error("Failed to update category", "error", err)
 		common.WriteErrorResponse(w, err)
@@ -102,7 +110,11 @@ func (h *categoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *categoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	if err := h.categoryService.Delete(r.Context(), id); err != nil {
 		h.logger.Error("Failed to delete category", "error", err)
@@ -134,8 +146,12 @@ func (h *categoryHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *categoryHandler) UnDelete(w http.ResponseWriter, r *http.Request) {
-	id := common.ParseID(r, "id")
-	err := h.categoryService.UnDelete(r.Context(), id)
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	err = h.categoryService.UnDelete(r.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to undelete category", "error", err)
 		common.WriteErrorResponse(w, err)

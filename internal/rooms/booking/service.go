@@ -9,6 +9,8 @@ import (
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/rooms/folio"
 	"lazeez-core/internal/rooms/room"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const passcodeLength = 6
@@ -21,6 +23,7 @@ type BookingService interface {
 	CheckOut(ctx context.Context, id, role, branchID, merchantID string) (*BookingDTO, error)
 	Cancel(ctx context.Context, id, role, branchID, merchantID string) (*BookingDTO, error)
 	DeleteBooking(ctx context.Context, id, role, branchID, merchantID string) error
+	ReGeneratePassCode(ctx context.Context, id, role, branchID, merchantID string) (*string, error)
 }
 
 type bookingService struct {
@@ -73,27 +76,46 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 		return nil, common.ErrUnAuthorized
 	}
 
-	rm, err := s.roomRepo.Get(ctx, req.RoomID)
-	if err != nil {
-		return nil, err
-	}
-	if rm.Room.BranchID != branchID {
-		return nil, common.ErrUnAuthorized
-	}
+	g, ctx := errgroup.WithContext(ctx)
+	rm := &room.RoomWithType{}
+	var (
+		plainPasscode  string
+		hashedPasscode string
+	)
 
-	occupied, err := s.repository.HasActiveBooking(ctx, req.RoomID)
-	if err != nil {
-		return nil, err
-	}
-	if occupied {
-		return nil, common.ErrRoomOccupied
-	}
+	g.Go(func() error {
+		var err error
+		rm, err = s.roomRepo.Get(ctx, req.RoomID)
+		if err != nil {
+			return err
+		}
+		*rm = *rm
+		return nil
+	})
 
-	plainPasscode := common.GeneratePasscode(passcodeLength)
-	hashedPasscode, err := s.keyService.HashPassword(plainPasscode)
-	if err != nil {
-		s.logger.Error("failed to hash passcode", "error", err)
-		return nil, common.ErrInternalServerError
+	g.Go(func() error {
+		occupied, err := s.repository.HasActiveBooking(ctx, req.RoomID)
+		if err != nil {
+			return err
+		}
+		if occupied {
+			return common.ErrRoomOccupied
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		plainPasscode, hashedPasscode, err = s.generatePasscode()
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		s.logger.Error("failed to create booking", "error", err)
+		return nil, err
 	}
 
 	b := req.ToModel()
@@ -103,6 +125,8 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 	b.PasscodeHash = hashedPasscode
 	b.CheckOutDate = b.CheckInDate.AddDate(0, 0, b.NumberOfNights)
 
+
+	// ====================== make this atomic ======================
 	if err := s.repository.Create(ctx, &b); err != nil {
 		return nil, err
 	}
@@ -116,6 +140,7 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 		return nil, common.ErrInternalServerError
 	}
 
+	// ====================== make this atomic ======================
 	dto := b.ToDTO()
 	dto.Passcode = plainPasscode
 	return &dto, nil
@@ -225,4 +250,36 @@ func (s *bookingService) DeleteBooking(ctx context.Context, id, role, branchID, 
 		return err
 	}
 	return s.repository.Delete(ctx, id)
+}
+
+func (s *bookingService) ReGeneratePassCode(ctx context.Context, id, role, branchID, merchantID string) (*string, error) {
+	b, err := s.repository.Get(ctx, id)
+	if err != nil {
+		s.logger.Error("failed to get booking", "error", err)
+		return nil, err
+	}
+	if err := s.authorizeManage(b, role, branchID); err != nil {
+		s.logger.Error("failed to authorize manage", "error", err)
+		return nil, err
+	}
+	plainPasscode, hashedPasscode, err := s.generatePasscode()
+	if err != nil {
+		return nil, err
+	}
+	b.PasscodeHash = hashedPasscode
+	if err := s.repository.Update(ctx, *b); err != nil {
+		s.logger.Error("failed to update booking", "error", err)
+		return nil, err
+	}
+	return &plainPasscode, nil
+}
+
+func (s *bookingService) generatePasscode() (string, string, error) {
+	plainPasscode := common.GeneratePasscode(passcodeLength)
+	hashedPasscode, err := s.keyService.HashPassword(plainPasscode)
+	if err != nil {
+		s.logger.Error("failed to hash passcode", "error", err)
+		return "", "", common.ErrInternalServerError
+	}
+	return plainPasscode, hashedPasscode, nil
 }

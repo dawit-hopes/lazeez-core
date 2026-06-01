@@ -26,8 +26,12 @@ func ToNullTimePtr(t sql.NullTime) *time.Time {
 	return nil
 }
 
-func ParseID(r *http.Request, parm string) string {
-	return chi.URLParam(r, parm)
+func ParseID(r *http.Request, parm string) (string, error) {
+	id := chi.URLParam(r, parm)
+	if id == "" {
+		return "", ErrInvalidRequest
+	}
+	return id, nil
 }
 
 func FormatText(text string) string {
