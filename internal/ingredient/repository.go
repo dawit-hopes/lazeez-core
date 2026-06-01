@@ -70,6 +70,7 @@ func (r *ingredientRepository) Update(ctx context.Context, ingredient Ingredient
 }
 
 func (r *ingredientRepository) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Ingredient], error) {
+	common.NormalizeFilter(&filter)
 	filters := map[string]any{}
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)

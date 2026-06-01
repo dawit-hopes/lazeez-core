@@ -234,11 +234,13 @@ func (r *orderRepository) ListAll(ctx context.Context, filter OrderFilter) (*com
 }
 
 func (r *orderRepository) listOrders(ctx context.Context, filter OrderFilter, baseCond string, baseArgs []any, orderBy string) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	common.NormalizeFilter(&filter.Filter)
+	page, limit := filter.PageLimit()
 	filterCond, args := BuildOrderFilterClause(filter, baseArgs)
-	offset := (filter.Page - 1) * filter.Limit
+	offset := (page - 1) * limit
 	argNum := len(args) + 1
 	query := orderWithRelations + baseCond + filterCond + " ORDER BY " + orderBy + " LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
-	args = append(args, filter.Limit, offset)
+	args = append(args, limit, offset)
 
 	results, err := common.QueryRows(r.joinDAL, ctx, query, args, func(rows *sql.Rows) (*OrderDTO, error) {
 		var dto OrderDTO
@@ -253,7 +255,7 @@ func (r *orderRepository) listOrders(ctx context.Context, filter OrderFilter, ba
 	}
 	return &common.PaginatedResponse[[]*OrderDTO]{
 		Data: results,
-		Meta: common.BuildPaginationMeta(int64(len(results)), filter.Page, filter.Limit),
+		Meta: common.BuildPaginationMeta(int64(len(results)), page, limit),
 	}, nil
 }
 
@@ -267,6 +269,8 @@ func (r *orderRepository) listOrdersWithCount(
 	buildClause orderFilterClauseBuilder,
 	orderBy string,
 ) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	common.NormalizeFilter(&filter.Filter)
+	page, limit := filter.PageLimit()
 	filterCond, args := buildClause(filter, baseArgs)
 
 	countQuery := "SELECT COUNT(*) FROM orders o WHERE o.is_deleted = FALSE" + baseCond + filterCond
@@ -279,10 +283,10 @@ func (r *orderRepository) listOrdersWithCount(
 		return nil, common.ErrInternalServerError
 	}
 
-	offset := (filter.Page - 1) * filter.Limit
+	offset := (page - 1) * limit
 	argNum := len(args) + 1
 	query := orderWithRelations + baseCond + filterCond + " ORDER BY " + orderBy + " LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
-	listArgs := append(append([]any{}, args...), filter.Limit, offset)
+	listArgs := append(append([]any{}, args...), limit, offset)
 
 	results, err := common.QueryRows(r.joinDAL, ctx, query, listArgs, func(rows *sql.Rows) (*OrderDTO, error) {
 		var dto OrderDTO
@@ -298,7 +302,7 @@ func (r *orderRepository) listOrdersWithCount(
 
 	return &common.PaginatedResponse[[]*OrderDTO]{
 		Data: results,
-		Meta: common.BuildPaginationMeta(total, filter.Page, filter.Limit),
+		Meta: common.BuildPaginationMeta(total, page, limit),
 	}, nil
 }
 

@@ -139,6 +139,7 @@ func (r *bookingRepository) HasActiveBooking(ctx context.Context, roomID string)
 }
 
 func (r *bookingRepository) List(ctx context.Context, filter common.Filter, branchID, merchantID string) (*common.PaginatedResponse[[]*Booking], error) {
+	common.NormalizeFilter(&filter)
 	if merchantID != "" && branchID == "" {
 		return r.listByMerchant(ctx, filter, merchantID)
 	}
@@ -154,14 +155,7 @@ func (r *bookingRepository) List(ctx context.Context, filter common.Filter, bran
 		filters["guest_name"] = common.ILike(filter.Search)
 	}
 
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
+	page, limit := filter.PageLimit()
 
 	total, err := r.dal.CountFiltered(ctx, filters)
 	if err != nil {
@@ -180,6 +174,7 @@ func (r *bookingRepository) List(ctx context.Context, filter common.Filter, bran
 }
 
 func (r *bookingRepository) listByMerchant(ctx context.Context, filter common.Filter, merchantID string) (*common.PaginatedResponse[[]*Booking], error) {
+	common.NormalizeFilter(&filter)
 	args := []any{merchantID}
 	extraClause := ""
 	if status := filterStatus(filter); status != "" {
@@ -191,14 +186,7 @@ func (r *bookingRepository) listByMerchant(ctx context.Context, filter common.Fi
 		extraClause += fmt.Sprintf(" AND bk.guest_name ILIKE $%d ESCAPE '\\'", len(args))
 	}
 
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
+	page, limit := filter.PageLimit()
 	offset := (page - 1) * limit
 
 	whereClause := fmt.Sprintf(`bk.is_deleted = FALSE AND br.merchant_id = $1%s`, extraClause)

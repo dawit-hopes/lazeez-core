@@ -91,6 +91,7 @@ func (r *categoryRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *categoryRepository) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Category], error) {
+	common.NormalizeFilter(&filter)
 	role, _ := middleware.GetRoleFromContext(ctx)
 
 	filters := map[string]any{}

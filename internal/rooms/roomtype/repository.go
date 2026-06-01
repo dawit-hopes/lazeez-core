@@ -97,6 +97,7 @@ func (r *roomRepository) ListScoped(ctx context.Context, filter common.Filter, s
 }
 
 func (r *roomRepository) listMaster(ctx context.Context, filter common.Filter, merchantID string) (*common.PaginatedResponse[[]*RoomDTO], error) {
+	common.NormalizeFilter(&filter)
 	if merchantID == "" {
 		return nil, common.ErrUnAuthorized
 	}
@@ -108,14 +109,7 @@ func (r *roomRepository) listMaster(ctx context.Context, filter common.Filter, m
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)
 	}
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
+	page, limit := filter.PageLimit()
 
 	total, err := r.dal.CountFiltered(ctx, filters)
 	if err != nil {
@@ -153,6 +147,7 @@ func branchManageWhereSQL(searchClause string) string {
 }
 
 func (r *roomRepository) listBranchManage(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*RoomDTO], error) {
+	common.NormalizeFilter(&filter)
 	searchClause := ""
 	args := []any{branchID}
 	if filter.Search != "" {
@@ -160,14 +155,7 @@ func (r *roomRepository) listBranchManage(ctx context.Context, filter common.Fil
 		args = append(args, "%"+filter.Search+"%")
 	}
 
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
+	page, limit := filter.PageLimit()
 	offset := (page - 1) * limit
 
 	countQuery := fmt.Sprintf(`

@@ -9,7 +9,7 @@ import (
 func ParseFilter(r *http.Request) Filter {
 	filter := Filter{
 		Page:   1,
-		Limit:  10,
+		Limit:  DefaultPageLimit,
 		Search: "",
 		Filter: make(map[string]any),
 	}
@@ -36,5 +36,6 @@ func ParseFilter(r *http.Request) Filter {
 			filter.Filter[trimmedKey] = strings.TrimSpace(values[0])
 		}
 	}
+	NormalizeFilter(&filter)
 	return filter
 }

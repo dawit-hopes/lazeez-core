@@ -5,6 +5,9 @@ import (
 	"reflect"
 )
 
+// DefaultPageLimit is the page size when limit is omitted from list requests.
+const DefaultPageLimit = 20
+
 type CursorPaginationResponse[T any] struct {
 	Data       []T    `json:"data"`
 	NextCursor string `json:"next_cursor,omitempty"`
@@ -46,9 +49,35 @@ func (p PaginatedResponse[T]) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// NormalizeFilter applies default page and limit for list endpoints.
+func NormalizeFilter(f *Filter) {
+	if f == nil {
+		return
+	}
+	if f.Page <= 0 {
+		f.Page = 1
+	}
+	if f.Limit <= 0 {
+		f.Limit = DefaultPageLimit
+	}
+}
+
+// PageLimit returns normalized page and limit values from a filter.
+func (f Filter) PageLimit() (page, limit int) {
+	page = f.Page
+	limit = f.Limit
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = DefaultPageLimit
+	}
+	return page, limit
+}
+
 func BuildPaginationMeta(totalDocs int64, page, limit int) PaginationMeta {
 	if limit <= 0 {
-		limit = 10
+		limit = DefaultPageLimit
 	}
 	if page <= 0 {
 		page = 1

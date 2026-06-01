@@ -105,6 +105,7 @@ func (r *tableRepository) UnDelete(ctx context.Context, id string) error {
 }
 
 func (r *tableRepository) List(ctx context.Context, filters common.Filter, branchID string) (*common.PaginatedResponse[[]*Table], error) {
+	common.NormalizeFilter(&filters)
 	filter := map[string]any{"is_deleted": false}
 	if branchID != "" {
 		filter["branch_id"] = branchID

@@ -29,10 +29,10 @@ func ParseRoomOrderFilter(r *http.Request) RoomOrderFilter {
 func ParseArchiveRoomOrderFilter(r *http.Request) RoomOrderFilter {
 	f := RoomOrderFilter{Filter: common.ParseFilter(r)}
 	if r.URL.Query().Get("limit") == "" {
-		f.Limit = 20
+		f.Limit = common.DefaultPageLimit
 	}
 	if f.Limit <= 0 {
-		f.Limit = 20
+		f.Limit = common.DefaultPageLimit
 	}
 	if f.Limit > 100 {
 		f.Limit = 100

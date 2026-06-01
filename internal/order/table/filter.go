@@ -32,10 +32,10 @@ func ParseOrderFilter(r *http.Request) OrderFilter {
 func ParseArchiveOrderFilter(r *http.Request) OrderFilter {
 	f := OrderFilter{Filter: common.ParseFilter(r)}
 	if r.URL.Query().Get("limit") == "" {
-		f.Limit = 20
+		f.Limit = common.DefaultPageLimit
 	}
 	if f.Limit <= 0 {
-		f.Limit = 20
+		f.Limit = common.DefaultPageLimit
 	}
 	if f.Limit > 100 {
 		f.Limit = 100

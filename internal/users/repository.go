@@ -153,6 +153,7 @@ func (r *userRepository) CheckUserExistsByPhoneNumber(ctx context.Context, phone
 }
 
 func (r *userRepository) GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*User], error) {
+	common.NormalizeFilter(&filter)
 	roleStr, ok := middleware.GetRoleFromContext(ctx)
 	if !ok {
 		return nil, common.ErrUnAuthorized

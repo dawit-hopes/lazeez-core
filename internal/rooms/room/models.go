@@ -30,16 +30,3 @@ func (r *Room) Addr() []any {
 	return []any{&r.ID, &r.RoomNumber, &r.RoomTypeID, &r.BranchID, &r.Floor, &r.QRCode, &r.QRVersion, &r.Reference, &r.Status, &r.DeletedAt, &r.IsDeleted, &r.CreatedAt, &r.UpdatedAt}
 }
 
-func (r *Room) ToDTO() RoomDTO {
-	return RoomDTO{
-		BaseDTO:    r.Base.ToDTO(),
-		RoomNumber: r.RoomNumber,
-		RoomTypeID: r.RoomTypeID,
-		BranchID:   r.BranchID,
-		Floor:      r.Floor,
-		QRCode:     r.QRCode,
-		QRVersion:  r.QRVersion,
-		Reference:  r.Reference,
-		Status:     RoomStatus(r.Status),
-	}
-}

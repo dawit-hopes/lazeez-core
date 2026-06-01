@@ -220,6 +220,7 @@ func (r *menuRepository) List(ctx context.Context, filter common.Filter, branchI
 }
 
 func (r *menuRepository) ListScoped(ctx context.Context, filter common.Filter, scope ListScope, branchID, merchantID string) (*common.PaginatedResponse[[]*Menu], error) {
+	common.NormalizeFilter(&filter)
 	switch scope {
 	case ScopeMaster:
 		return r.listMaster(ctx, filter, merchantID)
@@ -246,14 +247,15 @@ func (r *menuRepository) listMaster(ctx context.Context, filter common.Filter, m
 	if filter.Search != "" {
 		filters["name"] = common.ILike(filter.Search)
 	}
-	menus, err := r.dal.List(ctx, filters, filter.Page, filter.Limit)
+	page, limit := filter.PageLimit()
+	menus, err := r.dal.List(ctx, filters, page, limit)
 	if err != nil {
 		r.logger.Error("failed to list master menus", "error", err)
 		return nil, common.ErrInternalServerError
 	}
 	return &common.PaginatedResponse[[]*Menu]{
 		Data: menus,
-		Meta: common.BuildPaginationMeta(int64(len(menus)), filter.Page, filter.Limit),
+		Meta: common.BuildPaginationMeta(int64(len(menus)), page, limit),
 	}, nil
 }
 
@@ -274,11 +276,8 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 		args = append(args, "%"+filter.Search+"%")
 	}
 
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-	offset := (filter.Page - 1) * limit
+	page, limit := filter.PageLimit()
+	offset := (page - 1) * limit
 	argN := len(args)
 
 	query := fmt.Sprintf(`
@@ -319,7 +318,7 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 	}
 	return &common.PaginatedResponse[[]*Menu]{
 		Data: ptrs,
-		Meta: common.BuildPaginationMeta(int64(len(ptrs)), filter.Page, filter.Limit),
+		Meta: common.BuildPaginationMeta(int64(len(ptrs)), page, limit),
 	}, nil
 }
 
@@ -368,11 +367,8 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 		argIdx++
 	}
 
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 100
-	}
-	offset := (filter.Page - 1) * limit
+	page, limit := filter.PageLimit()
+	offset := (page - 1) * limit
 
 	query := fmt.Sprintf(`
 		SELECT m.id, m.name, m.image, m.deleted_at, m.is_deleted,
@@ -411,7 +407,7 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 	}
 	return &common.PaginatedResponse[[]*Menu]{
 		Data: ptrs,
-		Meta: common.BuildPaginationMeta(int64(len(ptrs)), filter.Page, filter.Limit),
+		Meta: common.BuildPaginationMeta(int64(len(ptrs)), page, limit),
 	}, nil
 }
 
@@ -743,14 +739,9 @@ func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, re
 	}
 	catalog.Categories = categories
 
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-	offset := (filter.Page - 1) * limit
-	if filter.Page <= 0 {
-		offset = 0
-	}
+	common.NormalizeFilter(&filter)
+	page, limit := filter.PageLimit()
+	offset := (page - 1) * limit
 
 	searchClause := ""
 	args := []any{reference}
@@ -778,6 +769,6 @@ func (r *menuRepository) ListMenus(ctx context.Context, filter common.Filter, re
 	}
 
 	catalog.Menus = menus
-	catalog.Meta = common.BuildPaginationMeta(int64(len(menus)), filter.Page, limit)
+	catalog.Meta = common.BuildPaginationMeta(int64(len(menus)), page, limit)
 	return catalog, nil
 }

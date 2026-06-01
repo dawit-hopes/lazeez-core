@@ -145,6 +145,7 @@ func (r *branchRepository) CheckExists(ctx context.Context, merchantID, branchNa
 }
 
 func (r *branchRepository) List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error) {
+	common.NormalizeFilter(&filter)
 	role, _ := middleware.GetRoleFromContext(ctx)
 	filters := map[string]any{}
 	if filter.Search != "" {
@@ -169,6 +170,7 @@ func (r *branchRepository) List(ctx context.Context, filter common.Filter) (*com
 }
 
 func (r *branchRepository) ListByMerchantID(ctx context.Context, merchantID string, filter common.Filter) (*common.PaginatedResponse[[]*Branch], error) {
+	common.NormalizeFilter(&filter)
 	r.logger.Info("listing branches by merchant ID", "merchantID", merchantID)
 	filters := map[string]any{"merchant_id": merchantID}
 	if filter.Search != "" {

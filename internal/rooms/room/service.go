@@ -2,7 +2,6 @@ package room
 
 import (
 	"context"
-	"fmt"
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
@@ -108,8 +107,7 @@ func (s *roomService) CreateRoom(ctx context.Context, req RoomRequestDTO, role, 
 		s.logger.Error("failed to create single room", "error", err)
 		return nil, err
 	}
-	dto := rm.ToDTO()
-	return &dto, nil
+	return s.roomDTO(ctx, rm.ID)
 }
 
 func (s *roomService) GetRoom(ctx context.Context, id, role, branchID, merchantID string) (*RoomDTO, error) {
@@ -117,7 +115,7 @@ func (s *roomService) GetRoom(ctx context.Context, id, role, branchID, merchantI
 	if err != nil {
 		return nil, err
 	}
-	if err := s.authorizeRead(ctx, rm, role, branchID, merchantID); err != nil {
+	if err := s.authorizeRead(ctx, &rm.Room, role, branchID, merchantID); err != nil {
 		return nil, err
 	}
 	dto := rm.ToDTO()
@@ -144,6 +142,15 @@ func (s *roomService) ListRooms(ctx context.Context, filter common.Filter, role,
 		Data: dtos,
 		Meta: result.Meta,
 	}, nil
+}
+
+func (s *roomService) roomDTO(ctx context.Context, id string) (*RoomDTO, error) {
+	rm, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	dto := rm.ToDTO()
+	return &dto, nil
 }
 
 // resolveListScope returns the branch and merchant filters to apply for a list request.
@@ -190,13 +197,13 @@ func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomUpdateR
 	if err != nil {
 		return nil, err
 	}
-	if err := s.authorizeManage(rm, role, branchID); err != nil {
+	if err := s.authorizeManage(&rm.Room, role, branchID); err != nil {
 		return nil, err
 	}
 
 	if req.RoomNumber != "" {
 		roomNumber := common.FormatText(req.RoomNumber)
-		if roomNumber != rm.RoomNumber {
+		if roomNumber != rm.Room.RoomNumber {
 			if err := s.repository.CheckRoomNumberExists(ctx, rm.BranchID, roomNumber); err != nil {
 				return nil, err
 			}
@@ -217,11 +224,10 @@ func (s *roomService) UpdateRoom(ctx context.Context, id string, req RoomUpdateR
 		rm.Floor = *req.Floor
 	}
 
-	if err := s.repository.Update(ctx, *rm); err != nil {
+	if err := s.repository.Update(ctx, rm.Room); err != nil {
 		return nil, err
 	}
-	dto := rm.ToDTO()
-	return &dto, nil
+	return s.roomDTO(ctx, id)
 }
 
 func (s *roomService) DeleteRoom(ctx context.Context, id, role, branchID, merchantID string) error {
@@ -232,7 +238,7 @@ func (s *roomService) DeleteRoom(ctx context.Context, id, role, branchID, mercha
 	if err != nil {
 		return err
 	}
-	if err := s.authorizeManage(rm, role, branchID); err != nil {
+	if err := s.authorizeManage(&rm.Room, role, branchID); err != nil {
 		return err
 	}
 	return s.repository.Delete(ctx, id)
@@ -246,7 +252,7 @@ func (s *roomService) RegenerateQRCode(ctx context.Context, id, role, branchID, 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.authorizeManage(rm, role, branchID); err != nil {
+	if err := s.authorizeManage(&rm.Room, role, branchID); err != nil {
 		return nil, err
 	}
 	if rm.Reference == "" {
@@ -258,9 +264,8 @@ func (s *roomService) RegenerateQRCode(ctx context.Context, id, role, branchID, 
 	}
 	rm.QRCode = qrURL
 	rm.QRVersion++
-	if err := s.repository.Update(ctx, *rm); err != nil {
+	if err := s.repository.Update(ctx, rm.Room); err != nil {
 		return nil, err
 	}
-	dto := rm.ToDTO()
-	return &dto, nil
+	return s.roomDTO(ctx, id)
 }

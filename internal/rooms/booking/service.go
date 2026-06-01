@@ -77,7 +77,7 @@ func (s *bookingService) CreateBooking(ctx context.Context, req BookingRequestDT
 	if err != nil {
 		return nil, err
 	}
-	if rm.BranchID != branchID {
+	if rm.Room.BranchID != branchID {
 		return nil, common.ErrUnAuthorized
 	}
 

@@ -11,11 +11,11 @@ import (
 
 type RoomRepository interface {
 	Create(ctx context.Context, room *Room) error
-	Get(ctx context.Context, id string) (*Room, error)
+	Get(ctx context.Context, id string) (*RoomWithType, error)
 	GetByReference(ctx context.Context, reference string) (*Room, error)
 	Update(ctx context.Context, room Room) error
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context, filter common.Filter, branchID, merchantID string) (*common.PaginatedResponse[[]*Room], error)
+	List(ctx context.Context, filter common.Filter, branchID, merchantID string) (*common.PaginatedResponse[[]*RoomWithType], error)
 	CheckRoomNumberExists(ctx context.Context, branchID, roomNumber string) error
 }
 
@@ -37,9 +37,14 @@ func (r *roomRepository) Create(ctx context.Context, room *Room) error {
 	return nil
 }
 
-func (r *roomRepository) Get(ctx context.Context, id string) (*Room, error) {
-	filter := map[string]any{"id": id, "is_deleted": false}
-	result, err := r.dal.Get(ctx, filter)
+func (r *roomRepository) Get(ctx context.Context, id string) (*RoomWithType, error) {
+	query := roomWithTypeSelect + ` WHERE sr.id = $1 AND sr.is_deleted = FALSE`
+	var result *RoomWithType
+	err := r.join.QueryRow(ctx, query, []any{id}, func(row *sql.Row) error {
+		var err error
+		result, err = scanRoomWithType(row)
+		return err
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, common.ErrRoomNotFound
@@ -96,45 +101,64 @@ func (r *roomRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *roomRepository) List(ctx context.Context, filter common.Filter, branchID, merchantID string) (*common.PaginatedResponse[[]*Room], error) {
+func (r *roomRepository) List(ctx context.Context, filter common.Filter, branchID, merchantID string) (*common.PaginatedResponse[[]*RoomWithType], error) {
 	if merchantID != "" && branchID == "" {
 		return r.listByMerchant(ctx, filter, merchantID)
 	}
+	return r.listByBranch(ctx, filter, branchID)
+}
 
-	filters := map[string]any{"is_deleted": false}
+func (r *roomRepository) listByBranch(ctx context.Context, filter common.Filter, branchID string) (*common.PaginatedResponse[[]*RoomWithType], error) {
+	common.NormalizeFilter(&filter)
+	args := []any{}
+	conditions := []string{"sr.is_deleted = FALSE"}
+	argN := 1
+
 	if branchID != "" {
-		filters["branch_id"] = branchID
+		conditions = append(conditions, fmt.Sprintf("sr.branch_id = $%d", argN))
+		args = append(args, branchID)
+		argN++
 	}
 	if filter.Search != "" {
-		filters["room_number"] = common.ILike(filter.Search)
+		conditions = append(conditions, fmt.Sprintf("sr.room_number ILIKE $%d ESCAPE '\\'", argN))
+		args = append(args, common.ILikePattern(filter.Search))
+		argN++
 	}
 
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
+	page, limit := filter.PageLimit()
+	offset := (page - 1) * limit
 
-	total, err := r.dal.CountFiltered(ctx, filters)
-	if err != nil {
+	whereClause := "WHERE " + joinConditions(conditions)
+
+	countQuery := `SELECT COUNT(*) FROM single_rooms sr ` + whereClause
+	var total int64
+	if err := r.join.QueryRow(ctx, countQuery, args, func(row *sql.Row) error {
+		return row.Scan(&total)
+	}); err != nil {
 		r.logger.Error("failed to count single rooms", "error", err)
 		return nil, common.ErrInternalServerError
 	}
-	results, err := r.dal.List(ctx, filters, page, limit)
+
+	listQuery := roomWithTypeSelect + " " + whereClause +
+		fmt.Sprintf(" ORDER BY sr.created_at DESC LIMIT $%d OFFSET $%d", argN, argN+1)
+	listArgs := append(append([]any{}, args...), limit, offset)
+
+	rows, err := common.QueryRows(r.join, ctx, listQuery, listArgs, func(rows *sql.Rows) (*RoomWithType, error) {
+		return scanRoomWithType(rows)
+	})
 	if err != nil {
 		r.logger.Error("failed to list single rooms", "error", err)
 		return nil, common.ErrInternalServerError
 	}
-	return &common.PaginatedResponse[[]*Room]{
-		Data: results,
+
+	return &common.PaginatedResponse[[]*RoomWithType]{
+		Data: rows,
 		Meta: common.BuildPaginationMeta(total, page, limit),
 	}, nil
 }
 
-func (r *roomRepository) listByMerchant(ctx context.Context, filter common.Filter, merchantID string) (*common.PaginatedResponse[[]*Room], error) {
+func (r *roomRepository) listByMerchant(ctx context.Context, filter common.Filter, merchantID string) (*common.PaginatedResponse[[]*RoomWithType], error) {
+	common.NormalizeFilter(&filter)
 	args := []any{merchantID}
 	searchClause := ""
 	if filter.Search != "" {
@@ -142,14 +166,7 @@ func (r *roomRepository) listByMerchant(ctx context.Context, filter common.Filte
 		args = append(args, common.ILikePattern(filter.Search))
 	}
 
-	page := filter.Page
-	if page <= 0 {
-		page = 1
-	}
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 10
-	}
+	page, limit := filter.PageLimit()
 	offset := (page - 1) * limit
 
 	whereClause := fmt.Sprintf(`sr.is_deleted = FALSE AND b.merchant_id = $1%s`, searchClause)
@@ -169,34 +186,37 @@ func (r *roomRepository) listByMerchant(ctx context.Context, filter common.Filte
 	}
 
 	argN := len(args)
-	listQuery := fmt.Sprintf(`
-		SELECT sr.id, sr.room_number, sr.room_type_id, sr.branch_id, sr.floor,
-			sr.qr_code, sr.qr_version, sr.reference, sr.deleted_at, sr.is_deleted,
-			sr.created_at, sr.updated_at
-		FROM single_rooms sr
+	listQuery := roomWithTypeSelect + `
 		INNER JOIN branches b ON b.id = sr.branch_id AND b.is_deleted = FALSE
-		WHERE %s
+		WHERE ` + whereClause + fmt.Sprintf(`
 		ORDER BY sr.created_at DESC
-		LIMIT $%d OFFSET $%d`, whereClause, argN+1, argN+2)
+		LIMIT $%d OFFSET $%d`, argN+1, argN+2)
 
 	listArgs := append(append([]any{}, args...), limit, offset)
 
-	rows, err := common.QueryRows(r.join, ctx, listQuery, listArgs, func(rows *sql.Rows) (*Room, error) {
-		var room Room
-		if err := rows.Scan(room.Addr()...); err != nil {
-			return nil, err
-		}
-		return &room, nil
+	rows, err := common.QueryRows(r.join, ctx, listQuery, listArgs, func(rows *sql.Rows) (*RoomWithType, error) {
+		return scanRoomWithType(rows)
 	})
 	if err != nil {
 		r.logger.Error("failed to list merchant single rooms", "error", err)
 		return nil, common.ErrInternalServerError
 	}
 
-	return &common.PaginatedResponse[[]*Room]{
+	return &common.PaginatedResponse[[]*RoomWithType]{
 		Data: rows,
 		Meta: common.BuildPaginationMeta(total, page, limit),
 	}, nil
+}
+
+func joinConditions(conditions []string) string {
+	if len(conditions) == 0 {
+		return ""
+	}
+	out := conditions[0]
+	for i := 1; i < len(conditions); i++ {
+		out += " AND " + conditions[i]
+	}
+	return out
 }
 
 func (r *roomRepository) CheckRoomNumberExists(ctx context.Context, branchID, roomNumber string) error {

@@ -218,6 +218,7 @@ WHERE m.id = $1 AND m.is_deleted = FALSE;
 }
 
 func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error) {
+	common.NormalizeFilter(&filter)
 	role, _ := middleware.GetRoleFromContext(ctx)
 	isSuperAdmin := role == string(users.RoleAdmin)
 
