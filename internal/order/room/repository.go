@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strconv"
+	"fmt"
 
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
@@ -44,8 +44,18 @@ const roomOrderWithRelations = `
 SELECT
 	o.id, o.order_number, o.room_id, o.booking_id, o.branch_id, o.session_key, o.order_status, o.cancellation_reason, o.total, o.bill_id,
 	o.created_at, o.updated_at,
+	COALESCE(
+		json_build_object(
+			'room_number', rm.room_number,
+			'reference', rm.reference,
+			'status', rm.status,
+			'floor', rm.floor
+		),
+		'{}'::json
+	)::text AS room,
 	COALESCE(items.agg, '[]'::json)::text AS order_items
 FROM room_orders o
+LEFT JOIN single_rooms rm ON rm.id = o.room_id AND rm.is_deleted = FALSE
 LEFT JOIN LATERAL (
 	SELECT json_agg(json_build_object(
 		'id', oi.id, 'menu_item_id', oi.menu_item_id, 'name', m.name,
@@ -181,7 +191,7 @@ func (r *roomOrderRepository) listOrders(ctx context.Context, filter RoomOrderFi
 	filterCond, args := BuildRoomOrderFilterClause(filter, baseArgs)
 	offset := (page - 1) * limit
 	argNum := len(args) + 1
-	query := roomOrderWithRelations + baseCond + filterCond + " ORDER BY " + orderBy + " LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
+	query := buildPagedOrdersQuery(baseCond, filterCond, orderBy, argNum, argNum+1)
 	args = append(args, limit, offset)
 
 	results, err := common.QueryRows(r.joinDAL, ctx, query, args, func(rows *sql.Rows) (*RoomOrderDTO, error) {
@@ -227,7 +237,7 @@ func (r *roomOrderRepository) listOrdersWithCount(
 
 	offset := (page - 1) * limit
 	argNum := len(args) + 1
-	query := roomOrderWithRelations + baseCond + filterCond + " ORDER BY " + orderBy + " LIMIT $" + strconv.Itoa(argNum) + " OFFSET $" + strconv.Itoa(argNum+1)
+	query := buildPagedOrdersQuery(baseCond, filterCond, orderBy, argNum, argNum+1)
 	listArgs := append(append([]any{}, args...), limit, offset)
 
 	results, err := common.QueryRows(r.joinDAL, ctx, query, listArgs, func(rows *sql.Rows) (*RoomOrderDTO, error) {
@@ -246,6 +256,48 @@ func (r *roomOrderRepository) listOrdersWithCount(
 		Data: results,
 		Meta: common.BuildPaginationMeta(total, page, limit),
 	}, nil
+}
+
+// buildPagedOrdersQuery paginates room_orders first, then joins heavy relations
+// (room details and aggregated order items) only for that page.
+func buildPagedOrdersQuery(baseCond, filterCond, orderBy string, limitArgNum, offsetArgNum int) string {
+	return fmt.Sprintf(`
+WITH paged_orders AS (
+	SELECT
+		o.id, o.order_number, o.room_id, o.booking_id, o.branch_id, o.session_key, o.order_status, o.cancellation_reason, o.total, o.bill_id,
+		o.created_at, o.updated_at
+	FROM room_orders o
+	WHERE o.is_deleted = FALSE%s%s
+	ORDER BY %s
+	LIMIT $%d OFFSET $%d
+)
+SELECT
+	o.id, o.order_number, o.room_id, o.booking_id, o.branch_id, o.session_key, o.order_status, o.cancellation_reason, o.total, o.bill_id,
+	o.created_at, o.updated_at,
+	COALESCE(
+		json_build_object(
+			'room_number', rm.room_number,
+			'reference', rm.reference,
+			'status', rm.status,
+			'floor', rm.floor
+		),
+		'{}'::json
+	)::text AS room,
+	COALESCE(items.agg, '[]'::json)::text AS order_items
+FROM paged_orders o
+LEFT JOIN single_rooms rm ON rm.id = o.room_id AND rm.is_deleted = FALSE
+LEFT JOIN LATERAL (
+	SELECT json_agg(json_build_object(
+		'id', oi.id, 'menu_item_id', oi.menu_item_id, 'name', m.name,
+		'modifier_options', oi.modifier_options,
+		'quantity', oi.quantity, 'price', oi.price, 'total', oi.total
+	)) AS agg
+	FROM room_order_items oi
+	LEFT JOIN menus m ON m.id = oi.menu_item_id AND m.is_deleted = FALSE
+	WHERE oi.room_order_id = o.id AND oi.is_deleted = FALSE
+) items ON true
+ORDER BY %s
+`, baseCond, filterCond, orderBy, limitArgNum, offsetArgNum, orderBy)
 }
 
 func (r *roomOrderRepository) OrderNumberExists(ctx context.Context, branchID string, orderNumber int) (bool, error) {
@@ -280,10 +332,12 @@ func (r *roomOrderRepository) SumActiveByBooking(ctx context.Context, bookingID 
 
 func (r *roomOrderRepository) scanOrderRow(row *sql.Row, dto *RoomOrderDTO) error {
 	var orderItemsJSON []byte
+	var roomJSON []byte
 	var cancellationReason sql.NullString
 	err := row.Scan(
 		&dto.ID, &dto.OrderNumber, &dto.RoomID, &dto.BookingID, &dto.BranchID, &dto.SessionKey, &dto.OrderStatus, &cancellationReason, &dto.Total, &dto.BillID,
 		&dto.CreatedAt, &dto.UpdatedAt,
+		&roomJSON,
 		&orderItemsJSON,
 	)
 	if err != nil {
@@ -291,16 +345,21 @@ func (r *roomOrderRepository) scanOrderRow(row *sql.Row, dto *RoomOrderDTO) erro
 	}
 	if cancellationReason.Valid {
 		dto.CancellationReason = cancellationReason.String
+	}
+	if err := json.Unmarshal(roomJSON, &dto.Room); err != nil {
+		return err
 	}
 	return r.unmarshalOrderItems(dto, orderItemsJSON)
 }
 
 func (r *roomOrderRepository) scanOrderRows(rows *sql.Rows, dto *RoomOrderDTO) error {
 	var orderItemsJSON []byte
+	var roomJSON []byte
 	var cancellationReason sql.NullString
 	err := rows.Scan(
 		&dto.ID, &dto.OrderNumber, &dto.RoomID, &dto.BookingID, &dto.BranchID, &dto.SessionKey, &dto.OrderStatus, &cancellationReason, &dto.Total, &dto.BillID,
 		&dto.CreatedAt, &dto.UpdatedAt,
+		&roomJSON,
 		&orderItemsJSON,
 	)
 	if err != nil {
@@ -308,6 +367,9 @@ func (r *roomOrderRepository) scanOrderRows(rows *sql.Rows, dto *RoomOrderDTO) e
 	}
 	if cancellationReason.Valid {
 		dto.CancellationReason = cancellationReason.String
+	}
+	if err := json.Unmarshal(roomJSON, &dto.Room); err != nil {
+		return err
 	}
 	return r.unmarshalOrderItems(dto, orderItemsJSON)
 }

@@ -2,6 +2,7 @@ package roomorder
 
 import (
 	item "lazeez-core/internal/order/Item"
+	"lazeez-core/internal/rooms/room"
 	"time"
 )
 
@@ -33,6 +34,7 @@ type RoomOrderDTO struct {
 	ID                 string              `json:"id"`
 	OrderNumber        int                 `json:"order_number"`
 	RoomID             string              `json:"room_id"`
+	Room               room.RoomResponseSimplified `json:"room"`
 	BookingID          string              `json:"booking_id"`
 	BranchID           string              `json:"branch_id"`
 	SessionKey         string              `json:"session_key"`
