@@ -13,6 +13,7 @@ type Room struct {
 	BranchID      sql.NullString `json:"branch_id" db:"branch_id"`
 	ParentID      sql.NullString `json:"parent_id" db:"parent_id"`
 	PricePerNight float64        `json:"price_per_night" db:"price_per_night"`
+	Reference     string         `json:"reference" db:"reference"`
 }
 
 func (r *Room) Table() string {
@@ -22,21 +23,21 @@ func (r *Room) Table() string {
 func (r *Room) Columns() []string {
 	return []string{
 		"id", "name", "description", "merchant_id", "branch_id", "parent_id",
-		"price_per_night", "deleted_at", "is_deleted",
+		"price_per_night", "reference", "deleted_at", "is_deleted",
 	}
 }
 
 func (r *Room) Values() []any {
 	return []any{
 		r.ID, r.Name, r.Description, r.MerchantID, r.BranchID, r.ParentID,
-		r.PricePerNight, r.DeletedAt, r.IsDeleted,
+		r.PricePerNight, r.Reference, r.DeletedAt, r.IsDeleted,
 	}
 }
 
 func (r *Room) Addr() []any {
 	return []any{
 		&r.ID, &r.Name, &r.Description, &r.MerchantID, &r.BranchID, &r.ParentID,
-		&r.PricePerNight, &r.DeletedAt, &r.IsDeleted, &r.CreatedAt, &r.UpdatedAt,
+		&r.PricePerNight, &r.Reference, &r.DeletedAt, &r.IsDeleted, &r.CreatedAt, &r.UpdatedAt,
 	}
 }
 

@@ -92,6 +92,7 @@ func (s *roomTypesService) CreateRoom(ctx context.Context, req RoomRequestDTO, r
 	room := req.ToModel()
 	room.ID = common.GenerateUUID()
 	room.Name = common.FormatText(req.Name)
+	room.Reference = common.GenerateReference()
 	if isMaster {
 		room.BranchID = common.ToNUllString("")
 		room.ParentID = common.ToNUllString("")
@@ -327,6 +328,7 @@ func (s *roomTypesService) CloneRoom(ctx context.Context, masterID string, req C
 		BranchID:      common.ToNUllString(branchID),
 		ParentID:      common.ToNUllString(masterID),
 		PricePerNight: master.PricePerNight,
+		Reference:     common.GenerateReference(),
 	}
 	if req.PricePerNight > 0 {
 		clone.PricePerNight = req.PricePerNight
