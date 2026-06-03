@@ -11,6 +11,7 @@ import (
 	"lazeez-core/internal/ingredient"
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
+	"lazeez-core/internal/rooms/booking"
 	"lazeez-core/internal/rooms/room"
 	"lazeez-core/internal/users"
 
@@ -40,6 +41,7 @@ type menuService struct {
 	modifierGroupService  modgroup.ModifierGroupService
 	modifierOptionService modoption.ModifierOptionService
 	roomService           room.RoomService
+	bookingService        booking.BookingService
 	fileService           files.FileService
 	logger                config.Logger
 }
@@ -52,6 +54,7 @@ func NewMenuService(menuRepository MenuRepository,
 	modifierGroupService modgroup.ModifierGroupService,
 	modifierOptionService modoption.ModifierOptionService,
 	roomService room.RoomService,
+	bookingService booking.BookingService,
 	logger config.Logger) MenuService {
 	return &menuService{
 		menuRepository:        menuRepository,
@@ -63,6 +66,7 @@ func NewMenuService(menuRepository MenuRepository,
 		modifierGroupService:  modifierGroupService,
 		modifierOptionService: modifierOptionService,
 		roomService:           roomService,
+		bookingService:        bookingService,
 	}
 }
 
@@ -606,11 +610,20 @@ func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, refer
 			return nil, err
 		}
 
-		if rm.Status != room.RoomStatusOccupied {
-			s.logger.Error("Room is not occupied", "room_id", rm.ID, "status", rm.Status)
-			return nil, common.ErrRoomNotOccupied
+		activeBooking, err := s.bookingService.GetBookingByRoom(ctx, rm.ID)
+		if err != nil {
+			s.logger.Error("no active booking for room", "room_id", rm.ID, "status", rm.Status, "error", err)
+			return nil, err
 		}
-		return s.menuRepository.ListMenusForRooms(ctx, filter, reference)
+
+		catalog, err := s.menuRepository.ListMenusForRooms(ctx, filter, reference)
+		if err != nil {
+			return nil, err
+		}
+		if catalog.Guest == nil && activeBooking.GuestName != "" {
+			catalog.Guest = &booking.GuestResponseSimplified{GuestName: activeBooking.GuestName}
+		}
+		return catalog, nil
 	default:
 		s.logger.Error("Invalid reference type", "reference_type", referenceType)
 		return nil, common.ErrInvalidRequest

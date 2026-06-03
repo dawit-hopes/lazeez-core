@@ -35,15 +35,15 @@ func buildMenuURL(baseURL, reference, serviceType string) string {
 	return fmt.Sprintf("%s/%s/%s", base, pathPrefix, ref)
 }
 
-func menuBaseURLFromEnv() string {
-	if base := strings.TrimSpace(os.Getenv("LAZEEZ_MENU_BASE_URL")); base != "" {
-		return base
+func menuBaseURLFromEnv(serviceType string) string {
+	if serviceType == "table" {
+		return os.Getenv("LAZEEZ_TABLE_MENU_BASE_URL")
 	}
-	return os.Getenv("LAZEEZ_TABLE_BASE_URL")
+	return os.Getenv("LAZEEZ_ROOM_MENU_BASE_URL")
 }
 
 func GenerateQRCodeHeader(reference string, serviceType string) (*multipart.FileHeader, error) {
-	url := buildMenuURL(menuBaseURLFromEnv(), reference, serviceType)
+	url := buildMenuURL(menuBaseURLFromEnv(serviceType), reference, serviceType)
 
 	// Generate QR in memory (no disk needed 🚀)
 	png, err := qrcode.Encode(url, qrcode.Medium, 256)

@@ -44,6 +44,11 @@ func (b *BookingUpdateRequestDTO) IsEmpty() bool {
 	return b.GuestName == "" && b.GuestPhone == ""
 }
 
+// GuestResponseSimplified is the guest-facing payload for public room menu catalog.
+type GuestResponseSimplified struct {
+	GuestName string `json:"guest_name"`
+}
+
 type BookingDTO struct {
 	common.BaseDTO
 	RoomID         string    `json:"room_id"`

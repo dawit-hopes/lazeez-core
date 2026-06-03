@@ -11,6 +11,7 @@ import (
 	"lazeez-core/internal/category"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/ingredient"
+	"lazeez-core/internal/rooms/booking"
 )
 
 type ListScope string
@@ -640,7 +641,15 @@ SELECT
 		'address', NULLIF(b.address, ''),
 		'phone_number', NULLIF(b.phone_number, '')
 	)) AS branch,
-	json_strip_nulls(json_build_object('name', mer.name, 'logo', NULLIF(mer.logo, ''))) AS merchant
+	json_strip_nulls(json_build_object('name', mer.name, 'logo', NULLIF(mer.logo, ''))) AS merchant,
+	(
+		SELECT json_strip_nulls(json_build_object('guest_name', bk.guest_name))
+		FROM bookings bk
+		WHERE bk.room_id = sr.id
+			AND bk.status = 'active'
+			AND bk.is_deleted = FALSE
+		LIMIT 1
+	) AS guest
 FROM single_rooms sr
 INNER JOIN rooms rt ON rt.id = sr.room_type_id AND rt.is_deleted = FALSE
 INNER JOIN branches b ON b.id = sr.branch_id AND b.is_deleted = FALSE
@@ -794,9 +803,9 @@ func (r *menuRepository) listPublicCategoriesForRoom(ctx context.Context, refere
 }
 
 func (r *menuRepository) getPublicMenuContextForRoom(ctx context.Context, reference string) (*PublicMenuCatalogResponse, error) {
-	var roomJSON, branchJSON, merchantJSON []byte
+	var roomJSON, branchJSON, merchantJSON, guestJSON []byte
 	err := r.join.QueryRow(ctx, menuPublicContextByRoomReference, []any{reference}, func(row *sql.Row) error {
-		return row.Scan(&roomJSON, &branchJSON, &merchantJSON)
+		return row.Scan(&roomJSON, &branchJSON, &merchantJSON, &guestJSON)
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -814,6 +823,13 @@ func (r *menuRepository) getPublicMenuContextForRoom(ctx context.Context, refere
 	}
 	if err := json.Unmarshal(merchantJSON, &catalog.Merchant); err != nil {
 		return nil, err
+	}
+	if len(guestJSON) > 0 && string(guestJSON) != "null" {
+		var guest booking.GuestResponseSimplified
+		if err := json.Unmarshal(guestJSON, &guest); err != nil {
+			return nil, err
+		}
+		catalog.Guest = &guest
 	}
 	return &catalog, nil
 }

@@ -250,8 +250,8 @@ func (s *bookingService) transition(ctx context.Context, id, role, branchID stri
 	if err := s.repository.Update(ctx, *b); err != nil {
 		return nil, err
 	}
-	if target == BookingCheckedOut {
-		if err := s.roomRepo.UpdateStatus(ctx, b.RoomID, string(room.RoomStatusOccupied)); err != nil {
+	if target == BookingCheckedOut || target == BookingCancelled {
+		if err := s.roomRepo.UpdateStatus(ctx, b.RoomID, string(room.RoomStatusVacant)); err != nil {
 			s.logger.Error("failed to update room status", "room_id", b.RoomID, "error", err)
 			return nil, err
 		}

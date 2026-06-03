@@ -125,10 +125,10 @@ type MenuDTOPublic struct {
 type PublicMenuCatalogResponse struct {
 	Table      *table.TableResponseSimplified         `json:"table,omitempty"`
 	Room       *room.RoomResponseSimplified           `json:"room,omitempty"`
-	Guest      *booking.BookingDTO                    `json:"guest,omitempty"`
+	Guest      *booking.GuestResponseSimplified       `json:"guest,omitempty"`
 	Branch     *branch.BranchResponseSimplified       `json:"branch"`
 	Merchant   *merchant.MerchantResponseSimplified   `json:"merchant"`
 	Menus      []*MenuDTOPublic                       `json:"menus"`
-	Meta       common.PaginationMeta                  `json:"meta"`
+	Meta       common.PaginationMeta                  `json:"-"`
 	Categories []*category.CategoryResponseSimplified `json:"categories"`
 }
