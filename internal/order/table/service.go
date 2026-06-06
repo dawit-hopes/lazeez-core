@@ -2,7 +2,6 @@ package order
 
 import (
 	"context"
-	"fmt"
 	"lazeez-core/config"
 	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
@@ -11,7 +10,6 @@ import (
 	"lazeez-core/internal/payment"
 	option "lazeez-core/internal/modifiers/option"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -78,11 +76,6 @@ func NewOrderService(
 		callbackURL:           callbackURL,
 		menuBaseURL:           menuBaseURL,
 	}
-}
-
-func buildPaymentReturnURL(menuBaseURL, tableReference, orderID string) string {
-	base := strings.TrimRight(menuBaseURL, "/")
-	return fmt.Sprintf("%s/%s/payment-return?orderId=%s", base, tableReference, orderID)
 }
 
 func (s *orderService) CreateClient(ctx context.Context, order OrderInput) (*CreateOrderResponse, error) {
@@ -163,7 +156,7 @@ func (s *orderService) CreateClient(ctx context.Context, order OrderInput) (*Cre
 		PhoneNumber: "0900000000",
 		TxRef:       created.ID,
 		CallbackURL: s.callbackURL,
-		ReturnURL:   buildPaymentReturnURL(s.menuBaseURL, tableReference, created.ID),
+		ReturnURL:   common.BuildPaymentReturnURL(s.menuBaseURL, tableReference, created.ID),
 		Customization: map[string]any{
 			"title":       "Order Payment",
 			"description": "Payment for order " + strconv.Itoa(created.OrderNumber),

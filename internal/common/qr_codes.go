@@ -18,11 +18,12 @@ const (
 )
 
 // buildMenuURL builds a guest-menu deep link: {base}/tbl/{ref} or {base}/rm/{ref}.
-// The base may already end with /tbl or /rm; those suffixes are normalized away first.
+// The base may already end with /tbl, /rm, or /table; those suffixes are normalized away first.
 func buildMenuURL(baseURL, reference, serviceType string) string {
 	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	base = strings.TrimSuffix(base, "/"+menuPathTable)
 	base = strings.TrimSuffix(base, "/"+menuPathRoom)
+	base = strings.TrimSuffix(base, "/table")
 
 	ref := strings.TrimLeft(strings.TrimSpace(reference), "/")
 	pathPrefix := menuPathTable
@@ -33,6 +34,12 @@ func buildMenuURL(baseURL, reference, serviceType string) string {
 		// default
 	}
 	return fmt.Sprintf("%s/%s/%s", base, pathPrefix, ref)
+}
+
+// BuildPaymentReturnURL builds the Chapa browser redirect for table orders.
+func BuildPaymentReturnURL(menuBaseURL, tableReference, orderID string) string {
+	menuURL := buildMenuURL(menuBaseURL, tableReference, "table")
+	return fmt.Sprintf("%s/payment-return?orderId=%s", menuURL, orderID)
 }
 
 func menuBaseURLFromEnv(serviceType string) string {
