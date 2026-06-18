@@ -33,5 +33,25 @@ func (r *MenuRequest) Validate() error {
 		validation.Field(&r.CategoryID,
 			validation.Required.Error("category id is required"),
 		),
+		validation.Field(&r.Discount,
+			validation.When(r.Discount != nil,
+				validation.By(func(value any) error {
+					discount, ok := value.(*MenuDiscount)
+					if !ok || discount == nil {
+						return nil
+					}
+					if discount.Type != DiscountTypePercentage && discount.Type != DiscountTypeFixed {
+						return validation.NewError("validation", "discount type must be percentage or fixed")
+					}
+					if !discount.IsValid(r.Price) {
+						if discount.Type == DiscountTypePercentage {
+							return validation.NewError("validation", "percentage discount must be greater than 0 and at most 100")
+						}
+						return validation.NewError("validation", "fixed discount must be greater than 0 and less than price")
+					}
+					return nil
+				}),
+			),
+		),
 	)
 }

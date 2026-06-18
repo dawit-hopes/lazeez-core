@@ -151,6 +151,20 @@ func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) error {
 			return common.ErrInvalidRequest
 		}
 	}
+
+	if discountRaw, ok := r.MultipartForm.Value["discount"]; ok {
+		req.DiscountSet = true
+		raw := ""
+		if len(discountRaw) > 0 {
+			raw = discountRaw[0]
+		}
+		discount, err := parseMenuDiscount(raw)
+		if err != nil {
+			h.logger.Error("Failed to parse discount", "error", err)
+			return common.ErrInvalidRequest
+		}
+		req.Discount = discount
+	}
 	return nil
 }
 

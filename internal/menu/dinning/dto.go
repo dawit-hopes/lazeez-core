@@ -28,6 +28,8 @@ type MenuRequest struct {
 	IsFasting       *bool                        `json:"is_fasting"`
 	PreparationTime float64                      `json:"preparation_time"`
 	IsAvailable     *bool                        `json:"is_available"`
+	Discount        *MenuDiscount                `json:"discount"`
+	DiscountSet     bool                         `json:"-"`
 	Modifiers       []group.ModifierGroupRequest `json:"modifier_groups"`
 	ModifiersSet    bool                         `json:"-"`
 }
@@ -48,11 +50,12 @@ type MenuDTO struct {
 	IsFasting       bool                        `json:"is_fasting"`
 	IsAvailable     bool                        `json:"is_available"`
 	PreparationTime float64                     `json:"preparation_time"`
+	Discount        *MenuDiscount               `json:"discount,omitempty"`
 	Modifiers       []group.ModifierGroupDTO    `json:"modifier_groups"`
 }
 
 func (m *MenuRequest) IsEmpty() bool {
-	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet
+	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet && !m.DiscountSet
 }
 
 func (m *MenuRequest) ToModel(isMaster bool) Menu {
@@ -83,6 +86,10 @@ func (m *MenuRequest) ToModel(isMaster bool) Menu {
 		IsAvailable:     isAvailable,
 		PreparationTime: m.PreparationTime,
 	}
+}
+
+func (m *MenuRequest) applyDiscountTo(menu *Menu) {
+	applyDiscountToModel(menu, m.Discount)
 }
 
 // ModifierOptionPublic is a guest-facing modifier option (no audit fields).
@@ -117,6 +124,7 @@ type MenuDTOPublic struct {
 	IsFasting       bool                                      `json:"is_fasting,omitempty"`
 	IsAvailable     bool                                      `json:"is_available"`
 	PreparationTime float64                                   `json:"preparation_time,omitempty"`
+	Discount        *MenuDiscount                             `json:"discount,omitempty"`
 	Modifiers       []ModifierGroupPublic                     `json:"modifier_groups,omitempty"`
 }
 

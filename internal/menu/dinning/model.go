@@ -20,8 +20,10 @@ type Menu struct {
 	MerchantID      sql.NullString `json:"merchant_id" db:"merchant_id"`
 	IsFasting       bool           `json:"is_fasting" db:"is_fasting"`
 	IsAvailable     bool           `json:"is_available" db:"is_available"`
-	PreparationTime float64        `json:"preparation_time" db:"preparation_time"`
-	Modifiers       pq.StringArray `json:"modifiers" db:"modifiers"`
+	PreparationTime float64         `json:"preparation_time" db:"preparation_time"`
+	DiscountType    sql.NullString  `json:"-" db:"discount_type"`
+	DiscountValue   sql.NullFloat64 `json:"-" db:"discount_value"`
+	Modifiers       pq.StringArray  `json:"modifiers" db:"modifiers"`
 	// Excluded is set only on branch list queries (not persisted on menus table).
 	Excluded bool `json:"-" db:"-"`
 	// MasterItem marks rows that originate from the restaurant master menu when branch_id is projected for display.
@@ -36,6 +38,7 @@ func (m *Menu) Columns() []string {
 	return []string{
 		"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "merchant_id",
 		"is_fasting", "is_available", "description", "price", "ingredients", "category_id", "modifiers", "preparation_time",
+		"discount_type", "discount_value",
 	}
 }
 
@@ -43,6 +46,7 @@ func (m *Menu) Values() []any {
 	return []any{
 		m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.MerchantID,
 		m.IsFasting, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers, m.PreparationTime,
+		m.DiscountType, m.DiscountValue,
 	}
 }
 
@@ -50,6 +54,7 @@ func (m *Menu) Addr() []any {
 	return []any{
 		&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.MerchantID,
 		&m.IsFasting, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.PreparationTime,
+		&m.DiscountType, &m.DiscountValue,
 		&m.CreatedAt, &m.UpdatedAt,
 	}
 }
@@ -96,5 +101,6 @@ func (m *Menu) ToDTO() MenuDTO {
 		IsFasting:       m.IsFasting,
 		IsAvailable:     m.IsAvailable,
 		PreparationTime: m.PreparationTime,
+		Discount:        discountFromModel(m.DiscountType, m.DiscountValue),
 	}
 }

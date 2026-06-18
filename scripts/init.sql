@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS menus (
     branch_id UUID,
     merchant_id UUID,
     preparation_time DECIMAL(10,2) NOT NULL DEFAULT 0,
+    discount_type VARCHAR(20),
+    discount_value DECIMAL(10, 2),
     is_fasting BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
@@ -104,7 +106,15 @@ CREATE TABLE IF NOT EXISTS menus (
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_menus_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     CONSTRAINT fk_menus_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
-    CONSTRAINT chk_menus_ingredients CHECK (array_length(ingredients, 1) > 0)
+    CONSTRAINT chk_menus_ingredients CHECK (array_length(ingredients, 1) > 0),
+    CONSTRAINT chk_menus_discount CHECK (
+        (discount_type IS NULL AND discount_value IS NULL)
+        OR (
+            discount_type IN ('percentage', 'fixed')
+            AND discount_value IS NOT NULL
+            AND discount_value > 0
+        )
+    )
 );
 
 -- Create index on name for faster lookups

@@ -15,6 +15,7 @@ import (
 	"lazeez-core/internal/rooms/room"
 	"lazeez-core/internal/users"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 )
@@ -154,6 +155,7 @@ func (s *menuService) Create(ctx context.Context, req MenuRequest, role string) 
 	}
 
 	menu := req.ToModel(isMaster)
+	req.applyDiscountTo(&menu)
 	if !isMaster && req.BranchID != "" {
 		br, err := s.branchService.Get(ctx, req.BranchID)
 		if err != nil {
@@ -265,6 +267,16 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest, ro
 
 	if req.PreparationTime != 0 {
 		existingMenu.PreparationTime = req.PreparationTime
+	}
+
+	if req.DiscountSet {
+		if req.Discount != nil && !req.Discount.IsValid(existingMenu.Price) {
+			if req.Discount.Type == DiscountTypePercentage {
+				return validation.NewError("validation", "percentage discount must be greater than 0 and at most 100")
+			}
+			return validation.NewError("validation", "fixed discount must be greater than 0 and less than price")
+		}
+		applyDiscountToModel(&existingMenu, req.Discount)
 	}
 
 	if req.ModifiersSet {

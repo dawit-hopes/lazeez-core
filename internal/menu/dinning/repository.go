@@ -95,6 +95,7 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 			m.is_fasting,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
+			m.discount_type, m.discount_value,
 			m.created_at, m.updated_at,
 			COALESCE(o.is_excluded, FALSE) AS is_excluded
 		FROM menus m
@@ -111,7 +112,8 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 			&menu.ID, &menu.Name, &menu.Image, &menu.DeletedAt, &menu.IsDeleted,
 			&menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsAvailable,
 			&menu.Description, &menu.Price, &menu.Ingredients, &menu.CategoryID,
-			&menu.Modifiers, &menu.PreparationTime, &menu.CreatedAt, &menu.UpdatedAt,
+			&menu.Modifiers, &menu.PreparationTime, &menu.DiscountType, &menu.DiscountValue,
+			&menu.CreatedAt, &menu.UpdatedAt,
 			&isExcluded,
 		)
 	})
@@ -163,6 +165,8 @@ func (r *menuRepository) Update(ctx context.Context, menu Menu) error {
 		"is_deleted":       menu.IsDeleted,
 		"preparation_time": menu.PreparationTime,
 		"modifiers":        menu.Modifiers,
+		"discount_type":    menu.DiscountType,
+		"discount_value":   menu.DiscountValue,
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
@@ -287,6 +291,7 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 			m.is_fasting,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
+			m.discount_type, m.discount_value,
 			m.created_at, m.updated_at,
 			COALESCE(o.is_excluded, FALSE) AS is_excluded
 		FROM menus m
@@ -337,7 +342,8 @@ func (r *menuRepository) listBranchMenuRows(ctx context.Context, query string, a
 			&item.Menu.ID, &item.Menu.Name, &item.Menu.Image, &item.Menu.DeletedAt, &item.Menu.IsDeleted,
 			&item.Menu.BranchID, &item.Menu.MerchantID, &item.Menu.IsFasting, &item.Menu.IsAvailable,
 			&item.Menu.Description, &item.Menu.Price, &item.Menu.Ingredients, &item.Menu.CategoryID,
-			&item.Menu.Modifiers, &item.Menu.PreparationTime, &item.Menu.CreatedAt, &item.Menu.UpdatedAt,
+			&item.Menu.Modifiers, &item.Menu.PreparationTime, &item.Menu.DiscountType, &item.Menu.DiscountValue,
+			&item.Menu.CreatedAt, &item.Menu.UpdatedAt,
 		}
 		if withMasterFlag {
 			scanTargets = append(scanTargets, &item.IsMaster)
@@ -379,6 +385,7 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 			m.is_fasting,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
+			m.discount_type, m.discount_value,
 			m.created_at, m.updated_at,
 			(m.branch_id IS NULL) AS is_master,
 			COALESCE(o.is_excluded, FALSE) AS is_excluded
@@ -561,6 +568,9 @@ SELECT
 	m.description,
 	m.price,
 	m.preparation_time,
+	CASE
+		WHEN m.discount_type IS NOT NULL THEN json_strip_nulls(json_build_object('type', m.discount_type, 'value', m.discount_value))
+	END AS discount,
 	CASE WHEN c.id IS NOT NULL THEN json_strip_nulls(json_build_object('name', c.name, 'icon', NULLIF(c.icon, ''))) END AS category,
 	COALESCE(ing.ingredients, '[]'::json) AS ingredients,
 	COALESCE(mods.modifier_groups, '[]'::json) AS modifier_groups
@@ -672,6 +682,9 @@ SELECT
 	m.description,
 	m.price,
 	m.preparation_time,
+	CASE
+		WHEN m.discount_type IS NOT NULL THEN json_strip_nulls(json_build_object('type', m.discount_type, 'value', m.discount_value))
+	END AS discount,
 	CASE WHEN c.id IS NOT NULL THEN json_strip_nulls(json_build_object('name', c.name, 'icon', NULLIF(c.icon, ''))) END AS category,
 	COALESCE(ing.ingredients, '[]'::json) AS ingredients,
 	COALESCE(mods.modifier_groups, '[]'::json) AS modifier_groups
@@ -835,13 +848,13 @@ func (r *menuRepository) getPublicMenuContextForRoom(ctx context.Context, refere
 }
 
 func (r *menuRepository) scanMenuPublicFromRows(rows *sql.Rows, dto *MenuDTOPublic) error {
-	var categoryJSON, ingredientsJSON, modifiersJSON []byte
+	var categoryJSON, ingredientsJSON, modifiersJSON, discountJSON []byte
 	var image, description sql.NullString
 	err := rows.Scan(
 		&dto.ID, &dto.Name, &image,
 		&dto.IsFasting, &dto.IsAvailable,
 		&description, &dto.Price, &dto.PreparationTime,
-		&categoryJSON, &ingredientsJSON, &modifiersJSON,
+		&discountJSON, &categoryJSON, &ingredientsJSON, &modifiersJSON,
 	)
 	if err != nil {
 		return err
@@ -851,6 +864,13 @@ func (r *menuRepository) scanMenuPublicFromRows(rows *sql.Rows, dto *MenuDTOPubl
 	}
 	if description.Valid && description.String != "" {
 		dto.Description = description.String
+	}
+	if len(discountJSON) > 0 && string(discountJSON) != "null" {
+		var discount MenuDiscount
+		if err := json.Unmarshal(discountJSON, &discount); err != nil {
+			return err
+		}
+		dto.Discount = &discount
 	}
 	return r.unmarshalMenuPublicRelations(dto, categoryJSON, ingredientsJSON, modifiersJSON)
 }
