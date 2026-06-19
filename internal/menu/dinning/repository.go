@@ -549,6 +549,7 @@ SELECT
 	json_strip_nulls(json_build_object(
 		'name', mer.name,
 		'logo', NULLIF(mer.logo, ''),
+		'subscription_plan', mer.subscription_plan,
 		'tax_charges', json_strip_nulls(json_build_object(
 			'vat_percent', mer.vat_percent,
 			'service_charge_percent', mer.service_charge_percent
@@ -661,6 +662,7 @@ SELECT
 	json_strip_nulls(json_build_object(
 		'name', mer.name,
 		'logo', NULLIF(mer.logo, ''),
+		'subscription_plan', mer.subscription_plan,
 		'tax_charges', json_strip_nulls(json_build_object(
 			'vat_percent', mer.vat_percent,
 			'service_charge_percent', mer.service_charge_percent

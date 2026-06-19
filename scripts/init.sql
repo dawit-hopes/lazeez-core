@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS merchants (
     logo TEXT,
     vat_percent DECIMAL(5, 2) NOT NULL DEFAULT 15,
     service_charge_percent DECIMAL(5, 2),
+    subscription_plan VARCHAR(50) NOT NULL DEFAULT 'DIGITAL_MENU',
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -24,6 +25,9 @@ CREATE TABLE IF NOT EXISTS merchants (
     CONSTRAINT chk_merchants_service_charge_percent CHECK (
         service_charge_percent IS NULL
         OR (service_charge_percent >= 0 AND service_charge_percent <= 100)
+    ),
+    CONSTRAINT chk_merchants_subscription_plan CHECK (
+        subscription_plan IN ('DIGITAL_MENU', 'ORDERING')
     )
 );
 

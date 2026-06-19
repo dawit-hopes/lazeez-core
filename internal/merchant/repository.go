@@ -48,7 +48,7 @@ func NewMerchantRepository(
 // users, filtering out soft-deleted records everywhere.
 const merchantWithRelationsActive = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent, m.subscription_plan,
 	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	COALESCE((
 		SELECT json_agg(json_build_object(
@@ -78,7 +78,7 @@ WHERE m.is_deleted = FALSE
 // users without filtering out soft-deleted records. Intended for super_admin.
 const merchantWithRelationsAll = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent, m.subscription_plan,
 	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	COALESCE((
 		SELECT json_agg(json_build_object(
@@ -106,7 +106,7 @@ FROM merchants m
 // merchantListActive lists merchants with branch/user counts only (no nested JSON).
 const merchantListActive = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent, m.subscription_plan,
 	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	(SELECT COUNT(*)::int FROM branches b WHERE b.merchant_id = m.id AND b.is_deleted = FALSE) AS total_branches,
 	(SELECT COUNT(DISTINCT u.id)::int FROM users u
@@ -121,7 +121,7 @@ WHERE m.is_deleted = FALSE
 // merchantListAll lists merchants with counts, including soft-deleted relations. Intended for super_admin.
 const merchantListAll = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent, m.subscription_plan,
 	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	(SELECT COUNT(*)::int FROM branches b WHERE b.merchant_id = m.id) AS total_branches,
 	(SELECT COUNT(DISTINCT u.id)::int FROM users u
@@ -163,11 +163,12 @@ func (r *merchantRepository) Get(ctx context.Context, id string) (*MerchantDTO, 
 func (r *merchantRepository) Update(ctx context.Context, merchant Merchant) error {
 	filter := map[string]any{"id": merchant.ID}
 	updates := map[string]any{
-		"name":        merchant.Name,
-		"branch_type": merchant.BranchType,
-		"logo":        merchant.Logo,
-		"deleted_at":  merchant.DeletedAt,
-		"is_deleted":  merchant.IsDeleted,
+		"name":              merchant.Name,
+		"branch_type":       merchant.BranchType,
+		"logo":              merchant.Logo,
+		"subscription_plan": merchant.SubscriptionPlan,
+		"deleted_at":        merchant.DeletedAt,
+		"is_deleted":        merchant.IsDeleted,
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
@@ -299,7 +300,7 @@ func (r *merchantRepository) scanMerchantListFromRows(rows *sql.Rows, dto *Merch
 	var vatPercent float64
 	err := rows.Scan(
 		&dto.ID, &dto.Name, &dto.BranchType, &dto.Logo,
-		&vatPercent, &serviceCharge,
+		&vatPercent, &serviceCharge, &dto.SubscriptionPlan,
 		&dto.CreatedAt, &dto.UpdatedAt, &deletedAt, &dto.IsDeleted,
 		&dto.TotalBranches, &dto.TotalUsers,
 	)
@@ -319,7 +320,7 @@ func (r *merchantRepository) scanMerchantWithRelations(row *sql.Row, dto *Mercha
 	var vatPercent float64
 	err := row.Scan(
 		&dto.ID, &dto.Name, &dto.BranchType, &dto.Logo,
-		&vatPercent, &serviceCharge,
+		&vatPercent, &serviceCharge, &dto.SubscriptionPlan,
 		&dto.CreatedAt, &dto.UpdatedAt, &deletedAt, &dto.IsDeleted,
 		&branchesJSON, &usersJSON,
 	)
@@ -338,7 +339,7 @@ func (r *merchantRepository) scanMerchantWithRelationsFromRows(rows *sql.Rows, d
 	var vatPercent float64
 	err := rows.Scan(
 		&dto.ID, &dto.Name, &dto.BranchType, &dto.Logo,
-		&vatPercent, &serviceCharge,
+		&vatPercent, &serviceCharge, &dto.SubscriptionPlan,
 		&dto.CreatedAt, &dto.UpdatedAt, &deletedAt, &dto.IsDeleted,
 		&branchesJSON, &usersJSON,
 	)

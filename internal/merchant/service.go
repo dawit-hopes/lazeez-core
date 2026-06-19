@@ -13,7 +13,7 @@ import (
 type MerchantService interface {
 	Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error)
 	Get(ctx context.Context, id string) (*MerchantDTO, error)
-	Update(ctx context.Context, id string, req MerchantRequest) error
+	Update(ctx context.Context, id string, req MerchantRequest, role string) error
 	GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error)
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
@@ -37,9 +37,10 @@ func NewMerchantService(merchantRepository MerchantRepository, fileService files
 
 func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (*MerchantDTO, error) {
 	merchant := Merchant{
-		Name:       common.FormatText(req.Name),
-		BranchType: req.BranchType,
-		VatPercent: defaultVatPercent,
+		Name:             common.FormatText(req.Name),
+		BranchType:       req.BranchType,
+		VatPercent:       defaultVatPercent,
+		SubscriptionPlan: req.SubscriptionPlan,
 	}
 	merchant.ID = common.GenerateUUID()
 	err := s.merchantRepository.CheckExists(ctx, merchant.Name, "")
@@ -78,7 +79,7 @@ func (s *merchantService) Get(ctx context.Context, id string) (*MerchantDTO, err
 	return merchant, nil
 }
 
-func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest) error {
+func (s *merchantService) Update(ctx context.Context, id string, req MerchantRequest, role string) error {
 	s.logger.Info("Updating merchant", "id", id, "name", req.Name)
 
 	// Load existing merchant from repository
@@ -109,6 +110,13 @@ func (s *merchantService) Update(ctx context.Context, id string, req MerchantReq
 
 	if req.BranchType != "" {
 		existingMerchant.BranchType = req.BranchType
+	}
+
+	if req.SubscriptionPlan != "" {
+		if !users.IsSuperAdminRoleString(role) {
+			return common.ErrUnAuthorized
+		}
+		existingMerchant.SubscriptionPlan = req.SubscriptionPlan
 	}
 
 	err = s.merchantRepository.Update(ctx, existingMerchant.ToModel())

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/middleware"
 	"mime/multipart"
 	"net/http"
 )
@@ -49,6 +50,7 @@ func (h *merchantHandler) parseRequest(r *http.Request, isRequired bool) (Mercha
 			// If not required, allow name-only updates
 			req.Name = r.FormValue("name")
 			req.BranchType = BranchType(r.FormValue("branch_type"))
+			req.SubscriptionPlan = SubscriptionPlan(r.FormValue("subscription_plan"))
 			return req, nil, nil
 		}
 		h.logger.Error("Failed to get logo file", "error", err)
@@ -59,6 +61,7 @@ func (h *merchantHandler) parseRequest(r *http.Request, isRequired bool) (Mercha
 	req.Logo = file
 	req.Name = r.FormValue("name")
 	req.BranchType = BranchType(r.FormValue("branch_type"))
+	req.SubscriptionPlan = SubscriptionPlan(r.FormValue("subscription_plan"))
 
 	return req, file, nil
 }
@@ -148,13 +151,20 @@ func (h *merchantHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if err := req.ValidateUpdate(); err != nil {
+		h.logger.Error("Failed to validate request body", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
 	if IsEmpty(&req) {
 		h.logger.Error("Name and logo are required")
 		common.WriteErrorResponse(w, common.ErrInvalidRequest)
 		return
 	}
 
-	err = h.merchantService.Update(r.Context(), id, req)
+	role, _ := middleware.GetRoleFromContext(r.Context())
+	err = h.merchantService.Update(r.Context(), id, req, role)
 	if err != nil {
 		h.logger.Error("Failed to update merchant", "error", err)
 		common.WriteErrorResponse(w, err)

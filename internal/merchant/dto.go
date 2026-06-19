@@ -16,10 +16,11 @@ const (
 )
 
 type MerchantRequest struct {
-	Name       string               `json:"name"`
-	Logo       multipart.File       `json:"logo"`
-	LogoHeader multipart.FileHeader `json:"-"`
-	BranchType BranchType           `json:"branch_type"`
+	Name             string               `json:"name"`
+	Logo             multipart.File       `json:"logo"`
+	LogoHeader       multipart.FileHeader `json:"-"`
+	BranchType       BranchType           `json:"branch_type"`
+	SubscriptionPlan SubscriptionPlan     `json:"subscription_plan"`
 }
 
 type MerchantDTO struct {
@@ -30,8 +31,9 @@ type MerchantDTO struct {
 	Users         []*users.UserDTO         `json:"users,omitempty"`
 	TotalBranches int                      `json:"total_branches"`
 	TotalUsers    int                      `json:"total_users"`
-	BranchType    BranchType               `json:"branch_type"`
-	TaxCharges    *TaxCharges              `json:"tax_charges,omitempty"`
+	BranchType       BranchType       `json:"branch_type"`
+	TaxCharges       *TaxCharges      `json:"tax_charges,omitempty"`
+	SubscriptionPlan SubscriptionPlan `json:"subscription_plan"`
 }
 
 func (m *MerchantDTO) ToModel() Merchant {
@@ -47,9 +49,10 @@ func (m *MerchantDTO) ToModel() Merchant {
 			UpdatedAt: m.UpdatedAt,
 			DeletedAt: deletedAt,
 		},
-		Name:       m.Name,
-		BranchType: m.BranchType,
-		Logo:       m.Logo,
+		Name:             m.Name,
+		BranchType:       m.BranchType,
+		Logo:             m.Logo,
+		SubscriptionPlan: m.SubscriptionPlan,
 	}
 	if m.TaxCharges != nil {
 		vatPercent := m.TaxCharges.VatPercent
@@ -63,8 +66,9 @@ func (m *MerchantDTO) ToModel() Merchant {
 }
 
 type MerchantResponseSimplified struct {
-	Name       string     `json:"name"`
-	BranchType BranchType `json:"branch_type"`
-	Logo       string     `json:"logo,omitempty"`
-	TaxCharges *TaxCharges `json:"tax_charges,omitempty"`
+	Name             string           `json:"name"`
+	BranchType       BranchType       `json:"branch_type,omitempty"`
+	Logo             string           `json:"logo,omitempty"`
+	TaxCharges       *TaxCharges      `json:"tax_charges,omitempty"`
+	SubscriptionPlan SubscriptionPlan `json:"subscription_plan"`
 }
