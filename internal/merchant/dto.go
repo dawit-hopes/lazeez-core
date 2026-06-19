@@ -31,6 +31,7 @@ type MerchantDTO struct {
 	TotalBranches int                      `json:"total_branches"`
 	TotalUsers    int                      `json:"total_users"`
 	BranchType    BranchType               `json:"branch_type"`
+	TaxCharges    *TaxCharges              `json:"tax_charges,omitempty"`
 }
 
 func (m *MerchantDTO) ToModel() Merchant {
@@ -38,7 +39,7 @@ func (m *MerchantDTO) ToModel() Merchant {
 	if m.DeletedAt != nil {
 		deletedAt = common.ToNullTime(*m.DeletedAt)
 	}
-	return Merchant{
+	merchant := Merchant{
 		Base: common.Base{
 			ID:        m.ID,
 			IsDeleted: m.IsDeleted,
@@ -50,10 +51,20 @@ func (m *MerchantDTO) ToModel() Merchant {
 		BranchType: m.BranchType,
 		Logo:       m.Logo,
 	}
+	if m.TaxCharges != nil {
+		vatPercent := m.TaxCharges.VatPercent
+		var serviceCharge sql.NullFloat64
+		if m.TaxCharges.ServiceChargePercent != nil {
+			serviceCharge = sql.NullFloat64{Float64: *m.TaxCharges.ServiceChargePercent, Valid: true}
+		}
+		applyTaxChargesToModel(&merchant, vatPercent, serviceCharge)
+	}
+	return merchant
 }
 
 type MerchantResponseSimplified struct {
 	Name       string     `json:"name"`
 	BranchType BranchType `json:"branch_type"`
 	Logo       string     `json:"logo,omitempty"`
+	TaxCharges *TaxCharges `json:"tax_charges,omitempty"`
 }

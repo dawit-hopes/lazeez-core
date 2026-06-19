@@ -7,6 +7,7 @@ import (
 	"lazeez-core/internal/ingredient"
 	"lazeez-core/internal/merchant"
 	"lazeez-core/internal/modifiers/group"
+	"lazeez-core/internal/promotion"
 	"lazeez-core/internal/rooms/booking"
 	"lazeez-core/internal/rooms/room"
 	"lazeez-core/internal/table"
@@ -137,6 +138,7 @@ type PublicMenuCatalogResponse struct {
 	Branch     *branch.BranchResponseSimplified       `json:"branch"`
 	Merchant   *merchant.MerchantResponseSimplified   `json:"merchant"`
 	Menus      []*MenuDTOPublic                       `json:"menus"`
+	Promotions []*promotion.PromotionPublicDTO        `json:"promotions"`
 	Meta       common.PaginationMeta                  `json:"-"`
 	Categories []*category.CategoryResponseSimplified `json:"categories"`
 }

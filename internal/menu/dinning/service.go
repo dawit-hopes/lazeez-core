@@ -11,6 +11,7 @@ import (
 	"lazeez-core/internal/ingredient"
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
+	"lazeez-core/internal/promotion"
 	"lazeez-core/internal/rooms/booking"
 	"lazeez-core/internal/rooms/room"
 	"lazeez-core/internal/users"
@@ -43,6 +44,7 @@ type menuService struct {
 	modifierOptionService modoption.ModifierOptionService
 	roomService           room.RoomService
 	bookingService        booking.BookingService
+	promotionService      promotion.PromotionService
 	fileService           files.FileService
 	logger                config.Logger
 }
@@ -56,6 +58,7 @@ func NewMenuService(menuRepository MenuRepository,
 	modifierOptionService modoption.ModifierOptionService,
 	roomService room.RoomService,
 	bookingService booking.BookingService,
+	promotionService promotion.PromotionService,
 	logger config.Logger) MenuService {
 	return &menuService{
 		menuRepository:        menuRepository,
@@ -68,6 +71,7 @@ func NewMenuService(menuRepository MenuRepository,
 		modifierOptionService: modifierOptionService,
 		roomService:           roomService,
 		bookingService:        bookingService,
+		promotionService:      promotionService,
 	}
 }
 
@@ -613,31 +617,47 @@ func (s *menuService) List(ctx context.Context, filter common.Filter, branchID, 
 }
 
 func (s *menuService) ListMenus(ctx context.Context, filter common.Filter, reference, referenceType string) (*PublicMenuCatalogResponse, error) {
+	var catalog *PublicMenuCatalogResponse
+	var err error
+
 	switch referenceType {
 	case "table":
-		return s.menuRepository.ListMenusForTables(ctx, filter, reference)
+		catalog, err = s.menuRepository.ListMenusForTables(ctx, filter, reference)
 	case "room":
-		rm, err := s.roomService.GetRoomByReference(ctx, reference)
-		if err != nil {
-			return nil, err
+		rm, roomErr := s.roomService.GetRoomByReference(ctx, reference)
+		if roomErr != nil {
+			return nil, roomErr
 		}
 
-		activeBooking, err := s.bookingService.GetBookingByRoom(ctx, rm.ID)
-		if err != nil {
-			s.logger.Error("no active booking for room", "room_id", rm.ID, "status", rm.Status, "error", err)
-			return nil, err
+		activeBooking, bookingErr := s.bookingService.GetBookingByRoom(ctx, rm.ID)
+		if bookingErr != nil {
+			s.logger.Error("no active booking for room", "room_id", rm.ID, "status", rm.Status, "error", bookingErr)
+			return nil, bookingErr
 		}
 
-		catalog, err := s.menuRepository.ListMenusForRooms(ctx, filter, reference)
+		catalog, err = s.menuRepository.ListMenusForRooms(ctx, filter, reference)
 		if err != nil {
 			return nil, err
 		}
 		if catalog.Guest == nil && activeBooking.GuestName != "" {
 			catalog.Guest = &booking.GuestResponseSimplified{GuestName: activeBooking.GuestName}
 		}
-		return catalog, nil
 	default:
 		s.logger.Error("Invalid reference type", "reference_type", referenceType)
 		return nil, common.ErrInvalidRequest
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	promotions, err := s.promotionService.ListActivePublicByReference(ctx, reference, referenceType)
+	if err != nil {
+		s.logger.Error("failed to list public promotions", "reference_type", referenceType, "error", err)
+		return nil, err
+	}
+	if promotions == nil {
+		promotions = []*promotion.PromotionPublicDTO{}
+	}
+	catalog.Promotions = promotions
+	return catalog, nil
 }

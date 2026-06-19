@@ -93,4 +93,7 @@ var (
 	ErrBillNotFound                     = &Errors{Code: NotFound, Message: "room bill not found"}
 	ErrBillAlreadySettled               = &Errors{Code: BadRequest, Message: "room bill is already settled"}
 	ErrBillUnsettled                    = &Errors{Code: BadRequest, Message: "room bill must be settled before checkout"}
+	ErrPromotionNotFound                = &Errors{Code: NotFound, Message: "promotion not found"}
+	ErrOrderRatingNotFound              = &Errors{Code: NotFound, Message: "order rating not found"}
+	ErrStayRatingNotFound               = &Errors{Code: NotFound, Message: "stay rating not found"}
 )

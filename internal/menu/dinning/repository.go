@@ -545,7 +545,14 @@ SELECT
 		'address', NULLIF(b.address, ''),
 		'phone_number', NULLIF(b.phone_number, '')
 	)) AS branch,
-	json_strip_nulls(json_build_object('name', mer.name, 'logo', NULLIF(mer.logo, ''))) AS merchant
+	json_strip_nulls(json_build_object(
+		'name', mer.name,
+		'logo', NULLIF(mer.logo, ''),
+		'tax_charges', json_strip_nulls(json_build_object(
+			'vat_percent', mer.vat_percent,
+			'service_charge_percent', mer.service_charge_percent
+		))
+	)) AS merchant
 FROM tables t
 INNER JOIN branches b ON b.id = t.branch_id AND b.is_deleted = FALSE
 INNER JOIN merchants mer ON mer.id = b.merchant_id AND mer.is_deleted = FALSE
@@ -651,7 +658,14 @@ SELECT
 		'address', NULLIF(b.address, ''),
 		'phone_number', NULLIF(b.phone_number, '')
 	)) AS branch,
-	json_strip_nulls(json_build_object('name', mer.name, 'logo', NULLIF(mer.logo, ''))) AS merchant,
+	json_strip_nulls(json_build_object(
+		'name', mer.name,
+		'logo', NULLIF(mer.logo, ''),
+		'tax_charges', json_strip_nulls(json_build_object(
+			'vat_percent', mer.vat_percent,
+			'service_charge_percent', mer.service_charge_percent
+		))
+	)) AS merchant,
 	(
 		SELECT json_strip_nulls(json_build_object('guest_name', bk.guest_name))
 		FROM bookings bk

@@ -22,6 +22,8 @@ type MerchantRepository interface {
 	UnDelete(ctx context.Context, id string) error
 	GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error)
 	CheckExists(ctx context.Context, name string, excludeMerchantID string) error
+	GetTaxCharges(ctx context.Context, merchantID string) (*TaxCharges, BranchType, error)
+	UpdateTaxCharges(ctx context.Context, merchantID string, vatPercent float64, serviceCharge sql.NullFloat64) (*TaxCharges, error)
 }
 
 type merchantRepository struct {
@@ -46,7 +48,8 @@ func NewMerchantRepository(
 // users, filtering out soft-deleted records everywhere.
 const merchantWithRelationsActive = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	COALESCE((
 		SELECT json_agg(json_build_object(
 			'id', b.id, 'merchant_id', b.merchant_id, 'branch_name', b.branch_name,
@@ -75,7 +78,8 @@ WHERE m.is_deleted = FALSE
 // users without filtering out soft-deleted records. Intended for super_admin.
 const merchantWithRelationsAll = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	COALESCE((
 		SELECT json_agg(json_build_object(
 			'id', b.id, 'merchant_id', b.merchant_id, 'branch_name', b.branch_name,
@@ -102,7 +106,8 @@ FROM merchants m
 // merchantListActive lists merchants with branch/user counts only (no nested JSON).
 const merchantListActive = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	(SELECT COUNT(*)::int FROM branches b WHERE b.merchant_id = m.id AND b.is_deleted = FALSE) AS total_branches,
 	(SELECT COUNT(DISTINCT u.id)::int FROM users u
 	 WHERE u.is_deleted = FALSE
@@ -116,7 +121,8 @@ WHERE m.is_deleted = FALSE
 // merchantListAll lists merchants with counts, including soft-deleted relations. Intended for super_admin.
 const merchantListAll = `
 SELECT 
-	m.id, m.name, m.branch_type, m.logo, m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
+	m.id, m.name, m.branch_type, m.logo, m.vat_percent, m.service_charge_percent,
+	m.created_at, m.updated_at, m.deleted_at, m.is_deleted,
 	(SELECT COUNT(*)::int FROM branches b WHERE b.merchant_id = m.id) AS total_branches,
 	(SELECT COUNT(DISTINCT u.id)::int FROM users u
 	 WHERE u.merchant_id = m.id OR EXISTS (
@@ -289,8 +295,11 @@ func (r *merchantRepository) GetAll(ctx context.Context, filter common.Filter) (
 // scanMerchantListFromRows scans a merchant list row with aggregate counts only.
 func (r *merchantRepository) scanMerchantListFromRows(rows *sql.Rows, dto *MerchantDTO) error {
 	var deletedAt sql.NullTime
+	var serviceCharge sql.NullFloat64
+	var vatPercent float64
 	err := rows.Scan(
 		&dto.ID, &dto.Name, &dto.BranchType, &dto.Logo,
+		&vatPercent, &serviceCharge,
 		&dto.CreatedAt, &dto.UpdatedAt, &deletedAt, &dto.IsDeleted,
 		&dto.TotalBranches, &dto.TotalUsers,
 	)
@@ -298,6 +307,7 @@ func (r *merchantRepository) scanMerchantListFromRows(rows *sql.Rows, dto *Merch
 		return err
 	}
 	dto.DeletedAt = common.ToNullTimePtr(deletedAt)
+	dto.TaxCharges = taxChargesFromModel(vatPercent, serviceCharge)
 	return nil
 }
 
@@ -305,8 +315,11 @@ func (r *merchantRepository) scanMerchantListFromRows(rows *sql.Rows, dto *Merch
 func (r *merchantRepository) scanMerchantWithRelations(row *sql.Row, dto *MerchantDTO) error {
 	var branchesJSON, usersJSON []byte
 	var deletedAt sql.NullTime
+	var serviceCharge sql.NullFloat64
+	var vatPercent float64
 	err := row.Scan(
 		&dto.ID, &dto.Name, &dto.BranchType, &dto.Logo,
+		&vatPercent, &serviceCharge,
 		&dto.CreatedAt, &dto.UpdatedAt, &deletedAt, &dto.IsDeleted,
 		&branchesJSON, &usersJSON,
 	)
@@ -314,14 +327,18 @@ func (r *merchantRepository) scanMerchantWithRelations(row *sql.Row, dto *Mercha
 		return err
 	}
 	dto.DeletedAt = common.ToNullTimePtr(deletedAt)
+	dto.TaxCharges = taxChargesFromModel(vatPercent, serviceCharge)
 	return r.unmarshalRelations(dto, branchesJSON, usersJSON)
 }
 
 func (r *merchantRepository) scanMerchantWithRelationsFromRows(rows *sql.Rows, dto *MerchantDTO) error {
 	var branchesJSON, usersJSON []byte
 	var deletedAt sql.NullTime
+	var serviceCharge sql.NullFloat64
+	var vatPercent float64
 	err := rows.Scan(
 		&dto.ID, &dto.Name, &dto.BranchType, &dto.Logo,
+		&vatPercent, &serviceCharge,
 		&dto.CreatedAt, &dto.UpdatedAt, &deletedAt, &dto.IsDeleted,
 		&branchesJSON, &usersJSON,
 	)
@@ -329,6 +346,7 @@ func (r *merchantRepository) scanMerchantWithRelationsFromRows(rows *sql.Rows, d
 		return err
 	}
 	dto.DeletedAt = common.ToNullTimePtr(deletedAt)
+	dto.TaxCharges = taxChargesFromModel(vatPercent, serviceCharge)
 	return r.unmarshalRelations(dto, branchesJSON, usersJSON)
 }
 
@@ -397,4 +415,48 @@ func (r *merchantRepository) UnDelete(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
+}
+
+func (r *merchantRepository) GetTaxCharges(ctx context.Context, merchantID string) (*TaxCharges, BranchType, error) {
+	const query = `
+		SELECT vat_percent, service_charge_percent, branch_type
+		FROM merchants
+		WHERE id = $1 AND is_deleted = FALSE`
+
+	var vatPercent float64
+	var serviceCharge sql.NullFloat64
+	var branchType BranchType
+	err := r.joinDAL.QueryRow(ctx, query, []any{merchantID}, func(row *sql.Row) error {
+		return row.Scan(&vatPercent, &serviceCharge, &branchType)
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "", common.ErrMerchantNotFound
+		}
+		r.logger.Error("failed to get merchant tax charges", "error", err)
+		return nil, "", err
+	}
+	return taxChargesFromModel(vatPercent, serviceCharge), branchType, nil
+}
+
+func (r *merchantRepository) UpdateTaxCharges(ctx context.Context, merchantID string, vatPercent float64, serviceCharge sql.NullFloat64) (*TaxCharges, error) {
+	const query = `
+		UPDATE merchants
+		SET vat_percent = $2, service_charge_percent = $3, updated_at = NOW()
+		WHERE id = $1 AND is_deleted = FALSE
+		RETURNING vat_percent, service_charge_percent`
+
+	var updatedVat float64
+	var updatedServiceCharge sql.NullFloat64
+	err := r.joinDAL.QueryRow(ctx, query, []any{merchantID, vatPercent, serviceCharge}, func(row *sql.Row) error {
+		return row.Scan(&updatedVat, &updatedServiceCharge)
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, common.ErrMerchantNotFound
+		}
+		r.logger.Error("failed to update merchant tax charges", "error", err)
+		return nil, err
+	}
+	return taxChargesFromModel(updatedVat, updatedServiceCharge), nil
 }

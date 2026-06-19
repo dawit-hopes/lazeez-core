@@ -10,6 +10,7 @@ import (
 	"lazeez-core/internal/category"
 	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/feedback"
 	"lazeez-core/internal/files"
 	"lazeez-core/internal/ingredient"
 	"lazeez-core/internal/key"
@@ -22,6 +23,7 @@ import (
 	roomorder "lazeez-core/internal/order/room"
 	order "lazeez-core/internal/order/table"
 	"lazeez-core/internal/payment"
+	"lazeez-core/internal/promotion"
 	"lazeez-core/internal/rooms/booking"
 	"lazeez-core/internal/rooms/folio"
 	"lazeez-core/internal/rooms/room"
@@ -56,6 +58,8 @@ type Dependencies struct {
 	FolioRepo          folio.FolioRepository
 	RoomSessionRepo    roomsession.RoomSessionRepository
 	RoomOrderRepo      roomorder.RoomOrderRepository
+	PromotionRepo      promotion.PromotionRepository
+	FeedbackRepo       feedback.FeedbackRepository
 
 	// Services
 	AuthService           auth.AuthService
@@ -77,6 +81,8 @@ type Dependencies struct {
 	RoomSessionService    roomsession.RoomSessionService
 	RoomOrderService      roomorder.RoomOrderService
 	PaymentService        payment.PaymentService
+	PromotionService      promotion.PromotionService
+	FeedbackService       feedback.FeedbackService
 
 	// Handlers
 	AuthHandler          auth.AuthHandler
@@ -95,6 +101,8 @@ type Dependencies struct {
 	FolioHandler         folio.FolioHandler
 	RoomSessionHandler   roomsession.RoomSessionHandler
 	RoomOrderHandler     roomorder.RoomOrderHandler
+	PromotionHandler     promotion.PromotionHandler
+	FeedbackHandler      feedback.FeedbackHandler
 
 	Middleware middleware.Middleware
 }
@@ -129,6 +137,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	roomSessionDAL := common.NewDAL(db, func() *roomsession.RoomSession { return &roomsession.RoomSession{} })
 	roomOrderDAL := common.NewDAL(db, func() *roomorder.RoomOrder { return &roomorder.RoomOrder{} })
 	roomOrderItemDAL := common.NewDAL(db, func() *roomorder.RoomOrderItem { return &roomorder.RoomOrderItem{} })
+	promotionDAL := common.NewDAL(db, func() *promotion.Promotion { return &promotion.Promotion{} })
 	joinDAL := common.NewJoinDAL(db)
 	cld, err := initCloudinary(logger)
 	if err != nil {
@@ -156,6 +165,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	folioRepo := folio.NewFolioRepository(roomBillDAL, logger)
 	roomSessionRepo := roomsession.NewRoomSessionRepository(roomSessionDAL, joinDAL, logger)
 	roomOrderRepo := roomorder.NewRoomOrderRepository(roomOrderDAL, roomOrderItemDAL, joinDAL, logger)
+	promotionRepo := promotion.NewPromotionRepository(promotionDAL, joinDAL, logger)
+	feedbackRepo := feedback.NewFeedbackRepository(joinDAL, logger)
 
 	// Initialize services
 	paymentService := payment.NewPaymentService(chapaSecretKey, chapaInitialURL, verifyURL, webhookSecret, logger)
@@ -172,10 +183,12 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	singleRoomService := room.NewRoomService(singleRoomRepo, roomRepo, branchService, merchantService, fileService, logger)
 	folioService := folio.NewFolioService(folioRepo, logger)
 	bookingService := booking.NewBookingService(bookingRepo, singleRoomRepo, branchService, merchantService, keyService, folioService, logger)
-	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, singleRoomService, bookingService, logger)
+	promotionService := promotion.NewPromotionService(promotionRepo, fileService, logger)
+	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, singleRoomService, bookingService, promotionService, logger)
 	orderItemService := item.NewOrderItemService(orderItemRepo, logger)
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
 	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
+	feedbackService := feedback.NewFeedbackService(feedbackRepo, orderRepo, clientSessionService, logger)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
 	roomSessionService := roomsession.NewRoomSessionService(roomSessionRepo, singleRoomRepo, bookingService, logger)
 	roomOrderService := roomorder.NewRoomOrderService(roomOrderRepo, menuService, modifierOptionService, folioService, singleRoomService, bookingService, logger)
@@ -197,6 +210,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	folioHandler := folio.NewFolioHandler(folioService, logger)
 	roomSessionHandler := roomsession.NewRoomSessionHandler(roomSessionService, logger)
 	roomOrderHandler := roomorder.NewRoomOrderHandler(roomOrderService, logger)
+	promotionHandler := promotion.NewPromotionHandler(promotionService, userService, logger)
+	feedbackHandler := feedback.NewFeedbackHandler(feedbackService, logger)
 
 	middleware := middleware.NewMiddleware(keyService, sessionService, logger)
 
@@ -220,6 +235,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		FolioRepo:             folioRepo,
 		RoomSessionRepo:       roomSessionRepo,
 		RoomOrderRepo:         roomOrderRepo,
+		PromotionRepo:         promotionRepo,
+		FeedbackRepo:          feedbackRepo,
 		AuthService:           authService,
 		UserService:           userService,
 		BranchService:         branchService,
@@ -239,6 +256,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		RoomSessionService:    roomSessionService,
 		RoomOrderService:      roomOrderService,
 		PaymentService:        paymentService,
+		PromotionService:      promotionService,
+		FeedbackService:       feedbackService,
 		AuthHandler:           authHandler,
 		UserHandler:           userHandler,
 		BranchHandler:         branchHandler,
@@ -255,6 +274,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		FolioHandler:          folioHandler,
 		RoomSessionHandler:    roomSessionHandler,
 		RoomOrderHandler:      roomOrderHandler,
+		PromotionHandler:      promotionHandler,
+		FeedbackHandler:       feedbackHandler,
 		Middleware:            middleware,
 	}, nil
 }
@@ -288,4 +309,6 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	folio.NewFolioRoutes(router, deps.FolioHandler, deps.Middleware)
 	roomsession.NewRoomSessionRoutes(router, deps.RoomSessionHandler, deps.Middleware)
 	roomorder.NewRoomOrderRoutes(router, deps.RoomOrderHandler, deps.Middleware)
+	promotion.NewPromotionRoutes(router, deps.PromotionHandler, deps.Middleware)
+	feedback.NewFeedbackRoutes(router, deps.FeedbackHandler, deps.Middleware)
 }

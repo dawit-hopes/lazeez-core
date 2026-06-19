@@ -23,6 +23,7 @@ type Middleware interface {
 	RequireRoomManagement(next http.Handler) http.Handler
 	RequireFrontDesk(next http.Handler) http.Handler
 	RequireOrderListAccess(next http.Handler) http.Handler
+	RequireFeedbackListAccess(next http.Handler) http.Handler
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
 	MethodNotAllowedHandler(w http.ResponseWriter, r *http.Request)
 	CORSHandler(next http.Handler) http.Handler
@@ -162,6 +163,36 @@ func (m *middleware) RequireOrderListAccess(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		case "super_branch_admin":
 			if merchantID, ok := GetMerchantIDFromContext(r.Context()); !ok || merchantID == "" {
+				common.WriteErrorResponse(w, common.ErrUnAuthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		default:
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		}
+	})
+}
+
+// RequireFeedbackListAccess allows staff roles that can view feedback in command center:
+// super_admin (all), super_branch_admin (merchant), branch staff (branch).
+func (m *middleware) RequireFeedbackListAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		switch role {
+		case "super_admin":
+			next.ServeHTTP(w, r)
+		case "super_branch_admin":
+			if merchantID, ok := GetMerchantIDFromContext(r.Context()); !ok || merchantID == "" {
+				common.WriteErrorResponse(w, common.ErrUnAuthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		case "branch_manager", "front_desk_agent", "room_service_staff":
+			if branchID, ok := GetBranchIDFromContext(r.Context()); !ok || branchID == "" {
 				common.WriteErrorResponse(w, common.ErrUnAuthorized)
 				return
 			}

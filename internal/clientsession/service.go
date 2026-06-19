@@ -12,6 +12,7 @@ const sessionDuration = time.Hour
 type ClientSessionService interface {
 	Create(ctx context.Context, input CreateSessionInput) (*ClientSessionResponse, error)
 	GetValidForOrder(ctx context.Context, sessionKey string) (*ClientSession, error)
+	GetBySessionKey(ctx context.Context, sessionKey string) (*ClientSession, error)
 }
 
 type clientSessionService struct {
@@ -47,8 +48,12 @@ func (s *clientSessionService) Create(ctx context.Context, input CreateSessionIn
 	return session.ToResponse(table.TableName), nil
 }
 
+func (s *clientSessionService) GetBySessionKey(ctx context.Context, sessionKey string) (*ClientSession, error) {
+	return s.repo.GetBySessionKey(ctx, sessionKey)
+}
+
 func (s *clientSessionService) GetValidForOrder(ctx context.Context, sessionKey string) (*ClientSession, error) {
-	session, err := s.repo.GetBySessionKey(ctx, sessionKey)
+	session, err := s.GetBySessionKey(ctx, sessionKey)
 	if err != nil {
 		return nil, err
 	}

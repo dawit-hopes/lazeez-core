@@ -2,9 +2,11 @@ package merchant
 
 import (
 	"context"
+	"database/sql"
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	"lazeez-core/internal/files"
+	"lazeez-core/internal/users"
 	"strings"
 )
 
@@ -15,6 +17,8 @@ type MerchantService interface {
 	GetAll(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*MerchantDTO], error)
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
+	GetTaxCharges(ctx context.Context, merchantID, role, callerMerchantID string) (*TaxCharges, error)
+	UpdateTaxCharges(ctx context.Context, merchantID string, req TaxChargesRequest, role, callerMerchantID string) (*TaxCharges, error)
 }
 
 type merchantService struct {
@@ -35,6 +39,7 @@ func (s *merchantService) Create(ctx context.Context, req MerchantRequest) (*Mer
 	merchant := Merchant{
 		Name:       common.FormatText(req.Name),
 		BranchType: req.BranchType,
+		VatPercent: defaultVatPercent,
 	}
 	merchant.ID = common.GenerateUUID()
 	err := s.merchantRepository.CheckExists(ctx, merchant.Name, "")
@@ -137,4 +142,67 @@ func (s *merchantService) UnDelete(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
+}
+
+func canReadTaxCharges(role, callerMerchantID, resourceMerchantID string) bool {
+	if users.IsSuperAdminRoleString(role) {
+		return true
+	}
+	if users.CanManageMerchantMaster(role, callerMerchantID, resourceMerchantID) {
+		return true
+	}
+	return users.IsBranchStaffRoleString(role) && callerMerchantID != "" && callerMerchantID == resourceMerchantID
+}
+
+func (s *merchantService) GetTaxCharges(ctx context.Context, merchantID, role, callerMerchantID string) (*TaxCharges, error) {
+	if !canReadTaxCharges(role, callerMerchantID, merchantID) {
+		return nil, common.ErrUnAuthorized
+	}
+	taxCharges, _, err := s.merchantRepository.GetTaxCharges(ctx, merchantID)
+	if err != nil {
+		s.logger.Error("Failed to get merchant tax charges", "error", err)
+		return nil, err
+	}
+	return taxCharges, nil
+}
+
+func (s *merchantService) UpdateTaxCharges(ctx context.Context, merchantID string, req TaxChargesRequest, role, callerMerchantID string) (*TaxCharges, error) {
+	if !users.CanManageMerchantMaster(role, callerMerchantID, merchantID) {
+		return nil, common.ErrUnAuthorized
+	}
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	current, branchType, err := s.merchantRepository.GetTaxCharges(ctx, merchantID)
+	if err != nil {
+		s.logger.Error("Failed to load merchant tax charges", "error", err)
+		return nil, err
+	}
+	if branchType != BranchTypeRestaurant {
+		return nil, common.ErrInvalidRequest
+	}
+
+	vatPercent := current.VatPercent
+	if req.VatPercent != nil {
+		vatPercent = *req.VatPercent
+	}
+
+	var serviceCharge sql.NullFloat64
+	if req.ServiceChargeSet {
+		if req.ServiceChargePercent == nil {
+			serviceCharge = sql.NullFloat64{}
+		} else {
+			serviceCharge = sql.NullFloat64{Float64: *req.ServiceChargePercent, Valid: true}
+		}
+	} else if current.ServiceChargePercent != nil {
+		serviceCharge = sql.NullFloat64{Float64: *current.ServiceChargePercent, Valid: true}
+	}
+
+	updated, err := s.merchantRepository.UpdateTaxCharges(ctx, merchantID, vatPercent, serviceCharge)
+	if err != nil {
+		s.logger.Error("Failed to update merchant tax charges", "error", err)
+		return nil, err
+	}
+	return updated, nil
 }

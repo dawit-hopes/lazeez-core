@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"lazeez-core/internal/category"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/promotion"
 	"lazeez-core/internal/rooms/booking"
 	"lazeez-core/internal/rooms/room"
 	"testing"
@@ -15,6 +16,7 @@ func TestPublicMenuCatalogResponse_JSONEnvelope(t *testing.T) {
 		Guest:      &booking.GuestResponseSimplified{GuestName: "Jane Doe"},
 		Meta:       common.PaginationMeta{TotalDocs: 3, Limit: 100, Page: 1},
 		Categories: []*category.CategoryResponseSimplified{{Name: "Main"}},
+		Promotions: []*promotion.PromotionPublicDTO{{ID: "promo-1", Title: "Weekend Feast"}},
 	}
 
 	dataBytes, err := json.Marshal(catalog)
@@ -35,6 +37,9 @@ func TestPublicMenuCatalogResponse_JSONEnvelope(t *testing.T) {
 	}
 	if _, ok := data["categories"]; !ok {
 		t.Fatal("expected categories inside data payload")
+	}
+	if _, ok := data["promotions"]; !ok {
+		t.Fatal("expected promotions inside data payload")
 	}
 
 	root := struct {

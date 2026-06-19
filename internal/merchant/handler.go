@@ -15,6 +15,8 @@ type MerchantHandler interface {
 	Delete(w http.ResponseWriter, r *http.Request)
 	GetAll(w http.ResponseWriter, r *http.Request)
 	UnDelete(w http.ResponseWriter, r *http.Request)
+	GetTaxCharges(w http.ResponseWriter, r *http.Request)
+	UpdateTaxCharges(w http.ResponseWriter, r *http.Request)
 }
 
 type merchantHandler struct {

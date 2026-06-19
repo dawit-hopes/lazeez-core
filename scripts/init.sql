@@ -12,10 +12,19 @@ CREATE TABLE IF NOT EXISTS merchants (
     name VARCHAR(100) NOT NULL,
     branch_type VARCHAR(50) NOT NULL DEFAULT 'restaurant',
     logo TEXT,
+    vat_percent DECIMAL(5, 2) NOT NULL DEFAULT 15,
+    service_charge_percent DECIMAL(5, 2),
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT chk_merchants_vat_percent CHECK (
+        vat_percent >= 0 AND vat_percent <= 100
+    ),
+    CONSTRAINT chk_merchants_service_charge_percent CHECK (
+        service_charge_percent IS NULL
+        OR (service_charge_percent >= 0 AND service_charge_percent <= 100)
+    )
 );
 
 -- Create index on name and created_at for faster lookups and sorting
@@ -144,6 +153,30 @@ CREATE TABLE IF NOT EXISTS branch_menu_overrides (
 CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_branch_id ON branch_menu_overrides(branch_id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_menu_id ON branch_menu_overrides(menu_id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_branch_menu_overrides_excluded ON branch_menu_overrides(branch_id, menu_id) WHERE is_deleted = FALSE AND is_excluded = TRUE;
+
+-- ============================================
+-- PROMOTIONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS promotions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    merchant_id UUID NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    description TEXT,
+    banner_image TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_promotions_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+    CONSTRAINT chk_promotions_date_range CHECK (end_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotions_merchant_start
+    ON promotions(merchant_id, start_date DESC)
+    WHERE is_deleted = FALSE;
 
 -- ============================================
 -- CATEGORIES TABLE
@@ -748,5 +781,77 @@ CREATE INDEX IF NOT EXISTS idx_room_order_items_order_id
 
 CREATE TRIGGER update_room_order_items_updated_at
     BEFORE UPDATE ON room_order_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- RESTAURANT FEEDBACK RATINGS
+-- ============================================
+CREATE TABLE IF NOT EXISTS order_ratings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID NOT NULL,
+    branch_id UUID NOT NULL,
+    session_key VARCHAR(255) NOT NULL,
+    rating INTEGER NOT NULL,
+    comment TEXT,
+    tags TEXT[] DEFAULT '{}',
+    phone_number VARCHAR(20),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_order_ratings_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    CONSTRAINT fk_order_ratings_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT chk_order_ratings_rating CHECK (rating >= 1 AND rating <= 5)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_order_ratings_order_id
+    ON order_ratings(order_id)
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_order_ratings_branch_created
+    ON order_ratings(branch_id, created_at DESC)
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_order_ratings_rating
+    ON order_ratings(rating)
+    WHERE is_deleted = FALSE;
+
+CREATE TABLE IF NOT EXISTS stay_ratings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_key VARCHAR(255) NOT NULL,
+    branch_id UUID NOT NULL,
+    table_name VARCHAR(255),
+    rating INTEGER NOT NULL,
+    comment TEXT,
+    tags TEXT[] DEFAULT '{}',
+    phone_number VARCHAR(20),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_stay_ratings_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT chk_stay_ratings_rating CHECK (rating >= 1 AND rating <= 5)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stay_ratings_session_key
+    ON stay_ratings(session_key)
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_stay_ratings_branch_created
+    ON stay_ratings(branch_id, created_at DESC)
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_stay_ratings_rating
+    ON stay_ratings(rating)
+    WHERE is_deleted = FALSE;
+
+CREATE TRIGGER update_order_ratings_updated_at
+    BEFORE UPDATE ON order_ratings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_stay_ratings_updated_at
+    BEFORE UPDATE ON stay_ratings
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

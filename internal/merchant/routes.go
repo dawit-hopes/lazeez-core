@@ -46,6 +46,18 @@ func NewMerchantRoutes(router chi.Router, handler MerchantHandler, middleware mi
 			Handler:     handler.UnDelete,
 			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
 		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/merchants/{id}/tax-charges",
+			Handler:     handler.GetTaxCharges,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
+		},
+		{
+			Method:      http.MethodPatch,
+			Path:        "/merchants/{id}/tax-charges",
+			Handler:     handler.UpdateTaxCharges,
+			Middlewares: []func(next http.Handler) http.Handler{middleware.ValidateToken},
+		},
 	}
 	common.RegisterRoutes(router, routes)
 }
