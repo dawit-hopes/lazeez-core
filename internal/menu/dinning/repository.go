@@ -558,7 +558,7 @@ INNER JOIN branches b ON b.id = t.branch_id AND b.is_deleted = FALSE
 INNER JOIN merchants mer ON mer.id = b.merchant_id AND mer.is_deleted = FALSE
 WHERE t.reference = $1 AND t.is_deleted = FALSE`
 
-// menuPublicListBase lists available branch-effective menus; CTE resolves branch once, JOINs replace per-row subqueries.
+// menuPublicListBase lists branch-effective menus (including unavailable); CTE resolves branch once, JOINs replace per-row subqueries.
 const menuPublicListBase = `
 WITH ctx AS (
 	SELECT t.branch_id, b.merchant_id
@@ -620,10 +620,9 @@ LEFT JOIN LATERAL (
 		INNER JOIN modifier_options mo ON mo.id::text = o.opt_id AND mo.is_deleted = FALSE
 	) opts ON TRUE
 ) mods ON TRUE
-WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
-	AND COALESCE(o.is_available, m.is_available) = TRUE`
+WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)`
 
-// menuPublicCategoriesByReference lists distinct categories used by available menus at the table's branch.
+// menuPublicCategoriesByReference lists distinct categories used by menus at the table's branch.
 const menuPublicCategoriesByReference = `
 WITH ctx AS (
 	SELECT t.branch_id, b.merchant_id
@@ -639,7 +638,6 @@ LEFT JOIN branch_menu_overrides o
 	ON o.menu_id = m.id AND o.branch_id = ctx.branch_id AND o.is_deleted = FALSE
 INNER JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
 WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
-	AND COALESCE(o.is_available, m.is_available) = TRUE
 ORDER BY c.name`
 
 // menuPublicContextByRoomReference resolves simplified room, branch, and merchant from a room QR reference.
@@ -741,8 +739,7 @@ LEFT JOIN LATERAL (
 		INNER JOIN modifier_options mo ON mo.id::text = o.opt_id AND mo.is_deleted = FALSE
 	) opts ON TRUE
 ) mods ON TRUE
-WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
-	AND COALESCE(o.is_available, m.is_available) = TRUE`
+WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)`
 
 const menuPublicCategoriesByRoomReference = `
 WITH ctx AS (
@@ -759,7 +756,6 @@ LEFT JOIN branch_menu_overrides o
 	ON o.menu_id = m.id AND o.branch_id = ctx.branch_id AND o.is_deleted = FALSE
 INNER JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
 WHERE NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
-	AND COALESCE(o.is_available, m.is_available) = TRUE
 ORDER BY c.name`
 
 func (r *menuRepository) listPublicCategories(ctx context.Context, reference string) ([]*category.CategoryResponseSimplified, error) {
