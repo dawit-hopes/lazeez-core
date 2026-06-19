@@ -30,9 +30,15 @@ func NewCategoryService(categoryRepository CategoryRepository, logger config.Log
 }
 
 func (s *categoryService) Create(ctx context.Context, req CategoryRequest) error {
+	name := common.FormatText(req.Name)
 	category := Category{
-		Name: common.FormatText(req.Name),
+		Name: name,
 		Icon: req.Icon,
+	}
+
+	if err := s.categoryRepository.HardDeleteSoftDeletedByName(ctx, name); err != nil {
+		s.logger.Error("Failed to purge soft-deleted category", "error", err)
+		return err
 	}
 
 	err := s.categoryRepository.CheckExists(ctx, req.Name)

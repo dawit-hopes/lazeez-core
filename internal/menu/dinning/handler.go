@@ -139,6 +139,10 @@ func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) error {
 		isFasting := v == "true"
 		req.IsFasting = &isFasting
 	}
+	if v := r.FormValue("is_chefs_choice"); v != "" {
+		isChefsChoice := v == "true"
+		req.IsChefsChoice = &isChefsChoice
+	}
 	if v := r.FormValue("is_available"); v != "" {
 		isAvailable := v == "true"
 		req.IsAvailable = &isAvailable

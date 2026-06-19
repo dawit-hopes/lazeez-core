@@ -257,6 +257,10 @@ func (s *menuService) Update(ctx context.Context, id string, req MenuRequest, ro
 		existingMenu.IsFasting = *req.IsFasting
 	}
 
+	if req.IsChefsChoice != nil {
+		existingMenu.IsChefsChoice = *req.IsChefsChoice
+	}
+
 	if req.IsAvailable != nil {
 		existingMenu.IsAvailable = *req.IsAvailable
 	}
@@ -366,7 +370,7 @@ func (s *menuService) updateMasterFromBranch(ctx context.Context, id, branchID s
 	}
 	// Branch users may only toggle availability on inherited master items.
 	if len(req.Ingredients) > 0 || req.ModifiersSet || req.Name != "" || req.CategoryID != "" ||
-		req.Image != nil || req.IsFasting != nil || req.Description != "" || req.Price != 0 ||
+		req.Image != nil || req.IsFasting != nil || req.IsChefsChoice != nil || req.Description != "" || req.Price != 0 ||
 		req.PreparationTime != 0 {
 		return common.ErrUnAuthorized
 	}

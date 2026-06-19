@@ -14,6 +14,7 @@ type IngredientRepository interface {
 	Update(ctx context.Context, ingredient Ingredient) error
 	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Ingredient], error)
 	CheckExists(ctx context.Context, name string) error
+	HardDeleteSoftDeletedByName(ctx context.Context, name string) error
 	Delete(ctx context.Context, id string) error
 	UnDelete(ctx context.Context, id string) error
 }
@@ -99,14 +100,25 @@ func (r *ingredientRepository) CheckExists(ctx context.Context, name string) err
 	return common.ErrIngredientAlreadyExists
 }
 
+func (r *ingredientRepository) HardDeleteSoftDeletedByName(ctx context.Context, name string) error {
+	if err := r.dal.HardDeleteByFilters(ctx, map[string]any{
+		"name":       name,
+		"is_deleted": true,
+	}); err != nil {
+		r.logger.Error("failed to purge soft-deleted ingredient", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
 
 func (r *ingredientRepository) Delete(ctx context.Context, id string) error {
-	filter := map[string]any{"id": id}
-	updates := map[string]any{
-		"is_deleted": true,
+	if _, err := r.Get(ctx, id); err != nil {
+		return err
 	}
-	err := r.dal.Update(ctx, filter, updates)
-	if err != nil {
+	if err := r.dal.HardDelete(ctx, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return common.ErrIngredientNotFound
+		}
 		r.logger.Error("failed to delete ingredient", "error", err)
 		return common.ErrInternalServerError
 	}

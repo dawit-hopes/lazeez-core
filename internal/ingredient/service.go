@@ -29,11 +29,17 @@ func NewIngredientService(ingredientRepository IngredientRepository, logger conf
 }
 
 func (s *ingredientService) Create(ctx context.Context, req IngredientRequest) error {
+	name := common.FormatText(req.Name)
 	ingredient := Ingredient{
-		Name: common.FormatText(req.Name),
+		Name: name,
 		Icon: req.Icon,
 	}
 	ingredient.ID = common.GenerateUUID()
+
+	if err := s.ingredientRepository.HardDeleteSoftDeletedByName(ctx, name); err != nil {
+		s.logger.Error("Failed to purge soft-deleted ingredient", "error", err)
+		return err
+	}
 
 	err := s.ingredientRepository.CheckExists(ctx, req.Name)
 	if err != nil {

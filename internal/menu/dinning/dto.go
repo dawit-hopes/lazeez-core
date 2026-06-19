@@ -27,6 +27,7 @@ type MenuRequest struct {
 	BranchID        string                       `json:"branch_id"`
 	MerchantID      string                       `json:"merchant_id"`
 	IsFasting       *bool                        `json:"is_fasting"`
+	IsChefsChoice   *bool                        `json:"is_chefs_choice"`
 	PreparationTime float64                      `json:"preparation_time"`
 	IsAvailable     *bool                        `json:"is_available"`
 	Discount        *MenuDiscount                `json:"discount"`
@@ -49,6 +50,7 @@ type MenuDTO struct {
 	IsMaster        bool                        `json:"is_master"`
 	IsExcluded      bool                        `json:"is_excluded"`
 	IsFasting       bool                        `json:"is_fasting"`
+	IsChefsChoice   bool                        `json:"is_chefs_choice"`
 	IsAvailable     bool                        `json:"is_available"`
 	PreparationTime float64                     `json:"preparation_time"`
 	Discount        *MenuDiscount               `json:"discount,omitempty"`
@@ -56,7 +58,7 @@ type MenuDTO struct {
 }
 
 func (m *MenuRequest) IsEmpty() bool {
-	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet && !m.DiscountSet
+	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsChefsChoice == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet && !m.DiscountSet
 }
 
 func (m *MenuRequest) ToModel(isMaster bool) Menu {
@@ -71,6 +73,10 @@ func (m *MenuRequest) ToModel(isMaster bool) Menu {
 	if m.IsFasting != nil {
 		isFasting = *m.IsFasting
 	}
+	isChefsChoice := false
+	if m.IsChefsChoice != nil {
+		isChefsChoice = *m.IsChefsChoice
+	}
 	isAvailable := true
 	if m.IsAvailable != nil {
 		isAvailable = *m.IsAvailable
@@ -84,6 +90,7 @@ func (m *MenuRequest) ToModel(isMaster bool) Menu {
 		BranchID:        branchID,
 		MerchantID:      merchantID,
 		IsFasting:       isFasting,
+		IsChefsChoice:   isChefsChoice,
 		IsAvailable:     isAvailable,
 		PreparationTime: m.PreparationTime,
 	}
@@ -123,6 +130,7 @@ type MenuDTOPublic struct {
 	Category        *category.CategoryResponseSimplified      `json:"category,omitempty"`
 	Ingredients     []ingredient.IngredientResponseSimplified `json:"ingredients"`
 	IsFasting       bool                                      `json:"is_fasting,omitempty"`
+	IsChefsChoice   bool                                      `json:"is_chefs_choice"`
 	IsAvailable     bool                                      `json:"is_available"`
 	PreparationTime float64                                   `json:"preparation_time,omitempty"`
 	Discount        *MenuDiscount                             `json:"discount,omitempty"`

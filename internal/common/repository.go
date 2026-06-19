@@ -15,6 +15,7 @@ type Repository[T Mappable] interface {
 	Delete(ctx context.Context, id string) error
 	DeleteByFilters(ctx context.Context, filters map[string]any) error
 	HardDelete(ctx context.Context, id string) error
+	HardDeleteByFilters(ctx context.Context, filters map[string]any) error
 	UnDelete(ctx context.Context, id string) error
 	UnDeleteByFilters(ctx context.Context, filters map[string]any) error
 	Count(ctx context.Context) (int, error)
@@ -331,6 +332,19 @@ func (r *DAL[T]) HardDelete(ctx context.Context, id string) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+// HardDeleteByFilters permanently removes records matching filters.
+func (r *DAL[T]) HardDeleteByFilters(ctx context.Context, filters map[string]any) error {
+	if len(filters) == 0 {
+		return nil
+	}
+
+	instance := r.factory()
+	whereClause, args := r.buildWhereClause(filters, 0)
+	query := fmt.Sprintf("DELETE FROM %s %s", instance.Table(), whereClause)
+	_, err := r.db.ExecContext(ctx, query, args...)
+	return err
 }
 
 // IsNull is a filter value that generates SQL "col IS NULL".

@@ -19,6 +19,7 @@ type Menu struct {
 	BranchID        sql.NullString `json:"branch_id" db:"branch_id"`
 	MerchantID      sql.NullString `json:"merchant_id" db:"merchant_id"`
 	IsFasting       bool           `json:"is_fasting" db:"is_fasting"`
+	IsChefsChoice   bool           `json:"is_chefs_choice" db:"is_chefs_choice"`
 	IsAvailable     bool           `json:"is_available" db:"is_available"`
 	PreparationTime float64         `json:"preparation_time" db:"preparation_time"`
 	DiscountType    sql.NullString  `json:"-" db:"discount_type"`
@@ -37,7 +38,7 @@ func (m *Menu) Table() string {
 func (m *Menu) Columns() []string {
 	return []string{
 		"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "merchant_id",
-		"is_fasting", "is_available", "description", "price", "ingredients", "category_id", "modifiers", "preparation_time",
+		"is_fasting", "is_chefs_choice", "is_available", "description", "price", "ingredients", "category_id", "modifiers", "preparation_time",
 		"discount_type", "discount_value",
 	}
 }
@@ -45,7 +46,7 @@ func (m *Menu) Columns() []string {
 func (m *Menu) Values() []any {
 	return []any{
 		m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.MerchantID,
-		m.IsFasting, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers, m.PreparationTime,
+		m.IsFasting, m.IsChefsChoice, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers, m.PreparationTime,
 		m.DiscountType, m.DiscountValue,
 	}
 }
@@ -53,7 +54,7 @@ func (m *Menu) Values() []any {
 func (m *Menu) Addr() []any {
 	return []any{
 		&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.MerchantID,
-		&m.IsFasting, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.PreparationTime,
+		&m.IsFasting, &m.IsChefsChoice, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.PreparationTime,
 		&m.DiscountType, &m.DiscountValue,
 		&m.CreatedAt, &m.UpdatedAt,
 	}
@@ -99,6 +100,7 @@ func (m *Menu) ToDTO() MenuDTO {
 		IsMaster:        m.IsMaster(),
 		IsExcluded:      m.Excluded,
 		IsFasting:       m.IsFasting,
+		IsChefsChoice:   m.IsChefsChoice,
 		IsAvailable:     m.IsAvailable,
 		PreparationTime: m.PreparationTime,
 		Discount:        discountFromModel(m.DiscountType, m.DiscountValue),

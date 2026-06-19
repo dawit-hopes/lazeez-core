@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS menus (
     discount_type VARCHAR(20),
     discount_value DECIMAL(10, 2),
     is_fasting BOOLEAN DEFAULT FALSE,
+    is_chefs_choice BOOLEAN DEFAULT FALSE,
     is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
     modifiers TEXT[],

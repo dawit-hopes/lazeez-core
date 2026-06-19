@@ -92,7 +92,7 @@ func (r *menuRepository) getBranchOwned(ctx context.Context, id, branchID string
 func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID string) (Menu, error) {
 	query := `
 		SELECT m.id, m.name, m.image, m.deleted_at, m.is_deleted, m.branch_id, m.merchant_id,
-			m.is_fasting,
+			m.is_fasting, m.is_chefs_choice,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
 			m.discount_type, m.discount_value,
@@ -110,7 +110,7 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 	err := r.join.QueryRow(ctx, query, []any{id, branchID}, func(row *sql.Row) error {
 		return row.Scan(
 			&menu.ID, &menu.Name, &menu.Image, &menu.DeletedAt, &menu.IsDeleted,
-			&menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsAvailable,
+			&menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsChefsChoice, &menu.IsAvailable,
 			&menu.Description, &menu.Price, &menu.Ingredients, &menu.CategoryID,
 			&menu.Modifiers, &menu.PreparationTime, &menu.DiscountType, &menu.DiscountValue,
 			&menu.CreatedAt, &menu.UpdatedAt,
@@ -160,6 +160,7 @@ func (r *menuRepository) Update(ctx context.Context, menu Menu) error {
 		"branch_id":        menu.BranchID,
 		"merchant_id":      menu.MerchantID,
 		"is_fasting":       menu.IsFasting,
+		"is_chefs_choice":  menu.IsChefsChoice,
 		"is_available":     menu.IsAvailable,
 		"deleted_at":       menu.DeletedAt,
 		"is_deleted":       menu.IsDeleted,
@@ -288,7 +289,7 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 
 	query := fmt.Sprintf(`
 		SELECT m.id, m.name, m.image, m.deleted_at, m.is_deleted, m.branch_id, m.merchant_id,
-			m.is_fasting,
+			m.is_fasting, m.is_chefs_choice,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
 			m.discount_type, m.discount_value,
@@ -340,7 +341,7 @@ func (r *menuRepository) listBranchMenuRows(ctx context.Context, query string, a
 		var item menuWithMeta
 		scanTargets := []any{
 			&item.Menu.ID, &item.Menu.Name, &item.Menu.Image, &item.Menu.DeletedAt, &item.Menu.IsDeleted,
-			&item.Menu.BranchID, &item.Menu.MerchantID, &item.Menu.IsFasting, &item.Menu.IsAvailable,
+			&item.Menu.BranchID, &item.Menu.MerchantID, &item.Menu.IsFasting, &item.Menu.IsChefsChoice, &item.Menu.IsAvailable,
 			&item.Menu.Description, &item.Menu.Price, &item.Menu.Ingredients, &item.Menu.CategoryID,
 			&item.Menu.Modifiers, &item.Menu.PreparationTime, &item.Menu.DiscountType, &item.Menu.DiscountValue,
 			&item.Menu.CreatedAt, &item.Menu.UpdatedAt,
@@ -382,7 +383,7 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 		SELECT m.id, m.name, m.image, m.deleted_at, m.is_deleted,
 			COALESCE(m.branch_id, b.id) AS branch_id,
 			m.merchant_id,
-			m.is_fasting,
+			m.is_fasting, m.is_chefs_choice,
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
 			m.discount_type, m.discount_value,
@@ -571,6 +572,7 @@ SELECT
 	m.name,
 	m.image,
 	m.is_fasting,
+	m.is_chefs_choice,
 	COALESCE(o.is_available, m.is_available) AS is_available,
 	m.description,
 	m.price,
@@ -690,6 +692,7 @@ SELECT
 	m.name,
 	m.image,
 	m.is_fasting,
+	m.is_chefs_choice,
 	COALESCE(o.is_available, m.is_available) AS is_available,
 	m.description,
 	m.price,
@@ -862,7 +865,7 @@ func (r *menuRepository) scanMenuPublicFromRows(rows *sql.Rows, dto *MenuDTOPubl
 	var image, description sql.NullString
 	err := rows.Scan(
 		&dto.ID, &dto.Name, &image,
-		&dto.IsFasting, &dto.IsAvailable,
+		&dto.IsFasting, &dto.IsChefsChoice, &dto.IsAvailable,
 		&description, &dto.Price, &dto.PreparationTime,
 		&discountJSON, &categoryJSON, &ingredientsJSON, &modifiersJSON,
 	)

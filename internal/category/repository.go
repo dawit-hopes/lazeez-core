@@ -19,6 +19,7 @@ type CategoryRepository interface {
 	List(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*Category], error)
 	ListForBranch(ctx context.Context, branchID string) ([]*CategoryResponseSimplified, error)
 	CheckExists(ctx context.Context, name string) error
+	HardDeleteSoftDeletedByName(ctx context.Context, name string) error
 }
 
 type categoryRepository struct {
@@ -74,14 +75,11 @@ func (r *categoryRepository) Update(ctx context.Context, category Category) erro
 }
 
 func (r *categoryRepository) Delete(ctx context.Context, id string) error {
-	filter := map[string]any{"id": id}
-	updates := map[string]any{
-		"is_deleted": true,
+	if _, err := r.Get(ctx, id); err != nil {
+		return err
 	}
-	err := r.dal.Update(ctx, filter, updates)
-	if err != nil {
+	if err := r.dal.HardDelete(ctx, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			r.logger.Error("category not found", "error", err)
 			return common.ErrCategoryNotFound
 		}
 		r.logger.Error("failed to delete category", "error", err)
@@ -154,6 +152,16 @@ func (r *categoryRepository) CheckExists(ctx context.Context, name string) error
 	return common.ErrCategoryAlreadyExists
 }
 
+func (r *categoryRepository) HardDeleteSoftDeletedByName(ctx context.Context, name string) error {
+	if err := r.dal.HardDeleteByFilters(ctx, map[string]any{
+		"name":       name,
+		"is_deleted": true,
+	}); err != nil {
+		r.logger.Error("failed to purge soft-deleted category", "error", err)
+		return common.ErrInternalServerError
+	}
+	return nil
+}
 
 func (r *categoryRepository) ListForBranch(ctx context.Context, branchID string) ([]*CategoryResponseSimplified, error) {
 	filter := map[string]any{"branch_id": branchID}
