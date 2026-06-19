@@ -106,26 +106,7 @@ func (s *authService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 		s.logger.Error("Failed to get user DTO with merchant", "error", err)
 		return nil, err
 	}
-	response, err := s.createLoginResponse(userDTO)
-	if err != nil {
-		s.logger.Error("Failed to create login response", "error", err)
-		return nil, err
-	}
-
-	sess := session.Session{
-		UserID:       existingUser.ID,
-		RefreshToken: response.RefreshToken,
-		AccessToken:  response.AccessToken,
-		IsRevoked:    false,
-	}
-
-	sessionErr := s.sessionService.CreateSession(ctx, sess)
-	if sessionErr != nil {
-		s.logger.Error("Failed to create session", "error", sessionErr)
-		return nil, sessionErr
-	}
-
-	return response, nil
+	return s.issueLoginResponse(ctx, userDTO)
 }
 
 func (s *authService) FirstTimeLogin(ctx context.Context, req SetPasswordRequest) (*LoginResponse, error) {
@@ -162,7 +143,7 @@ func (s *authService) setPasswordAndLogin(ctx context.Context, req SetPasswordRe
 		s.logger.Error("Failed to get user DTO with merchant", "error", err)
 		return nil, err
 	}
-	return s.createLoginResponse(userDTO)
+	return s.issueLoginResponse(ctx, userDTO)
 }
 
 func (s *authService) Logout(ctx context.Context, userID string) error {
@@ -209,7 +190,33 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*L
 		return nil, err
 	}
 
-	return s.createLoginResponse(user)
+	return s.issueLoginResponse(ctx, user)
+}
+
+func (s *authService) issueLoginResponse(ctx context.Context, user users.UserDTO) (*LoginResponse, error) {
+	response, err := s.createLoginResponse(user)
+	if err != nil {
+		s.logger.Error("Failed to create login response", "error", err)
+		return nil, err
+	}
+	if err := s.persistSession(ctx, user.ID, response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (s *authService) persistSession(ctx context.Context, userID string, response *LoginResponse) error {
+	sess := session.Session{
+		UserID:       userID,
+		RefreshToken: response.RefreshToken,
+		AccessToken:  response.AccessToken,
+		IsRevoked:    false,
+	}
+	if err := s.sessionService.CreateSession(ctx, sess); err != nil {
+		s.logger.Error("Failed to persist session", "error", err)
+		return err
+	}
+	return nil
 }
 
 func (s *authService) validateSession(ctx context.Context, userID string, refreshToken string) error {

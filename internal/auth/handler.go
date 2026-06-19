@@ -108,6 +108,7 @@ func (h *authHandler) handleSetPassword(w http.ResponseWriter, r *http.Request, 
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	h.setCookies(w, loginResponse.RefreshToken)
 	common.WriteSuccessResponse(w, common.Response{Data: loginResponse, Message: successMsg, StatusCode: http.StatusOK})
 }
 
