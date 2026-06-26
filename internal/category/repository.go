@@ -59,6 +59,7 @@ func (r *categoryRepository) Update(ctx context.Context, category Category) erro
 	updates := map[string]any{
 		"name":       category.Name,
 		"icon":       category.Icon,
+		"station":    category.Station,
 		"deleted_at": category.DeletedAt,
 		"is_deleted": category.IsDeleted,
 	}

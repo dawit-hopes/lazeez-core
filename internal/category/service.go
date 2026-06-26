@@ -32,8 +32,9 @@ func NewCategoryService(categoryRepository CategoryRepository, logger config.Log
 func (s *categoryService) Create(ctx context.Context, req CategoryRequest) error {
 	name := common.FormatText(req.Name)
 	category := Category{
-		Name: name,
-		Icon: req.Icon,
+		Name:    name,
+		Icon:    req.Icon,
+		Station: req.Station,
 	}
 
 	if err := s.categoryRepository.HardDeleteSoftDeletedByName(ctx, name); err != nil {
@@ -85,6 +86,9 @@ func (s *categoryService) Update(ctx context.Context, id string, req CategoryReq
 	}
 	if req.Icon != "" {
 		existingCategory.Icon = req.Icon
+	}
+	if req.Station != "" {
+		existingCategory.Station = req.Station
 	}
 
 	err = s.categoryRepository.Update(ctx, existingCategory)

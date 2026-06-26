@@ -10,6 +10,7 @@ import (
 
 type OrderItemService interface {
 	Create(ctx context.Context, orderItem OrderItemRequest) error
+	UpdateStatus(ctx context.Context, id, itemStatus string) error
 }
 
 type orderItemService struct {
@@ -30,6 +31,14 @@ func (s *orderItemService) Create(ctx context.Context, orderItem OrderItemReques
 		mods = pq.StringArray{}
 	}
 
+	station := orderItem.Station
+	if station == "" {
+		station = "kitchen"
+	}
+	itemStatus := orderItem.ItemStatus
+	if itemStatus == "" {
+		itemStatus = "sent"
+	}
 	orderItemModel := OrderItem{
 		OrderID:         orderItem.OrderID,
 		MenuItemID:      orderItem.MenuItemID,
@@ -37,6 +46,8 @@ func (s *orderItemService) Create(ctx context.Context, orderItem OrderItemReques
 		Quantity:        orderItem.Quantity,
 		Price:           orderItem.Price,
 		Total:           orderItem.Total,
+		Station:         station,
+		ItemStatus:      itemStatus,
 	}
 	orderItemModel.ID = common.GenerateUUID()
 
@@ -45,5 +56,13 @@ func (s *orderItemService) Create(ctx context.Context, orderItem OrderItemReques
 		return err
 	}
 
+	return nil
+}
+
+func (s *orderItemService) UpdateStatus(ctx context.Context, id, itemStatus string) error {
+	if err := s.orderItemRepository.UpdateStatus(ctx, id, itemStatus); err != nil {
+		s.logger.Error("failed to update order item status", "error", err)
+		return err
+	}
 	return nil
 }

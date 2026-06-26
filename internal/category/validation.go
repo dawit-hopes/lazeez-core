@@ -10,6 +10,10 @@ func (r *CategoryRequest) Validate(requireIcon bool) error {
 			validation.When(requireIcon, validation.Required.Error("name is required")),
 			validation.When(r.Name != "", validation.Length(1, 100).Error("name must be between 1 and 100 characters")),
 		),
+		validation.Field(&r.Station,
+			validation.When(r.Station != "",
+				validation.In("kitchen", "bar").Error("station must be kitchen or bar")),
+		),
 	}
 	if requireIcon {
 		rules = append(rules,

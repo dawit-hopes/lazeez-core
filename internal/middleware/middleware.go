@@ -22,6 +22,9 @@ type Middleware interface {
 	RequireSuperAdmin(next http.Handler) http.Handler
 	RequireRoomManagement(next http.Handler) http.Handler
 	RequireFrontDesk(next http.Handler) http.Handler
+	RequireWaiter(next http.Handler) http.Handler
+	RequireStationAccess(next http.Handler) http.Handler
+	RequireCashier(next http.Handler) http.Handler
 	RequireOrderListAccess(next http.Handler) http.Handler
 	RequireFeedbackListAccess(next http.Handler) http.Handler
 	NotFoundHandler(w http.ResponseWriter, r *http.Request)
@@ -147,6 +150,64 @@ func (m *middleware) RequireFrontDesk(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireWaiter allows only the waiter tablet account (role waiter) with a branch. Use after ValidateToken.
+func (m *middleware) RequireWaiter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok || role != "waiter" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		if branchID, ok := GetBranchIDFromContext(r.Context()); !ok || branchID == "" {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireStationAccess allows kitchen/bar station screens (kitchen_staff, barista) and branch_manager. Use after ValidateToken.
+func (m *middleware) RequireStationAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		switch role {
+		case "kitchen_staff", "barista", "branch_manager":
+			if branchID, ok := GetBranchIDFromContext(r.Context()); !ok || branchID == "" {
+				common.WriteErrorResponse(w, common.ErrUnAuthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		default:
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		}
+	})
+}
+
+// RequireCashier allows the cashier screen (cashier) and branch_manager. Use after ValidateToken.
+func (m *middleware) RequireCashier(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role, ok := GetRoleFromContext(r.Context())
+		if !ok {
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+			return
+		}
+		switch role {
+		case "cashier", "branch_manager":
+			if branchID, ok := GetBranchIDFromContext(r.Context()); !ok || branchID == "" {
+				common.WriteErrorResponse(w, common.ErrUnAuthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		default:
+			common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		}
 	})
 }
 

@@ -13,6 +13,10 @@ const (
 	RoleSuperBranchManager Role = "super_branch_admin"
 	RoleFrontDeskAgent     Role = "front_desk_agent"
 	RoleRoomServiceStaff   Role = "room_service_staff"
+	RoleWaiter             Role = "waiter"
+	RoleKitchenStaff       Role = "kitchen_staff"
+	RoleBarista            Role = "barista"
+	RoleCashier            Role = "cashier"
 )
 
 type User struct {
@@ -20,6 +24,7 @@ type User struct {
 	PhoneNumber     string         `json:"phone_number" db:"phone_number"`
 	FullName        string         `json:"full_name" db:"full_name"`
 	Password        string         `json:"-" db:"password"`
+	PasscodeHash    sql.NullString `json:"-" db:"passcode_hash"`
 	Role            Role           `json:"role" db:"role"`
 	BranchID        sql.NullString `json:"branch_id" db:"branch_id"`
 	MerchantID      sql.NullString `json:"merchant_id" db:"merchant_id"`
@@ -33,15 +38,15 @@ func (u *User) Table() string {
 }
 
 func (u *User) Columns() []string {
-	return []string{"id", "full_name", "phone_number", "password", "role", "branch_id", "merchant_id", "is_locked", "is_first_login", "logging_attempts", "deleted_at", "is_deleted"}
+	return []string{"id", "full_name", "phone_number", "password", "passcode_hash", "role", "branch_id", "merchant_id", "is_locked", "is_first_login", "logging_attempts", "deleted_at", "is_deleted"}
 }
 
 func (u *User) Values() []any {
-	return []any{u.ID, u.FullName, u.PhoneNumber, u.Password, u.Role, u.BranchID, u.MerchantID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.DeletedAt, u.IsDeleted}
+	return []any{u.ID, u.FullName, u.PhoneNumber, u.Password, u.PasscodeHash, u.Role, u.BranchID, u.MerchantID, u.IsLocked, u.IsFirstLogin, u.LoggingAttempts, u.DeletedAt, u.IsDeleted}
 }
 
 func (u *User) Addr() []any {
-	return []any{&u.ID, &u.FullName, &u.PhoneNumber, &u.Password, &u.Role, &u.BranchID, &u.MerchantID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.DeletedAt, &u.IsDeleted, &u.CreatedAt, &u.UpdatedAt}
+	return []any{&u.ID, &u.FullName, &u.PhoneNumber, &u.Password, &u.PasscodeHash, &u.Role, &u.BranchID, &u.MerchantID, &u.IsLocked, &u.IsFirstLogin, &u.LoggingAttempts, &u.DeletedAt, &u.IsDeleted, &u.CreatedAt, &u.UpdatedAt}
 }
 
 func (u *User) ToDTO() UserDTO {

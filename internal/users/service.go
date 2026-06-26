@@ -5,6 +5,7 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/branch"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/key"
 )
 
 type UserService interface {
@@ -17,6 +18,8 @@ type UserService interface {
 	GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*UserDTO], error)
 	GetUserByBranchID(ctx context.Context, branchID string) (UserDTO, error)
 	UnDeleteUser(ctx context.Context, id string) error
+	// ResolveWaiterByPIN resolves a submitted PIN to a waiter user ID within a branch.
+	ResolveWaiterByPIN(ctx context.Context, branchID, pin string) (string, error)
 	// Internal methods for auth module
 	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*User, error)
 	GetUserDTOWithMerchant(ctx context.Context, user *User) (UserDTO, error)
@@ -30,13 +33,15 @@ type UserService interface {
 type userService struct {
 	userRepository UserRepository
 	branchService  branch.BranchService
+	keyService     key.KeyService
 	logger         config.Logger
 }
 
-func NewUserService(userRepository UserRepository, branchService branch.BranchService, logger config.Logger) UserService {
+func NewUserService(userRepository UserRepository, branchService branch.BranchService, keyService key.KeyService, logger config.Logger) UserService {
 	return &userService{
 		userRepository: userRepository,
 		branchService:  branchService,
+		keyService:     keyService,
 		logger:         logger,
 	}
 }
@@ -56,12 +61,45 @@ func (s *userService) CreateUser(ctx context.Context, req UserRequest) error {
 		return err
 	}
 	newUser := s.createUserDefaultData(&req)
+	if req.Role == RoleWaiter {
+		if req.Pin == "" {
+			return common.ErrInvalidRequest
+		}
+		hashedPin, err := s.keyService.HashPassword(req.Pin)
+		if err != nil {
+			s.logger.Error("Failed to hash waiter pin", "error", err)
+			return common.ErrInternalServerError
+		}
+		newUser.PasscodeHash = common.ToNUllString(hashedPin)
+	}
 	err := s.userRepository.CreateUser(ctx, *newUser)
 	if err != nil {
 		s.logger.Error("Failed to create user", "error", err)
 		return err
 	}
 	return nil
+}
+
+// ResolveWaiterByPIN finds the waiter in the given branch whose PIN matches and returns the user ID.
+func (s *userService) ResolveWaiterByPIN(ctx context.Context, branchID, pin string) (string, error) {
+	if branchID == "" || pin == "" {
+		return "", common.ErrUnAuthorized
+	}
+	waiters, err := s.userRepository.GetWaitersByBranch(ctx, branchID)
+	if err != nil {
+		s.logger.Error("Failed to list waiters by branch", "error", err)
+		return "", common.ErrInternalServerError
+	}
+	for i := range waiters {
+		w := waiters[i]
+		if !w.PasscodeHash.Valid || w.PasscodeHash.String == "" {
+			continue
+		}
+		if ok, _ := s.keyService.VerifyPassword(pin, w.PasscodeHash.String); ok {
+			return w.ID, nil
+		}
+	}
+	return "", common.ErrUnAuthorized
 }
 
 func (s *userService) CreateSuperAdminUser(ctx context.Context, req SuperAdminUserRequest) error {

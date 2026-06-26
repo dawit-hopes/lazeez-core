@@ -96,4 +96,10 @@ var (
 	ErrPromotionNotFound                = &Errors{Code: NotFound, Message: "promotion not found"}
 	ErrOrderRatingNotFound              = &Errors{Code: NotFound, Message: "order rating not found"}
 	ErrStayRatingNotFound               = &Errors{Code: NotFound, Message: "stay rating not found"}
+	ErrCheckNotFound                    = &Errors{Code: NotFound, Message: "table check not found"}
+	ErrCheckNotOpen                     = &Errors{Code: BadRequest, Message: "table check is not open"}
+	ErrCheckNotReady                    = &Errors{Code: BadRequest, Message: "table check is not ready for billing"}
+	ErrWaiterPinRequired                = &Errors{Code: BadRequest, Message: "waiter pin is required"}
+	ErrInvalidWaiterPin                 = &Errors{Code: Unauthorized, Message: "invalid waiter pin"}
+	ErrInvalidItemStatusTransition      = &Errors{Code: BadRequest, Message: "invalid item status transition"}
 )

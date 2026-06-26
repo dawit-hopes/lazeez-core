@@ -15,6 +15,8 @@ type UserRequest struct {
 	BranchID    string `json:"branch_id"`
 	MerchantID  string `json:"merchant_id"`
 	Role        Role   `json:"role"`
+	// Pin is the waiter's PIN, required only when Role is waiter. Stored hashed; never returned.
+	Pin string `json:"pin,omitempty"`
 }
 
 type SuperAdminUserRequest struct {

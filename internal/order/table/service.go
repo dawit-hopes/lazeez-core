@@ -5,10 +5,12 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/clientsession"
 	"lazeez-core/internal/common"
-	item "lazeez-core/internal/order/Item"
 	"lazeez-core/internal/menu/dinning"
-	"lazeez-core/internal/payment"
 	option "lazeez-core/internal/modifiers/option"
+	item "lazeez-core/internal/order/Item"
+	"lazeez-core/internal/order/check"
+	"lazeez-core/internal/payment"
+	"lazeez-core/internal/users"
 	"strconv"
 	"time"
 
@@ -40,18 +42,30 @@ type OrderService interface {
 	GetAdmin(ctx context.Context, id string) (*OrderDTO, error)
 	ListAdmin(ctx context.Context, filter OrderFilter) (*common.PaginatedResponse[[]*OrderDTO], error)
 	UpdateAdmin(ctx context.Context, id string, input OrderUpdateInput) error
+
+	// Waiter: PIN-attributed dine-in orders (no payment), branch_id from token
+	CreateWaiter(ctx context.Context, branchID string, input WaiterOrderInput) (*OrderDTO, error)
+	GetWaiter(ctx context.Context, id string, branchID string) (*OrderDTO, error)
+	ListWaiter(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error)
+	UpdateWaiter(ctx context.Context, id string, input WaiterUpdateInput, branchID string) error
+
+	// Station: kitchen/bar KDS feed + item status advance
+	ListStationItems(ctx context.Context, branchID, station string) ([]*StationItemDTO, error)
+	UpdateItemStatus(ctx context.Context, itemID, branchID, station, nextStatus string) error
 }
 
 type orderService struct {
-	orderRepository      OrderRepository
-	orderItemService     item.OrderItemService
-	menuService          menu.MenuService
+	orderRepository       OrderRepository
+	orderItemService      item.OrderItemService
+	menuService           menu.MenuService
 	modifierOptionService option.ModifierOptionService
-	clientSessionService clientsession.ClientSessionService
-	paymentService       payment.PaymentService
-	logger               config.Logger
-	callbackURL          string
-	menuBaseURL          string
+	clientSessionService  clientsession.ClientSessionService
+	paymentService        payment.PaymentService
+	userService           users.UserService
+	checkService          check.CheckService
+	logger                config.Logger
+	callbackURL           string
+	menuBaseURL           string
 }
 
 func NewOrderService(
@@ -61,6 +75,8 @@ func NewOrderService(
 	modifierOptionService option.ModifierOptionService,
 	clientSessionService clientsession.ClientSessionService,
 	paymentService payment.PaymentService,
+	userService users.UserService,
+	checkService check.CheckService,
 	logger config.Logger,
 	callbackURL string,
 	menuBaseURL string,
@@ -72,6 +88,8 @@ func NewOrderService(
 		modifierOptionService: modifierOptionService,
 		clientSessionService:  clientSessionService,
 		paymentService:        paymentService,
+		userService:           userService,
+		checkService:          checkService,
 		logger:                logger,
 		callbackURL:           callbackURL,
 		menuBaseURL:           menuBaseURL,
@@ -122,6 +140,7 @@ func (s *orderService) CreateClient(ctx context.Context, order OrderInput) (*Cre
 		PaymentDate:     time.Now(),
 		PaymentAmount:   order.Total,
 		PaymentCurrency: ETB,
+		OrderSource:     OrderSourceClient,
 	}
 	orderModel.ID = common.GenerateUUID()
 	created, err := s.orderRepository.Create(ctx, orderModel)

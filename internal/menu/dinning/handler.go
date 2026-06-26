@@ -132,6 +132,9 @@ func (h *menuHandler) parseFormFields(r *http.Request, req *MenuRequest) error {
 		req.Ingredients = strings.Split(ing, ",")
 	}
 	req.CategoryID = r.FormValue("category_id")
+	if station := strings.TrimSpace(r.FormValue("station")); station != "" {
+		req.Station = station
+	}
 	if mid := strings.TrimSpace(r.FormValue("merchant_id")); mid != "" {
 		req.MerchantID = mid
 	}

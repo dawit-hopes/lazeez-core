@@ -23,6 +23,7 @@ type UserRepository interface {
 	CheckUserExistsByPhoneNumber(ctx context.Context, phoneNumber string) error
 	GetAllUsers(ctx context.Context, filter common.Filter) (*common.PaginatedResponse[[]*User], error)
 	GetUserByBranchID(ctx context.Context, branchID string) (User, error)
+	GetWaitersByBranch(ctx context.Context, branchID string) ([]User, error)
 	UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error
 	ResetLoggingAttempts(ctx context.Context, id string) error
 	LockUser(ctx context.Context, id string) error
@@ -199,7 +200,7 @@ func (r *userRepository) listUsersScoped(ctx context.Context, filter common.Filt
 	roleStrings := rolesToStrings(viewable)
 
 	baseSelect := `
-		SELECT u.id, u.full_name, u.phone_number, u.password, u.role, u.branch_id, u.merchant_id,
+		SELECT u.id, u.full_name, u.phone_number, u.password, u.passcode_hash, u.role, u.branch_id, u.merchant_id,
 			u.is_locked, u.is_first_login, u.logging_attempts, u.deleted_at, u.is_deleted, u.created_at, u.updated_at
 		FROM users u`
 
@@ -290,6 +291,28 @@ func (r *userRepository) GetUserByBranchID(ctx context.Context, branchID string)
 		return User{}, err
 	}
 	return *result, nil
+}
+
+// GetWaitersByBranch returns non-deleted waiter accounts in a branch that have a PIN set.
+// Used to resolve a submitted PIN to a specific waiter for order attribution.
+func (r *userRepository) GetWaitersByBranch(ctx context.Context, branchID string) ([]User, error) {
+	filters := map[string]any{
+		"branch_id":  branchID,
+		"role":       string(RoleWaiter),
+		"is_deleted": false,
+	}
+	results, err := r.dal.List(ctx, filters, 1, 1000)
+	if err != nil {
+		r.logger.Error("failed to list waiters by branch", "error", err)
+		return nil, err
+	}
+	waiters := make([]User, 0, len(results))
+	for _, u := range results {
+		if u != nil {
+			waiters = append(waiters, *u)
+		}
+	}
+	return waiters, nil
 }
 
 func (r *userRepository) UpdateLoggingAttempts(ctx context.Context, id string, attempts int) error {

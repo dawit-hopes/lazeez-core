@@ -34,6 +34,8 @@ type MenuRequest struct {
 	DiscountSet     bool                         `json:"-"`
 	Modifiers       []group.ModifierGroupRequest `json:"modifier_groups"`
 	ModifiersSet    bool                         `json:"-"`
+	// Station optionally overrides the category's preparation station ("kitchen" or "bar").
+	Station string `json:"station"`
 }
 
 type MenuDTO struct {
@@ -55,10 +57,12 @@ type MenuDTO struct {
 	PreparationTime float64                     `json:"preparation_time"`
 	Discount        *MenuDiscount               `json:"discount,omitempty"`
 	Modifiers       []group.ModifierGroupDTO    `json:"modifier_groups"`
+	// Station is the effective preparation station (menu override or inherited from category).
+	Station string `json:"station,omitempty"`
 }
 
 func (m *MenuRequest) IsEmpty() bool {
-	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsChefsChoice == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet && !m.DiscountSet
+	return m.Name == "" && m.Image == nil && m.Description == "" && m.Price == 0 && len(m.Ingredients) == 0 && m.CategoryID == "" && m.BranchID == "" && m.IsFasting == nil && m.IsChefsChoice == nil && m.IsAvailable == nil && m.PreparationTime == 0 && !m.ModifiersSet && !m.DiscountSet && m.Station == ""
 }
 
 func (m *MenuRequest) ToModel(isMaster bool) Menu {
@@ -93,6 +97,7 @@ func (m *MenuRequest) ToModel(isMaster bool) Menu {
 		IsChefsChoice:   isChefsChoice,
 		IsAvailable:     isAvailable,
 		PreparationTime: m.PreparationTime,
+		Station:         common.ToNUllString(m.Station),
 	}
 }
 

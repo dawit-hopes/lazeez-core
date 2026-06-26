@@ -8,6 +8,8 @@ type OrderItemDTO struct {
 	Quantity        int      `json:"quantity"`
 	Price           float64  `json:"price"`
 	Total           float64  `json:"total"`
+	Station         string   `json:"station,omitempty"`
+	ItemStatus      string   `json:"item_status,omitempty"`
 }
 
 type OrderItemRequest struct {
@@ -18,4 +20,7 @@ type OrderItemRequest struct {
 	Quantity        int      `json:"quantity"`
 	Price           float64  `json:"price"`
 	Total           float64  `json:"total"`
+	// Station and ItemStatus are set server-side for waiter orders (not trusted from clients).
+	Station    string `json:"-"`
+	ItemStatus string `json:"-"`
 }

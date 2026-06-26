@@ -33,6 +33,10 @@ func (r *MenuRequest) Validate() error {
 		validation.Field(&r.CategoryID,
 			validation.Required.Error("category id is required"),
 		),
+		validation.Field(&r.Station,
+			validation.When(r.Station != "",
+				validation.In("kitchen", "bar").Error("station must be kitchen or bar")),
+		),
 		validation.Field(&r.Discount,
 			validation.When(r.Discount != nil,
 				validation.By(func(value any) error {

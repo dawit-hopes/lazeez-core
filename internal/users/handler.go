@@ -54,6 +54,7 @@ func (h *userHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	req.Pin = ""
 	common.WriteSuccessResponse(w, common.Response{Data: req, Message: "User created successfully", StatusCode: http.StatusOK})
 }
 

@@ -2,9 +2,23 @@ package auth
 
 import (
 	"database/sql"
+	"fmt"
 	"lazeez-core/internal/common"
+	"lazeez-core/internal/users"
 	"regexp"
 )
+
+// roleToString coerces a role claim (string or users.Role) to its string form.
+func roleToString(v any) string {
+	switch r := v.(type) {
+	case string:
+		return r
+	case users.Role:
+		return string(r)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
 
 func (s *authService) validatePassword(password string) error {
 	if password == "" {
@@ -61,7 +75,13 @@ func (s *authService) generateTokens(user map[string]any) (string, string, error
 	}
 	payload := map[string]any{"uid": user["id"], "bid": branchID, "mid": merchantID, "rol": user["role"]}
 
-	accessToken, err := s.keyService.GenerateJWTToken(payload, accessTokenExpirationMinutes)
+	accessExpiration := accessTokenExpirationMinutes
+	switch roleToString(user["role"]) {
+	case string(users.RoleWaiter), string(users.RoleKitchenStaff), string(users.RoleBarista), string(users.RoleCashier):
+		accessExpiration = stationAccessTokenExpirationMinutes
+	}
+
+	accessToken, err := s.keyService.GenerateJWTToken(payload, accessExpiration)
 	if err != nil {
 		s.logger.Error("Failed to generate access token", "error", err)
 		return "", "", err

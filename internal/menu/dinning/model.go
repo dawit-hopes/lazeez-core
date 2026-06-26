@@ -25,6 +25,8 @@ type Menu struct {
 	DiscountType    sql.NullString  `json:"-" db:"discount_type"`
 	DiscountValue   sql.NullFloat64 `json:"-" db:"discount_value"`
 	Modifiers       pq.StringArray  `json:"modifiers" db:"modifiers"`
+	// Station optionally overrides the category's station ("kitchen" or "bar"). NULL means inherit from category.
+	Station sql.NullString `json:"station" db:"station"`
 	// Excluded is set only on branch list queries (not persisted on menus table).
 	Excluded bool `json:"-" db:"-"`
 	// MasterItem marks rows that originate from the restaurant master menu when branch_id is projected for display.
@@ -39,7 +41,7 @@ func (m *Menu) Columns() []string {
 	return []string{
 		"id", "name", "image", "deleted_at", "is_deleted", "branch_id", "merchant_id",
 		"is_fasting", "is_chefs_choice", "is_available", "description", "price", "ingredients", "category_id", "modifiers", "preparation_time",
-		"discount_type", "discount_value",
+		"discount_type", "discount_value", "station",
 	}
 }
 
@@ -47,7 +49,7 @@ func (m *Menu) Values() []any {
 	return []any{
 		m.ID, m.Name, m.Image, m.DeletedAt, m.IsDeleted, m.BranchID, m.MerchantID,
 		m.IsFasting, m.IsChefsChoice, m.IsAvailable, m.Description, m.Price, m.Ingredients, m.CategoryID, m.Modifiers, m.PreparationTime,
-		m.DiscountType, m.DiscountValue,
+		m.DiscountType, m.DiscountValue, m.Station,
 	}
 }
 
@@ -55,9 +57,17 @@ func (m *Menu) Addr() []any {
 	return []any{
 		&m.ID, &m.Name, &m.Image, &m.DeletedAt, &m.IsDeleted, &m.BranchID, &m.MerchantID,
 		&m.IsFasting, &m.IsChefsChoice, &m.IsAvailable, &m.Description, &m.Price, &m.Ingredients, &m.CategoryID, &m.Modifiers, &m.PreparationTime,
-		&m.DiscountType, &m.DiscountValue,
+		&m.DiscountType, &m.DiscountValue, &m.Station,
 		&m.CreatedAt, &m.UpdatedAt,
 	}
+}
+
+// StationString returns the menu's station override, or empty if not set.
+func (m *Menu) StationString() string {
+	if m.Station.Valid {
+		return m.Station.String
+	}
+	return ""
 }
 
 func (m *Menu) IsMaster() bool {
@@ -104,5 +114,6 @@ func (m *Menu) ToDTO() MenuDTO {
 		IsAvailable:     m.IsAvailable,
 		PreparationTime: m.PreparationTime,
 		Discount:        discountFromModel(m.DiscountType, m.DiscountValue),
+		Station:         m.StationString(),
 	}
 }

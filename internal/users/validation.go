@@ -23,7 +23,15 @@ func (u *UserRequest) Validate(isUpdate bool) error {
 			validation.Match(regexp.MustCompile(`^[0-9a-f-]+$`)).Error("merchant id must be a valid UUID")),
 		validation.Field(&u.Role,
 			validation.When(!isUpdate, validation.Required.Error("role is required")),
-			validation.In(RoleBranchManager, RoleFrontDeskAgent, RoleRoomServiceStaff).Error("role must be a valid role")),
+			validation.In(
+				RoleBranchManager, RoleFrontDeskAgent, RoleRoomServiceStaff,
+				RoleWaiter, RoleKitchenStaff, RoleBarista, RoleCashier,
+			).Error("role must be a valid role")),
+		validation.Field(&u.Pin,
+			validation.When(u.Role == RoleWaiter,
+				validation.When(!isUpdate, validation.Required.Error("pin is required for waiters")),
+				validation.Match(regexp.MustCompile(`^[0-9]{4,6}$`)).Error("pin must be 4 to 6 digits")),
+		),
 	)
 }
 

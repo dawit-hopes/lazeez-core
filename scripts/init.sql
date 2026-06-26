@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS merchants (
     vat_percent DECIMAL(5, 2) NOT NULL DEFAULT 15,
     service_charge_percent DECIMAL(5, 2),
     subscription_plan VARCHAR(50) NOT NULL DEFAULT 'DIGITAL_MENU',
+    bill_print_policy VARCHAR(20) NOT NULL DEFAULT 'strict',
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -28,8 +29,13 @@ CREATE TABLE IF NOT EXISTS merchants (
     ),
     CONSTRAINT chk_merchants_subscription_plan CHECK (
         subscription_plan IN ('DIGITAL_MENU', 'ORDERING')
+    ),
+    CONSTRAINT chk_merchants_bill_print_policy CHECK (
+        bill_print_policy IN ('strict', 'lenient')
     )
 );
+
+COMMENT ON COLUMN merchants.bill_print_policy IS 'strict = bill only when all items ready; lenient = when no item still sent';
 
 -- Create index on name and created_at for faster lookups and sorting
 CREATE INDEX IF NOT EXISTS idx_merchants_name ON merchants(name) WHERE is_deleted = FALSE;
@@ -64,6 +70,7 @@ CREATE TABLE IF NOT EXISTS users (
     phone_number VARCHAR(20) NOT NULL UNIQUE,
     full_name VARCHAR(100) NOT NULL,
     password VARCHAR(255),
+    passcode_hash VARCHAR(255),
     role VARCHAR(50) NOT NULL DEFAULT 'branch_manager',
     branch_id UUID,
     merchant_id UUID,
@@ -81,9 +88,15 @@ CREATE TABLE IF NOT EXISTS users (
         'branch_manager',
         'super_branch_admin',
         'front_desk_agent',
-        'room_service_staff'
+        'room_service_staff',
+        'waiter',
+        'kitchen_staff',
+        'barista',
+        'cashier'
     ))
 );
+
+COMMENT ON COLUMN users.passcode_hash IS 'Hashed PIN for individual waiters (PIN-only records, no password)';
 
 -- Create indexes for faster lookups
 CREATE INDEX IF NOT EXISTS idx_users_phone_number ON users(phone_number) WHERE is_deleted = FALSE;
@@ -115,12 +128,14 @@ CREATE TABLE IF NOT EXISTS menus (
     is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
     modifiers TEXT[],
+    station VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_menus_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     CONSTRAINT fk_menus_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
     CONSTRAINT chk_menus_ingredients CHECK (array_length(ingredients, 1) > 0),
+    CONSTRAINT chk_menus_station CHECK (station IS NULL OR station IN ('kitchen', 'bar')),
     CONSTRAINT chk_menus_discount CHECK (
         (discount_type IS NULL AND discount_value IS NULL)
         OR (
@@ -190,11 +205,15 @@ CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
     icon TEXT,
+    station VARCHAR(20) NOT NULL DEFAULT '',
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT chk_categories_station CHECK (station IN ('', 'kitchen', 'bar'))
 );
+
+COMMENT ON COLUMN categories.station IS 'Default preparation station for items in this category (kitchen/bar), empty if unset';
 
 -- Create index on name for faster lookups
 CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name) WHERE is_deleted = FALSE;
@@ -337,6 +356,45 @@ COMMENT ON TABLE modifier_options IS 'Selectable options for modifier groups (e.
 COMMENT ON TABLE modifier_groups IS 'Modifier groups for menus (e.g. Size, Extras); option IDs in options array';
 
 -- ============================================
+-- TABLE CHECKS TABLE (per-seating tab; folio analog, cashier-settled cash-only)
+-- ============================================
+CREATE TABLE IF NOT EXISTS table_checks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    branch_id UUID NOT NULL,
+    table_number INTEGER NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    vat_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    service_charge_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    payment_method VARCHAR(50) NOT NULL DEFAULT '',
+    settled_by UUID,
+    settled_at TIMESTAMP WITH TIME ZONE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT fk_table_checks_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_table_checks_settled_by FOREIGN KEY (settled_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT chk_table_checks_status CHECK (status IN ('open', 'closed', 'void'))
+);
+
+-- At most one open check per table within a branch.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_table_checks_open_table
+    ON table_checks (branch_id, table_number)
+    WHERE status = 'open' AND is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_table_checks_branch_id ON table_checks(branch_id) WHERE is_deleted = FALSE;
+
+COMMENT ON TABLE table_checks IS 'Per-seating tab aggregating waiter orders for a table; cashier settles it cash-only';
+COMMENT ON COLUMN table_checks.status IS 'Check lifecycle: open, closed (settled), or void';
+
+CREATE TRIGGER update_table_checks_updated_at
+    BEFORE UPDATE ON table_checks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
 -- ORDERS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS orders (
@@ -354,11 +412,17 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_amount DECIMAL(10, 2) DEFAULT 0,
     payment_currency VARCHAR(10) DEFAULT 'ETB',
     payment_transaction_id VARCHAR(255),
+    order_source VARCHAR(20) NOT NULL DEFAULT 'client',
+    waiter_id UUID,
+    check_id UUID,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
-    CONSTRAINT fk_orders_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    CONSTRAINT fk_orders_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_orders_waiter FOREIGN KEY (waiter_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_orders_check FOREIGN KEY (check_id) REFERENCES table_checks(id) ON DELETE SET NULL,
+    CONSTRAINT chk_orders_order_source CHECK (order_source IN ('client', 'waiter'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_order_number ON orders(branch_id, order_number) WHERE is_deleted = FALSE;
@@ -366,6 +430,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_branch_id ON orders(branch_id) WHERE is_de
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_orders_session_key ON orders(session_key) WHERE is_deleted = FALSE AND session_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_branch_status_date ON orders(branch_id, order_status, created_at DESC) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_orders_check_id ON orders(check_id) WHERE is_deleted = FALSE AND check_id IS NOT NULL;
 
 -- ============================================
 -- ORDER ITEMS TABLE
@@ -378,21 +443,31 @@ CREATE TABLE IF NOT EXISTS order_items (
     quantity INTEGER NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
     total DECIMAL(10, 2) NOT NULL,
+    station VARCHAR(20) NOT NULL DEFAULT 'kitchen',
+    item_status VARCHAR(20) NOT NULL DEFAULT 'sent',
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    CONSTRAINT fk_order_items_menu FOREIGN KEY (menu_item_id) REFERENCES menus(id) ON DELETE CASCADE
+    CONSTRAINT fk_order_items_menu FOREIGN KEY (menu_item_id) REFERENCES menus(id) ON DELETE CASCADE,
+    CONSTRAINT chk_order_items_station CHECK (station IN ('kitchen', 'bar')),
+    CONSTRAINT chk_order_items_item_status CHECK (item_status IN ('sent', 'accepted', 'preparing', 'ready', 'cancelled'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_order_items_station_status ON order_items(station, item_status) WHERE is_deleted = FALSE;
 
 COMMENT ON TABLE orders IS 'Stores customer orders; session_key identifies client (QR code), branch_id for restaurant';
 COMMENT ON TABLE order_items IS 'Line items for each order; links to menus (menu_item_id)';
 COMMENT ON COLUMN orders.order_number IS 'Short 6-digit display number shown to guests and staff (100000-999999)';
 COMMENT ON COLUMN orders.session_key IS 'Guest session key from client_sessions; used for client get/list';
-COMMENT ON COLUMN orders.order_status IS 'pending, processing, ready, completed, cancelled';
+COMMENT ON COLUMN orders.order_status IS 'client: pending, processing, ready, completed, cancelled; waiter: placed, in_preparation, ready, served, cancelled';
+COMMENT ON COLUMN orders.order_source IS 'client (guest QR + Chapa) or waiter (tablet, PIN-attributed, no payment)';
+COMMENT ON COLUMN orders.waiter_id IS 'PIN-resolved waiter who placed a waiter order';
+COMMENT ON COLUMN orders.check_id IS 'Table check (tab) this waiter order belongs to';
+COMMENT ON COLUMN order_items.station IS 'Preparation station this line routes to (kitchen/bar)';
+COMMENT ON COLUMN order_items.item_status IS 'Fulfillment state: sent, accepted, preparing, ready, cancelled';
 
 CREATE TRIGGER update_orders_updated_at
     BEFORE UPDATE ON orders

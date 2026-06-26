@@ -96,12 +96,14 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
 			m.discount_type, m.discount_value,
+			NULLIF(COALESCE(NULLIF(m.station, ''), c.station, ''), '') AS station,
 			m.created_at, m.updated_at,
 			COALESCE(o.is_excluded, FALSE) AS is_excluded
 		FROM menus m
 		INNER JOIN branches b ON b.id = $2 AND b.is_deleted = FALSE
 		LEFT JOIN branch_menu_overrides o
 			ON o.menu_id = m.id AND o.branch_id = $2 AND o.is_deleted = FALSE
+		LEFT JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
 		WHERE m.id = $1 AND m.is_deleted = FALSE AND m.branch_id IS NULL
 			AND m.merchant_id = b.merchant_id`
 
@@ -113,6 +115,7 @@ func (r *menuRepository) getMasterForBranch(ctx context.Context, id, branchID st
 			&menu.BranchID, &menu.MerchantID, &menu.IsFasting, &menu.IsChefsChoice, &menu.IsAvailable,
 			&menu.Description, &menu.Price, &menu.Ingredients, &menu.CategoryID,
 			&menu.Modifiers, &menu.PreparationTime, &menu.DiscountType, &menu.DiscountValue,
+			&menu.Station,
 			&menu.CreatedAt, &menu.UpdatedAt,
 			&isExcluded,
 		)
@@ -168,6 +171,7 @@ func (r *menuRepository) Update(ctx context.Context, menu Menu) error {
 		"modifiers":        menu.Modifiers,
 		"discount_type":    menu.DiscountType,
 		"discount_value":   menu.DiscountValue,
+		"station":          menu.Station,
 	}
 	err := r.dal.Update(ctx, filter, updates)
 	if err != nil {
@@ -293,12 +297,14 @@ func (r *menuRepository) listBranchMenus(ctx context.Context, filter common.Filt
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
 			m.discount_type, m.discount_value,
+			NULLIF(COALESCE(NULLIF(m.station, ''), c.station, ''), '') AS station,
 			m.created_at, m.updated_at,
 			COALESCE(o.is_excluded, FALSE) AS is_excluded
 		FROM menus m
 		INNER JOIN branches b ON b.id = $1 AND b.is_deleted = FALSE
 		LEFT JOIN branch_menu_overrides o
 			ON o.menu_id = m.id AND o.branch_id = $1 AND o.is_deleted = FALSE
+		LEFT JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
 		WHERE m.is_deleted = FALSE
 			AND (
 				m.branch_id = $1
@@ -344,6 +350,7 @@ func (r *menuRepository) listBranchMenuRows(ctx context.Context, query string, a
 			&item.Menu.BranchID, &item.Menu.MerchantID, &item.Menu.IsFasting, &item.Menu.IsChefsChoice, &item.Menu.IsAvailable,
 			&item.Menu.Description, &item.Menu.Price, &item.Menu.Ingredients, &item.Menu.CategoryID,
 			&item.Menu.Modifiers, &item.Menu.PreparationTime, &item.Menu.DiscountType, &item.Menu.DiscountValue,
+			&item.Menu.Station,
 			&item.Menu.CreatedAt, &item.Menu.UpdatedAt,
 		}
 		if withMasterFlag {
@@ -387,6 +394,7 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 			COALESCE(o.is_available, m.is_available) AS is_available,
 			m.description, m.price, m.ingredients, m.category_id, m.modifiers, m.preparation_time,
 			m.discount_type, m.discount_value,
+			NULLIF(COALESCE(NULLIF(m.station, ''), c.station, ''), '') AS station,
 			m.created_at, m.updated_at,
 			(m.branch_id IS NULL) AS is_master,
 			COALESCE(o.is_excluded, FALSE) AS is_excluded
@@ -395,6 +403,7 @@ func (r *menuRepository) listAllBranchesEffective(ctx context.Context, filter co
 			AND (m.branch_id = b.id OR (m.branch_id IS NULL AND m.merchant_id = b.merchant_id))
 		LEFT JOIN branch_menu_overrides o
 			ON o.menu_id = m.id AND o.branch_id = b.id AND o.is_deleted = FALSE
+		LEFT JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
 		WHERE b.is_deleted = FALSE
 			AND NOT (m.branch_id IS NULL AND COALESCE(o.is_excluded, FALSE) = TRUE)
 			%s

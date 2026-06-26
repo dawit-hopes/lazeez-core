@@ -14,6 +14,9 @@ import (
 var (
 	accessTokenExpirationMinutes  = 15
 	refreshTokenExpirationMinutes = 60 * 24 * 30
+	// Always-on restaurant station screens (waiter tablet, kitchen, bar, cashier)
+	// keep a 24h access token so they are not logged out mid-shift.
+	stationAccessTokenExpirationMinutes = 60 * 24
 )
 
 type AuthService interface {

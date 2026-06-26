@@ -16,16 +16,20 @@ type BranchMenuSnapshot struct {
 	Price       float64
 	IsAvailable bool
 	IsExcluded  bool
+	// Station is the effective preparation station (menu override or inherited from category).
+	Station string
 }
 
 const getBranchMenuSnapshotsQuery = `
 SELECT m.id::text, m.name, m.price,
 	COALESCE(o.is_available, m.is_available) AS is_available,
-	COALESCE(o.is_excluded, FALSE) AS is_excluded
+	COALESCE(o.is_excluded, FALSE) AS is_excluded,
+	COALESCE(NULLIF(m.station, ''), c.station, '') AS station
 FROM menus m
 INNER JOIN branches b ON b.id = $1 AND b.is_deleted = FALSE
 LEFT JOIN branch_menu_overrides o
 	ON o.menu_id = m.id AND o.branch_id = $1 AND o.is_deleted = FALSE
+LEFT JOIN categories c ON c.id = m.category_id AND c.is_deleted = FALSE
 WHERE m.is_deleted = FALSE
 	AND m.id = ANY($2)
 	AND (
@@ -47,7 +51,7 @@ func (r *menuRepository) GetBranchMenuSnapshots(ctx context.Context, branchID st
 
 	rows, err := common.QueryRows(r.join, ctx, getBranchMenuSnapshotsQuery, []any{branchID, pq.Array(menuIDs)}, func(rows *sql.Rows) (BranchMenuSnapshot, error) {
 		var snap BranchMenuSnapshot
-		if err := rows.Scan(&snap.ID, &snap.Name, &snap.Price, &snap.IsAvailable, &snap.IsExcluded); err != nil {
+		if err := rows.Scan(&snap.ID, &snap.Name, &snap.Price, &snap.IsAvailable, &snap.IsExcluded, &snap.Station); err != nil {
 			return BranchMenuSnapshot{}, err
 		}
 		return snap, nil

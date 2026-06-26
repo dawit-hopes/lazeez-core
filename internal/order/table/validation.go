@@ -43,6 +43,68 @@ func (r *OrderInput) Validate() error {
 	)
 }
 
+func (r *WaiterOrderInput) Validate() error {
+	return validation.ValidateStruct(r,
+		validation.Field(&r.TableNumber,
+			validation.Required.Error("table number is required"),
+			validation.Min(1).Error("table number must be at least 1"),
+			validation.Max(999).Error("table number must be at most 999"),
+		),
+		validation.Field(&r.WaiterPIN,
+			validation.Required.Error("waiter pin is required"),
+		),
+		validation.Field(&r.OrderItems,
+			validation.Required.Error("order items are required"),
+			validation.Length(1, 100).Error("at least one order item is required"),
+			validation.Each(validation.By(func(value interface{}) error {
+				oi, ok := value.(WaiterOrderItemInput)
+				if !ok {
+					return nil
+				}
+				return validation.ValidateStruct(&oi,
+					validation.Field(&oi.MenuItemID, validation.Required.Error("menu item id is required")),
+					validation.Field(&oi.Quantity,
+						validation.Required.Error("quantity is required"),
+						validation.Min(1).Error("quantity must be at least 1"),
+					),
+				)
+			})),
+		),
+	)
+}
+
+// WaiterUpdateInput is the waiter's serve/cancel request for an order they placed.
+type WaiterUpdateInput struct {
+	OrderStatus        string `json:"order_status"`
+	CancellationReason string `json:"cancellation_reason,omitempty"`
+}
+
+func (r *WaiterUpdateInput) Validate() error {
+	return validation.ValidateStruct(r,
+		validation.Field(&r.OrderStatus,
+			validation.Required.Error("order status is required"),
+			validation.In(
+				string(StatusServed),
+				string(StatusCancelled),
+			).Error("waiter can only mark an order served or cancelled"),
+		),
+	)
+}
+
+func (r *ItemStatusUpdateInput) Validate() error {
+	return validation.ValidateStruct(r,
+		validation.Field(&r.ItemStatus,
+			validation.Required.Error("item status is required"),
+			validation.In(
+				ItemStatusAccepted,
+				ItemStatusPreparing,
+				ItemStatusReady,
+				ItemStatusCancelled,
+			).Error("invalid item status"),
+		),
+	)
+}
+
 func (r *OrderUpdateInput) Validate() error {
 	return validation.ValidateStruct(r,
 		validation.Field(&r.OrderStatus,

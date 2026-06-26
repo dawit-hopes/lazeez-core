@@ -11,6 +11,8 @@ import (
 	"lazeez-core/config"
 	"lazeez-core/internal/common"
 	item "lazeez-core/internal/order/Item"
+
+	"github.com/lib/pq"
 )
 
 type OrderRepository interface {
@@ -29,6 +31,20 @@ type OrderRepository interface {
 	CheckExists(ctx context.Context, tableNumber int, branchID string) error
 	GetBranchIDByReference(ctx context.Context, reference string) (string, error)
 	OrderNumberExists(ctx context.Context, branchID string, orderNumber int) (bool, error)
+	ListWaiterByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error)
+	ListStationItems(ctx context.Context, branchID, station string) ([]*StationItemDTO, error)
+	GetItemContext(ctx context.Context, itemID string) (OrderItemContext, error)
+}
+
+// OrderItemContext is the minimal order/item state a station needs to advance an item.
+type OrderItemContext struct {
+	ItemID      string
+	OrderID     string
+	BranchID    string
+	OrderSource string
+	Station     string
+	ItemStatus  string
+	CheckID     string
 }
 
 type orderRepository struct {
@@ -46,6 +62,7 @@ const orderWithRelations = `
 SELECT 
 	o.id, o.order_number, o.table_number, o.branch_id, o.session_key, o.order_status, o.cancellation_reason, o.total, o.payment_method, o.payment_status,
 	o.payment_date, o.payment_amount, o.payment_currency, o.payment_transaction_id,
+	o.order_source, o.waiter_id, o.check_id,
 	o.created_at, o.updated_at,
 	COALESCE(items.agg, '[]'::json)::text AS order_items
 FROM orders o
@@ -53,7 +70,8 @@ LEFT JOIN LATERAL (
 	SELECT json_agg(json_build_object(
 		'id', oi.id, 'menu_item_id', oi.menu_item_id, 'name', m.name,
 		'modifier_options', oi.modifier_options,
-		'quantity', oi.quantity, 'price', oi.price, 'total', oi.total
+		'quantity', oi.quantity, 'price', oi.price, 'total', oi.total,
+		'station', oi.station, 'item_status', oi.item_status
 	)) AS agg
 	FROM order_items oi
 	LEFT JOIN menus m ON m.id = oi.menu_item_id AND m.is_deleted = FALSE
@@ -310,6 +328,69 @@ func (r *orderRepository) ListBySessionKey(ctx context.Context, filter OrderFilt
 	return r.listOrders(ctx, filter, " AND o.session_key = $1 ", []any{sessionKey}, "o.created_at DESC")
 }
 
+func (r *orderRepository) ListWaiterByBranch(ctx context.Context, filter OrderFilter, branchID string) (*common.PaginatedResponse[[]*OrderDTO], error) {
+	return r.listOrders(ctx, filter, " AND o.branch_id = $1 AND o.order_source = 'waiter' ", []any{branchID}, "o.created_at DESC")
+}
+
+func (r *orderRepository) ListStationItems(ctx context.Context, branchID, station string) ([]*StationItemDTO, error) {
+	const query = `
+		SELECT oi.id, oi.order_id, o.order_number, o.table_number, oi.menu_item_id, m.name,
+			oi.quantity, oi.modifier_options, oi.station, oi.item_status, oi.created_at
+		FROM order_items oi
+		INNER JOIN orders o ON o.id = oi.order_id AND o.is_deleted = FALSE
+			AND o.order_source = 'waiter' AND o.order_status <> 'cancelled'
+		LEFT JOIN menus m ON m.id = oi.menu_item_id AND m.is_deleted = FALSE
+		WHERE o.branch_id = $1 AND oi.station = $2 AND oi.is_deleted = FALSE
+			AND oi.item_status IN ('sent', 'accepted', 'preparing')
+		ORDER BY oi.created_at ASC`
+
+	results, err := common.QueryRows(r.joinDAL, ctx, query, []any{branchID, station}, func(rows *sql.Rows) (*StationItemDTO, error) {
+		var dto StationItemDTO
+		var name sql.NullString
+		var mods pq.StringArray
+		if err := rows.Scan(
+			&dto.ID, &dto.OrderID, &dto.OrderNumber, &dto.TableNumber, &dto.MenuItemID, &name,
+			&dto.Quantity, &mods, &dto.Station, &dto.ItemStatus, &dto.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if name.Valid {
+			dto.Name = name.String
+		}
+		dto.ModifierOptions = []string(mods)
+		if dto.ModifierOptions == nil {
+			dto.ModifierOptions = []string{}
+		}
+		return &dto, nil
+	})
+	if err != nil {
+		r.logger.Error("failed to list station items", "error", err)
+		return nil, common.ErrInternalServerError
+	}
+	return results, nil
+}
+
+func (r *orderRepository) GetItemContext(ctx context.Context, itemID string) (OrderItemContext, error) {
+	const query = `
+		SELECT oi.id, oi.order_id, o.branch_id, o.order_source, oi.station, oi.item_status, COALESCE(o.check_id::text, '')
+		FROM order_items oi
+		INNER JOIN orders o ON o.id = oi.order_id AND o.is_deleted = FALSE
+		WHERE oi.id = $1 AND oi.is_deleted = FALSE
+		LIMIT 1`
+	var c OrderItemContext
+	err := r.joinDAL.QueryRow(ctx, query, []any{itemID}, func(row *sql.Row) error {
+		return row.Scan(&c.ItemID, &c.OrderID, &c.BranchID, &c.OrderSource, &c.Station, &c.ItemStatus, &c.CheckID)
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return OrderItemContext{}, common.ErrOrderItemNotFound
+		}
+		r.logger.Error("failed to get order item context", "error", err)
+		return OrderItemContext{}, common.ErrInternalServerError
+	}
+	return c, nil
+}
+
 func (r *orderRepository) OrderNumberExists(ctx context.Context, branchID string, orderNumber int) (bool, error) {
 	filter := map[string]any{
 		"branch_id":     branchID,
@@ -359,11 +440,12 @@ func (r *orderRepository) CheckExists(ctx context.Context, tableNumber int, bran
 
 func (r *orderRepository) scanOrderWithRelations(row *sql.Row, dto *OrderDTO) error {
 	var orderItemsJSON []byte
-	var cancellationReason sql.NullString
+	var cancellationReason, waiterID, checkID sql.NullString
 	err := row.Scan(
 		&dto.ID, &dto.OrderNumber, &dto.TableNumber, &dto.BranchID, &dto.SessionKey, &dto.OrderStatus, &cancellationReason, &dto.Total,
 		&dto.PaymentMethod, &dto.PaymentStatus, &dto.PaymentDate, &dto.PaymentAmount,
 		&dto.PaymentCurrency, &dto.PaymentTransactionID,
+		&dto.OrderSource, &waiterID, &checkID,
 		&dto.CreatedAt, &dto.UpdatedAt,
 		&orderItemsJSON,
 	)
@@ -372,17 +454,24 @@ func (r *orderRepository) scanOrderWithRelations(row *sql.Row, dto *OrderDTO) er
 	}
 	if cancellationReason.Valid {
 		dto.CancellationReason = cancellationReason.String
+	}
+	if waiterID.Valid {
+		dto.WaiterID = waiterID.String
+	}
+	if checkID.Valid {
+		dto.CheckID = checkID.String
 	}
 	return r.unmarshalOrderItems(dto, orderItemsJSON)
 }
 
 func (r *orderRepository) scanOrderWithRelationsFromRows(rows *sql.Rows, dto *OrderDTO) error {
 	var orderItemsJSON []byte
-	var cancellationReason sql.NullString
+	var cancellationReason, waiterID, checkID sql.NullString
 	err := rows.Scan(
 		&dto.ID, &dto.OrderNumber, &dto.TableNumber, &dto.BranchID, &dto.SessionKey, &dto.OrderStatus, &cancellationReason, &dto.Total,
 		&dto.PaymentMethod, &dto.PaymentStatus, &dto.PaymentDate, &dto.PaymentAmount,
 		&dto.PaymentCurrency, &dto.PaymentTransactionID,
+		&dto.OrderSource, &waiterID, &checkID,
 		&dto.CreatedAt, &dto.UpdatedAt,
 		&orderItemsJSON,
 	)
@@ -391,6 +480,12 @@ func (r *orderRepository) scanOrderWithRelationsFromRows(rows *sql.Rows, dto *Or
 	}
 	if cancellationReason.Valid {
 		dto.CancellationReason = cancellationReason.String
+	}
+	if waiterID.Valid {
+		dto.WaiterID = waiterID.String
+	}
+	if checkID.Valid {
+		dto.CheckID = checkID.String
 	}
 	return r.unmarshalOrderItems(dto, orderItemsJSON)
 }

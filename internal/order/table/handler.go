@@ -26,6 +26,16 @@ type OrderHandler interface {
 	ListAdmin(w http.ResponseWriter, r *http.Request)
 	UpdateAdmin(w http.ResponseWriter, r *http.Request)
 
+	// Waiter handlers (waiter device token + per-order PIN)
+	CreateWaiter(w http.ResponseWriter, r *http.Request)
+	GetWaiter(w http.ResponseWriter, r *http.Request)
+	ListWaiter(w http.ResponseWriter, r *http.Request)
+	UpdateWaiter(w http.ResponseWriter, r *http.Request)
+
+	// Station handlers (kitchen/bar KDS)
+	ListStationItems(w http.ResponseWriter, r *http.Request)
+	UpdateItemStatus(w http.ResponseWriter, r *http.Request)
+
 	// webhook handlers
 	ProcessPaymentWebHook(w http.ResponseWriter, r *http.Request)
 }
@@ -334,6 +344,213 @@ func (h *orderHandler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 		Message:    "Order updated successfully",
 		StatusCode: http.StatusOK,
 	})
+}
+
+// --- Waiter ---
+
+func (h *orderHandler) CreateWaiter(w http.ResponseWriter, r *http.Request) {
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	var req WaiterOrderInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode request", "error", err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+
+	if err := req.Validate(); err != nil {
+		h.logger.Error("Failed to validate waiter order request", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	order, err := h.orderService.CreateWaiter(r.Context(), branchID, req)
+	if err != nil {
+		h.logger.Error("Failed to create waiter order", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       order,
+		Message:    "Order placed successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *orderHandler) GetWaiter(w http.ResponseWriter, r *http.Request) {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	order, err := h.orderService.GetWaiter(r.Context(), id, branchID)
+	if err != nil {
+		h.logger.Error("Failed to get waiter order", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       order,
+		Message:    "Order fetched successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *orderHandler) ListWaiter(w http.ResponseWriter, r *http.Request) {
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	filter := ParseOrderFilter(r)
+	result, err := h.orderService.ListWaiter(r.Context(), filter, branchID)
+	if err != nil {
+		h.logger.Error("Failed to list waiter orders", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       result.Data,
+		Meta:       &result.Meta,
+		Message:    "Orders fetched successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *orderHandler) UpdateWaiter(w http.ResponseWriter, r *http.Request) {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	var req WaiterUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode request", "error", err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+
+	if err := req.Validate(); err != nil {
+		h.logger.Error("Failed to validate waiter order update", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	if err := h.orderService.UpdateWaiter(r.Context(), id, req, branchID); err != nil {
+		h.logger.Error("Failed to update waiter order", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Message:    "Order updated successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+// --- Station (KDS) ---
+
+func (h *orderHandler) ListStationItems(w http.ResponseWriter, r *http.Request) {
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	station := r.URL.Query().Get("station")
+	if station == "" {
+		role, _ := middleware.GetRoleFromContext(r.Context())
+		station = stationForRole(role)
+	}
+	if station == "" {
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+
+	items, err := h.orderService.ListStationItems(r.Context(), branchID, station)
+	if err != nil {
+		h.logger.Error("Failed to list station items", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Data:       items,
+		Message:    "Station items fetched successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+func (h *orderHandler) UpdateItemStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := common.ParseID(r, "id")
+	if err != nil {
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	branchID, ok := middleware.GetBranchIDFromContext(r.Context())
+	if !ok || branchID == "" {
+		common.WriteErrorResponse(w, common.ErrUnAuthorized)
+		return
+	}
+
+	var req ItemStatusUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode request", "error", err)
+		common.WriteErrorResponse(w, common.ErrInvalidRequest)
+		return
+	}
+	if err := req.Validate(); err != nil {
+		h.logger.Error("Failed to validate item status update", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	role, _ := middleware.GetRoleFromContext(r.Context())
+	station := stationForRole(role)
+
+	if err := h.orderService.UpdateItemStatus(r.Context(), id, branchID, station, req.ItemStatus); err != nil {
+		h.logger.Error("Failed to update item status", "error", err)
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	common.WriteSuccessResponse(w, common.Response{
+		Message:    "Item status updated successfully",
+		StatusCode: http.StatusOK,
+	})
+}
+
+// stationForRole restricts a staff member to their own station; branch managers
+// (and any non-station role) are unrestricted (empty station).
+func stationForRole(role string) string {
+	switch role {
+	case "kitchen_staff":
+		return StationKitchen
+	case "barista":
+		return StationBar
+	default:
+		return ""
+	}
 }
 
 func (h *orderHandler) ProcessPaymentWebHook(w http.ResponseWriter, r *http.Request) {

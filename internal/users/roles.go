@@ -7,12 +7,17 @@ var ValidRoles = []Role{
 	RoleSuperBranchManager,
 	RoleFrontDeskAgent,
 	RoleRoomServiceStaff,
+	RoleWaiter,
+	RoleKitchenStaff,
+	RoleBarista,
+	RoleCashier,
 }
 
 // IsBranchStaffRole reports roles scoped to a single branch (require branch_id and merchant at login).
 func IsBranchStaffRole(r Role) bool {
 	switch r {
-	case RoleBranchManager, RoleFrontDeskAgent, RoleRoomServiceStaff:
+	case RoleBranchManager, RoleFrontDeskAgent, RoleRoomServiceStaff,
+		RoleWaiter, RoleKitchenStaff, RoleBarista, RoleCashier:
 		return true
 	default:
 		return false
@@ -63,7 +68,7 @@ func CreatableRoles(creator Role, branchType BranchType) []Role {
 		if branchType == BranchTypeHotel {
 			return []Role{RoleFrontDeskAgent, RoleRoomServiceStaff}
 		}
-		return nil
+		return []Role{RoleWaiter, RoleKitchenStaff, RoleBarista, RoleCashier}
 	default:
 		return nil
 	}

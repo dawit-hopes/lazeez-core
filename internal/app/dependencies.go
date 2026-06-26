@@ -20,6 +20,7 @@ import (
 	modgroup "lazeez-core/internal/modifiers/group"
 	modoption "lazeez-core/internal/modifiers/option"
 	item "lazeez-core/internal/order/Item"
+	"lazeez-core/internal/order/check"
 	roomorder "lazeez-core/internal/order/room"
 	order "lazeez-core/internal/order/table"
 	"lazeez-core/internal/payment"
@@ -80,6 +81,7 @@ type Dependencies struct {
 	FolioService          folio.FolioService
 	RoomSessionService    roomsession.RoomSessionService
 	RoomOrderService      roomorder.RoomOrderService
+	CheckService          check.CheckService
 	PaymentService        payment.PaymentService
 	PromotionService      promotion.PromotionService
 	FeedbackService       feedback.FeedbackService
@@ -101,6 +103,7 @@ type Dependencies struct {
 	FolioHandler         folio.FolioHandler
 	RoomSessionHandler   roomsession.RoomSessionHandler
 	RoomOrderHandler     roomorder.RoomOrderHandler
+	CheckHandler         check.CheckHandler
 	PromotionHandler     promotion.PromotionHandler
 	FeedbackHandler      feedback.FeedbackHandler
 
@@ -128,6 +131,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	modifierOptionDAL := common.NewDAL(db, func() *modoption.ModifierOption { return &modoption.ModifierOption{} })
 	orderDAL := common.NewDAL(db, func() *order.Order { return &order.Order{} })
 	orderItemDAL := common.NewDAL(db, func() *item.OrderItem { return &item.OrderItem{} })
+	tableCheckDAL := common.NewDAL(db, func() *check.TableCheck { return &check.TableCheck{} })
 	tableDAL := common.NewDAL(db, func() *table.Table { return &table.Table{} })
 	roomDAL := common.NewDAL(db, func() *rooms.Room { return &rooms.Room{} })
 	singleRoomDAL := common.NewDAL(db, func() *room.Room { return &room.Room{} })
@@ -157,6 +161,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	modifierOptionRepo := modoption.NewModifierOptionRepository(modifierOptionDAL, joinDAL, logger)
 	orderRepo := order.NewOrderRepository(orderDAL, joinDAL, logger)
 	orderItemRepo := item.NewOrderItemRepository(orderItemDAL, logger)
+	checkRepo := check.NewCheckRepository(tableCheckDAL, joinDAL, logger)
 	tableRepo := table.NewTableRepository(tableDAL, logger)
 	roomRepo := rooms.NewRoomRepository(roomDAL, joinDAL, logger)
 	singleRoomRepo := room.NewRoomRepository(singleRoomDAL, joinDAL, logger)
@@ -172,7 +177,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	paymentService := payment.NewPaymentService(chapaSecretKey, chapaInitialURL, verifyURL, webhookSecret, logger)
 	branchService := branch.NewBranchService(branchRepo, logger)
 	sessionService := session.NewSessionService(sessionRepo, logger)
-	userService := users.NewUserService(userRepo, branchService, logger)
+	userService := users.NewUserService(userRepo, branchService, keyService, logger)
 	authService := auth.NewAuthService(userService, sessionService, keyService, logger, secretKey)
 	merchantService := merchant.NewMerchantService(merchantRepo, fileService, logger)
 	roomTypeService := rooms.NewRoomTypeService(roomRepo, branchService, merchantService, fileService, logger)
@@ -187,7 +192,8 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	menuService := menu.NewMenuService(menuRepo, fileService, categoryService, branchService, ingredientService, modifierGroupService, modifierOptionService, singleRoomService, bookingService, promotionService, logger)
 	orderItemService := item.NewOrderItemService(orderItemRepo, logger)
 	clientSessionService := clientsession.NewClientSessionService(clientSessionRepo, logger)
-	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, logger, callbackURL, menuBaseURL)
+	checkService := check.NewCheckService(checkRepo, logger)
+	orderService := order.NewOrderService(orderRepo, orderItemService, menuService, modifierOptionService, clientSessionService, paymentService, userService, checkService, logger, callbackURL, menuBaseURL)
 	feedbackService := feedback.NewFeedbackService(feedbackRepo, orderRepo, clientSessionService, logger)
 	tableService := table.NewTableService(tableRepo, fileService, branchService, logger)
 	roomSessionService := roomsession.NewRoomSessionService(roomSessionRepo, singleRoomRepo, bookingService, logger)
@@ -210,6 +216,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 	folioHandler := folio.NewFolioHandler(folioService, logger)
 	roomSessionHandler := roomsession.NewRoomSessionHandler(roomSessionService, logger)
 	roomOrderHandler := roomorder.NewRoomOrderHandler(roomOrderService, logger)
+	checkHandler := check.NewCheckHandler(checkService, logger)
 	promotionHandler := promotion.NewPromotionHandler(promotionService, userService, logger)
 	feedbackHandler := feedback.NewFeedbackHandler(feedbackService, logger)
 
@@ -255,6 +262,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		FolioService:          folioService,
 		RoomSessionService:    roomSessionService,
 		RoomOrderService:      roomOrderService,
+		CheckService:          checkService,
 		PaymentService:        paymentService,
 		PromotionService:      promotionService,
 		FeedbackService:       feedbackService,
@@ -274,6 +282,7 @@ func initializeDependencies(db *sql.DB, logger config.Logger, callbackURL string
 		FolioHandler:          folioHandler,
 		RoomSessionHandler:    roomSessionHandler,
 		RoomOrderHandler:      roomOrderHandler,
+		CheckHandler:          checkHandler,
 		PromotionHandler:      promotionHandler,
 		FeedbackHandler:       feedbackHandler,
 		Middleware:            middleware,
@@ -309,6 +318,7 @@ func registerRoutes(router chi.Router, deps *Dependencies) {
 	folio.NewFolioRoutes(router, deps.FolioHandler, deps.Middleware)
 	roomsession.NewRoomSessionRoutes(router, deps.RoomSessionHandler, deps.Middleware)
 	roomorder.NewRoomOrderRoutes(router, deps.RoomOrderHandler, deps.Middleware)
+	check.NewCheckRoutes(router, deps.CheckHandler, deps.Middleware)
 	promotion.NewPromotionRoutes(router, deps.PromotionHandler, deps.Middleware)
 	feedback.NewFeedbackRoutes(router, deps.FeedbackHandler, deps.Middleware)
 }

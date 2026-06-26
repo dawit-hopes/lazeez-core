@@ -1,6 +1,7 @@
 package order
 
 import (
+	"database/sql"
 	"lazeez-core/internal/common"
 	"time"
 )
@@ -20,7 +21,11 @@ type Order struct {
 	PaymentAmount        float64   `json:"payment_amount" db:"payment_amount"`
 	PaymentCurrency      string    `json:"payment_currency" db:"payment_currency"`
 	PaymentTransactionID string    `json:"payment_transaction_id" db:"payment_transaction_id"`
-	OrderItems           []string  `json:"order_items" db:"order_items"`
+	// OrderSource distinguishes guest QR orders ("client") from waiter orders ("waiter").
+	OrderSource string         `json:"order_source" db:"order_source"`
+	WaiterID    sql.NullString `json:"waiter_id" db:"waiter_id"`
+	CheckID     sql.NullString `json:"check_id" db:"check_id"`
+	OrderItems  []string       `json:"order_items" db:"order_items"`
 }
 
 func (o *Order) Table() string {
@@ -28,15 +33,15 @@ func (o *Order) Table() string {
 }
 
 func (o *Order) Columns() []string {
-	return []string{"id", "order_number", "table_number", "branch_id", "session_key", "order_status", "cancellation_reason", "total", "payment_method", "payment_status", "payment_date", "payment_amount", "payment_currency", "payment_transaction_id", "deleted_at", "is_deleted"}
+	return []string{"id", "order_number", "table_number", "branch_id", "session_key", "order_status", "cancellation_reason", "total", "payment_method", "payment_status", "payment_date", "payment_amount", "payment_currency", "payment_transaction_id", "order_source", "waiter_id", "check_id", "deleted_at", "is_deleted"}
 }
 
 func (o *Order) Values() []any {
-	return []any{o.ID, o.OrderNumber, o.TableNumber, o.BranchID, o.SessionKey, o.OrderStatus, o.CancellationReason, o.Total, o.PaymentMethod, o.PaymentStatus, o.PaymentDate, o.PaymentAmount, o.PaymentCurrency, o.PaymentTransactionID, o.DeletedAt, o.IsDeleted}
+	return []any{o.ID, o.OrderNumber, o.TableNumber, o.BranchID, o.SessionKey, o.OrderStatus, o.CancellationReason, o.Total, o.PaymentMethod, o.PaymentStatus, o.PaymentDate, o.PaymentAmount, o.PaymentCurrency, o.PaymentTransactionID, o.OrderSource, o.WaiterID, o.CheckID, o.DeletedAt, o.IsDeleted}
 }
 
 func (o *Order) Addr() []any {
-	return []any{&o.ID, &o.OrderNumber, &o.TableNumber, &o.BranchID, &o.SessionKey, &o.OrderStatus, &o.CancellationReason, &o.Total, &o.PaymentMethod, &o.PaymentStatus, &o.PaymentDate, &o.PaymentAmount, &o.PaymentCurrency, &o.PaymentTransactionID, &o.DeletedAt, &o.IsDeleted, &o.CreatedAt, &o.UpdatedAt}
+	return []any{&o.ID, &o.OrderNumber, &o.TableNumber, &o.BranchID, &o.SessionKey, &o.OrderStatus, &o.CancellationReason, &o.Total, &o.PaymentMethod, &o.PaymentStatus, &o.PaymentDate, &o.PaymentAmount, &o.PaymentCurrency, &o.PaymentTransactionID, &o.OrderSource, &o.WaiterID, &o.CheckID, &o.DeletedAt, &o.IsDeleted, &o.CreatedAt, &o.UpdatedAt}
 }
 
 func (o *Order) ToDTO() OrderDTO {
@@ -55,5 +60,32 @@ func (o *Order) ToDTO() OrderDTO {
 		PaymentAmount:        o.PaymentAmount,
 		PaymentCurrency:      o.PaymentCurrency,
 		PaymentTransactionID: o.PaymentTransactionID,
+		OrderSource:          o.OrderSource,
+		WaiterID:             o.waiterID(),
+		CheckID:              o.checkID(),
 	}
+}
+
+// SetWaiterID stores the resolved waiter, leaving it NULL when empty.
+func (o *Order) SetWaiterID(id string) {
+	o.WaiterID = sql.NullString{String: id, Valid: id != ""}
+}
+
+// SetCheckID associates the order with a table check, leaving it NULL when empty.
+func (o *Order) SetCheckID(id string) {
+	o.CheckID = sql.NullString{String: id, Valid: id != ""}
+}
+
+func (o *Order) waiterID() string {
+	if o.WaiterID.Valid {
+		return o.WaiterID.String
+	}
+	return ""
+}
+
+func (o *Order) checkID() string {
+	if o.CheckID.Valid {
+		return o.CheckID.String
+	}
+	return ""
 }
